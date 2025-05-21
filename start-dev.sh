@@ -8,16 +8,16 @@ pkill -f "uvicorn api:app" || true
 clear
 
 # Start the FastAPI server
-echo "Starting Python FastAPI server on port 8001..."
-cd invoice-extraction
+echo "Starting Python FastAPI server on port 8000..."
+cd backend
 
 # Check if Python dependencies are installed
 echo "Checking Python dependencies..."
 pip install -r requirements.txt
 
 # Start the FastAPI server in the background
-echo "Starting FastAPI server at http://localhost:8001"
-python -m uvicorn api:app --host 0.0.0.0 --port 8001 &
+echo "Starting FastAPI server at http://localhost:8000"
+python -m uvicorn api:app --host 0.0.0.0 --port 8000 &
 PYTHON_PID=$!
 
 # Wait for the FastAPI server to start
@@ -27,7 +27,7 @@ sleep 3
 # Verify the server is running
 echo "Checking if FastAPI server is running..."
 for i in {1..5}; do
-  if curl -s http://localhost:8001/health > /dev/null; then
+  if curl -s http://localhost:8000/health > /dev/null; then
     echo "✅ FastAPI server is running!"
     break
   fi
