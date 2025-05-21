@@ -1,0 +1,10 @@
+anthropic
+pymupdf
+opencv-python
+numpy
+python-dotenv
+boto3
+pillow
+fastapi
+uvicorn
+python-multipart 

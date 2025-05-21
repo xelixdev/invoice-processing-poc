@@ -1,0 +1,28 @@
+PO_Number,Date,Vendor_ID,Vendor_Name,Company_ID,Company_Name,Item_Code,Description,Quantity,Unit_Price,Total,Required_Delivery_Date,Currency,PO_Status
+PO-20250105-001,2025-01-05,V001,Your Office LLC,C001,Smith Consulting,CH-002,Office Chair - Standard,4,75.00,300.00,2025-01-12,USD,Approved
+PO-20250105-001,2025-01-05,V001,Your Office LLC,C001,Smith Consulting,DK-002,Office Desk - Standard,3,200.00,600.00,2025-01-12,USD,Approved
+PO-20250105-001,2025-01-05,V001,Your Office LLC,C001,Smith Consulting,TV-002,Office TV - 43",2,500.00,1000.00,2025-01-12,USD,Approved
+PO-20250105-001,2025-01-05,V001,Your Office LLC,C001,Smith Consulting,SF-001,Office Couch - 3-seater,1,750.00,750.00,2025-01-12,USD,Approved
+PO-20250105-001,2025-01-05,V001,Your Office LLC,C001,Smith Consulting,LM-002,Office Lamp - Desk,5,25.00,125.00,2025-01-12,USD,Approved
+PO-20250105-001,2025-01-05,V001,Your Office LLC,C001,Smith Consulting,WD-001,Office Water Dispenser,1,280.00,280.00,2025-01-12,USD,Approved
+PO-20250107-002,2025-01-07,V002,Tech Solutions Inc.,C001,Smith Consulting,PC-001,Desktop Computer,5,850.00,4250.00,2025-01-17,USD,Approved
+PO-20250107-002,2025-01-07,V002,Tech Solutions Inc.,C001,Smith Consulting,PR-001,Laser Printer - Color,2,450.00,900.00,2025-01-17,USD,Approved
+PO-20250107-002,2025-01-07,V002,Tech Solutions Inc.,C001,Smith Consulting,LP-001,Laptop - Standard,3,950.00,2850.00,2025-01-17,USD,Approved
+PO-20250107-002,2025-01-07,V002,Tech Solutions Inc.,C001,Smith Consulting,CB-001,Network Cable - Cat6,20,15.00,300.00,2025-01-17,USD,Approved
+PO-20250110-003,2025-01-10,V003,Furniture Depot,C002,Johnson Technologies,DK-001,Office Desk - Executive,2,350.00,700.00,2025-01-20,USD,Approved
+PO-20250110-003,2025-01-10,V003,Furniture Depot,C002,Johnson Technologies,CH-001,Office Chair - Executive,2,175.00,350.00,2025-01-20,USD,Approved
+PO-20250110-003,2025-01-10,V003,Furniture Depot,C002,Johnson Technologies,BK-001,Office Bookshelf,3,180.00,540.00,2025-01-20,USD,Approved
+PO-20250112-004,2025-01-12,V004,Office Supplies Co.,C003,Williams Enterprises,PP-001,Copy Paper - A4,50,4.50,225.00,2025-01-19,USD,Approved
+PO-20250112-004,2025-01-12,V004,Office Supplies Co.,C003,Williams Enterprises,PN-001,Whiteboard Pen Set,10,12.00,120.00,2025-01-19,USD,Approved
+PO-20250115-005,2025-01-15,V005,Electronics Warehouse,C004,Taylor Industries,TV-001,Office TV - 55",5,700.00,3500.00,2025-01-25,USD,Approved
+PO-20250115-005,2025-01-15,V005,Electronics Warehouse,C004,Taylor Industries,PR-001,Laser Printer - Color,3,450.00,1350.00,2025-01-25,USD,Approved
+PO-20250118-006,2025-01-18,V001,Your Office LLC,C005,Miller Associates,CH-002,Office Chair - Standard,10,75.00,750.00,2025-01-28,USD,Approved
+PO-20250118-006,2025-01-18,V001,Your Office LLC,C005,Miller Associates,DK-002,Office Desk - Standard,8,200.00,1600.00,2025-01-28,USD,Approved
+PO-20250118-006,2025-01-18,V001,Your Office LLC,C005,Miller Associates,LM-002,Office Lamp - Desk,15,25.00,375.00,2025-01-28,USD,Approved
+PO-20250120-007,2025-01-20,V002,Tech Solutions Inc.,C001,Smith Consulting,SW-001,Office Software License,25,200.00,5000.00,2025-02-01,USD,Approved
+PO-20250125-008,2025-01-25,V003,Furniture Depot,C003,Williams Enterprises,SF-002,Office Sofa - 2-seater,4,550.00,2200.00,2025-02-05,USD,Approved
+PO-20250125-008,2025-01-25,V003,Furniture Depot,C003,Williams Enterprises,LM-001,Office Lamp - Floor,6,45.00,270.00,2025-02-05,USD,Approved
+PO-20250128-009,2025-01-28,V004,Office Supplies Co.,C004,Taylor Industries,PP-001,Copy Paper - A4,100,4.50,450.00,2025-02-08,USD,Approved
+PO-20250128-009,2025-01-28,V004,Office Supplies Co.,C004,Taylor Industries,PN-001,Whiteboard Pen Set,25,12.00,300.00,2025-02-08,USD,Approved
+PO-20250201-010,2025-02-01,V005,Electronics Warehouse,C005,Miller Associates,LP-001,Laptop - Standard,5,950.00,4750.00,2025-02-11,USD,Approved
+PO-20250201-010,2025-02-01,V005,Electronics Warehouse,C005,Miller Associates,CB-001,Network Cable - Cat6,30,15.00,450.00,2025-02-11,USD,Approved
