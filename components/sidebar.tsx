@@ -14,7 +14,7 @@ export default function Sidebar() {
     <div className="w-16 flex flex-col bg-[#0f0629] text-white">
       <div className="h-16 flex items-center justify-center">
         <Link href="/" className="flex items-center justify-center">
-          <img src="/images/xelix-logo-purple.svg" alt="Logo" className="w-8 h-8" />
+          <img src="/xelix_logo.svg" alt="Logo" className="w-8 h-8" />
         </Link>
       </div>
       <nav className="flex-1 flex flex-col items-center py-4 gap-6">
