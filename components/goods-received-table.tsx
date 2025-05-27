@@ -26,11 +26,11 @@ export default function GoodsReceivedTable() {
   }, [])
 
   if (loading) {
-    return <div className="flex justify-center items-center h-64">Loading goods received notes...</div>
+    return <div className="flex justify-center items-center h-64">Loading goods receipt notes...</div>
   }
 
   if (goodsReceived.length === 0) {
-    return <div className="flex justify-center items-center h-64">No goods received notes found.</div>
+    return <div className="flex justify-center items-center h-64">No goods receipt notes found.</div>
   }
 
   return (

@@ -1,4 +1,6 @@
-import { Search, SlidersHorizontal, Bell } from "lucide-react"
+import { Search, Bell } from "lucide-react"
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { faFilter } from '@fortawesome/free-solid-svg-icons'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -14,7 +16,7 @@ export default function Dashboard() {
         <header className="border-b">
           <div className="flex h-16 items-center px-4 gap-6">
             <nav className="flex items-center space-x-4 lg:space-x-6">
-              <a href="#" className="text-sm font-medium transition-colors hover:text-primary">
+              <a href="#" className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary">
                 Dashboard
               </a>
               <a
@@ -33,10 +35,7 @@ export default function Dashboard() {
                 href="/goods-received"
                 className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
               >
-                Goods Received Notes
-              </a>
-              <a href="#" className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary">
-                Reports
+                Goods Receipt Notes
               </a>
             </nav>
             <div className="ml-auto flex items-center space-x-4">
@@ -56,30 +55,30 @@ export default function Dashboard() {
           </div>
           <div className="flex flex-col gap-6">
             <div className="flex flex-col sm:flex-row gap-4 justify-between">
-              <div className="relative w-full max-w-md">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input type="search" placeholder="Search invoices..." className="w-full pl-8 bg-white" />
-              </div>
-              <div className="flex gap-4">
-                <Button variant="outline" className="flex items-center gap-2">
-                  <SlidersHorizontal className="h-4 w-4" />
-                  Columns & Filters
+              <div className="flex gap-4 items-center">
+                <div className="relative w-full max-w-xl">
+                  <Search className="absolute left-2.5 top-2.5 h-5 w-4 text-muted-foreground" />
+                  <Input type="search" placeholder="Search invoices..." className="w-full pl-8 bg-white" />
+                </div>
+                <Button variant="outline" className="flex items-center gap-2 border-violet-600 text-violet-600 hover:bg-violet-50">
+                  <FontAwesomeIcon icon={faFilter} className="h-4 w-4" />
+                    Columns & Filters
                 </Button>
-                <Tabs defaultValue="all" className="w-fit">
-                  <TabsList className="grid grid-cols-5">
-                    <TabsTrigger
-                      value="all"
-                      className="bg-violet-600 text-white data-[state=active]:bg-violet-600 data-[state=active]:text-white"
-                    >
-                      All
-                    </TabsTrigger>
-                    <TabsTrigger value="review">Review</TabsTrigger>
-                    <TabsTrigger value="in-approval">In Approval</TabsTrigger>
-                    <TabsTrigger value="approved">Approved</TabsTrigger>
-                    <TabsTrigger value="paid">Paid</TabsTrigger>
-                  </TabsList>
-                </Tabs>
               </div>
+              <Tabs defaultValue="all" className="w-fit">
+                <TabsList className="grid grid-cols-5">
+                  <TabsTrigger
+                    value="all"
+                    className="bg-violet-600 text-white data-[state=active]:bg-violet-600 data-[state=active]:text-white"
+                  >
+                    All
+                  </TabsTrigger>
+                  <TabsTrigger value="review">Review</TabsTrigger>
+                  <TabsTrigger value="in-approval">In Approval</TabsTrigger>
+                  <TabsTrigger value="approved">Approved</TabsTrigger>
+                  <TabsTrigger value="paid">Paid</TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
             <InvoiceTable />
           </div>
