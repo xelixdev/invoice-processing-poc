@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { ArrowLeft, Search, Maximize, FileText, Circle, Edit, Plus, Download, ChevronLeft, ChevronRight } from "lucide-react"
+import { ArrowLeft, FileText, Circle, Edit, Plus, Download, ChevronLeft, ChevronRight, Maximize, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
 import Sidebar from "@/components/sidebar"
 import Link from "next/link"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -35,12 +36,12 @@ interface LineItem {
 }
 
 export default function InvoiceDetailsPage() {
-  const [zoomLevel, setZoomLevel] = useState(100)
   const [extractedData, setExtractedData] = useState<InvoiceData | null>(null)
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [fileData, setFileData] = useState<string | null>(null)
   const [fileType, setFileType] = useState<string | null>(null)
   const [fileName, setFileName] = useState<string | null>(null)
+  const [isFullscreenOpen, setIsFullscreenOpen] = useState(false)
   const pdfContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -103,6 +104,64 @@ export default function InvoiceDetailsPage() {
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
+    }
+  }
+
+  // Render file preview content
+  const renderFilePreview = (isFullscreen = false) => {
+    if (!fileData) {
+      return (
+        <div className="bg-white shadow-sm p-8 max-w-xs mx-auto">
+          <div className="space-y-4">
+            <div className="h-8 bg-gray-200 w-3/4 rounded"></div>
+            <div className="h-4 bg-gray-200 w-1/2 rounded"></div>
+            <div className="h-4 bg-gray-200 w-full rounded"></div>
+            <div className="h-4 bg-gray-200 w-3/4 rounded"></div>
+            <div className="h-4 bg-gray-200 w-full rounded"></div>
+            <div className="flex justify-between mt-8">
+              <div className="h-6 bg-gray-200 w-1/4 rounded"></div>
+              <div className="h-6 bg-violet-200 w-1/4 rounded"></div>
+            </div>
+            <div className="flex justify-between">
+              <div className="h-6 bg-gray-200 w-1/3 rounded"></div>
+              <div className="h-6 bg-gray-200 w-1/4 rounded"></div>
+            </div>
+            <div className="flex justify-between">
+              <div className="h-6 bg-gray-200 w-1/4 rounded"></div>
+              <div className="h-6 bg-violet-200 w-1/4 rounded"></div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    if (fileType === 'application/pdf') {
+      return (
+        <div className="relative w-full h-full">
+          <iframe 
+            src={fileData} 
+            className="w-full h-full border-0" 
+          />
+        </div>
+      )
+    } else if (fileType?.startsWith('image/')) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <img 
+            src={fileData} 
+            alt="Invoice preview" 
+            className="max-w-full max-h-full object-contain"
+          />
+        </div>
+      )
+    } else {
+      return (
+        <div className="flex flex-col items-center justify-center text-center p-8">
+          <FileText className="h-16 w-16 text-muted-foreground mb-4" />
+          <p className="text-lg font-medium mb-2">CSV File</p>
+          <p className="text-sm text-muted-foreground">CSV files cannot be previewed.</p>
+        </div>
+      )
     }
   }
 
@@ -178,100 +237,50 @@ export default function InvoiceDetailsPage() {
           <TabsContent value="details" className="flex-1 p-0 mt-0">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 h-full">
               <div className="border rounded-lg overflow-hidden">
-                <div className="flex items-center justify-between border-b p-4">
+                <div className="flex items-center justify-between border-b p-3 h-14">
                   <h3 className="font-medium">Invoice Preview</h3>
                   <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="icon">
-                      <Search className="h-4 w-4" />
-                    </Button>
-                    {fileData && (
-                      <Button variant="ghost" size="icon" onClick={handleDownload}>
-                        <Download className="h-4 w-4" />
-                      </Button>
-                    )}
-                    <div className="flex items-center text-sm">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setZoomLevel(Math.max(50, zoomLevel - 10))}
-                        className="h-8 w-8 p-0"
-                      >
-                        -
-                      </Button>
-                      <span className="w-12 text-center">{zoomLevel}%</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setZoomLevel(Math.min(200, zoomLevel + 10))}
-                        className="h-8 w-8 p-0"
-                      >
-                        +
-                      </Button>
-                    </div>
-                    <Button variant="ghost" size="icon">
-                      <Maximize className="h-4 w-4" />
-                    </Button>
+                    <Dialog open={isFullscreenOpen} onOpenChange={setIsFullscreenOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Maximize className="h-4 w-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full p-0">
+                        <div className="flex flex-col h-full">
+                          <div className="flex items-center justify-between p-4 border-b">
+                            <h3 className="font-medium">Invoice Preview - Fullscreen</h3>
+                            <div className="flex items-center gap-2">
+                              {fileData && (
+                                <Button variant="ghost" size="icon" onClick={handleDownload}>
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <Button variant="ghost" size="icon" onClick={() => setIsFullscreenOpen(false)}>
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="flex-1 bg-gray-50 overflow-auto">
+                            {renderFilePreview(true)}
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-center p-2 h-[600px] bg-gray-50 overflow-auto" ref={pdfContainerRef}>
-                  {fileData ? (
-                    fileType === 'application/pdf' ? (
-                      <div className="relative w-full h-full">
-                        <iframe 
-                          src={fileData} 
-                          className="w-full h-full border-0" 
-                          style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}
-                        />
-                      </div>
-                    ) : fileType?.startsWith('image/') ? (
-                      <div className="flex items-center justify-center h-full">
-                        <img 
-                          src={fileData} 
-                          alt="Invoice preview" 
-                          className="max-w-full max-h-full object-contain"
-                          style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'center center' }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center text-center p-8">
-                        <FileText className="h-16 w-16 text-muted-foreground mb-4" />
-                        <p className="text-lg font-medium mb-2">CSV File</p>
-                        <p className="text-sm text-muted-foreground">CSV files cannot be previewed.</p>
-                      </div>
-                    )
-                  ) : (
-                  <div className="bg-white shadow-sm p-8 max-w-xs mx-auto">
-                    <div className="space-y-4">
-                      <div className="h-8 bg-gray-200 w-3/4 rounded"></div>
-                      <div className="h-4 bg-gray-200 w-1/2 rounded"></div>
-                      <div className="h-4 bg-gray-200 w-full rounded"></div>
-                      <div className="h-4 bg-gray-200 w-3/4 rounded"></div>
-                      <div className="h-4 bg-gray-200 w-full rounded"></div>
-                      <div className="flex justify-between mt-8">
-                        <div className="h-6 bg-gray-200 w-1/4 rounded"></div>
-                        <div className="h-6 bg-violet-200 w-1/4 rounded"></div>
-                      </div>
-                      <div className="flex justify-between">
-                        <div className="h-6 bg-gray-200 w-1/3 rounded"></div>
-                        <div className="h-6 bg-gray-200 w-1/4 rounded"></div>
-                      </div>
-                      <div className="flex justify-between">
-                        <div className="h-6 bg-gray-200 w-1/4 rounded"></div>
-                        <div className="h-6 bg-violet-200 w-1/4 rounded"></div>
-                      </div>
-                    </div>
-                  </div>
-                  )}
+                  {renderFilePreview()}
                 </div>
               </div>
 
               <div className="border rounded-lg overflow-hidden">
-                <div className="flex items-center justify-between p-4 border-b">
+                <div className="flex items-center justify-between p-3 border-b h-14">
                   <h3 className="font-medium">Invoice Information</h3>
                   <Button variant="ghost" size="sm" className="h-8 gap-1">
                     <Edit className="h-4 w-4" />
-                    Edit Details
+                    Edit
                   </Button>
                 </div>
 
