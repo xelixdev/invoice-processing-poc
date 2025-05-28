@@ -5,7 +5,7 @@ import { ArrowLeft, FileText, Circle, Edit, Plus, Download, ChevronLeft, Chevron
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogOverlay, DialogPortal } from "@/components/ui/dialog"
 import Sidebar from "@/components/sidebar"
 import Link from "next/link"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -246,26 +246,24 @@ export default function InvoiceDetailsPage() {
                           <Maximize className="h-4 w-4" />
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full p-0">
-                        <div className="flex flex-col h-full">
-                          <div className="flex items-center justify-between p-4 border-b">
-                            <h3 className="font-medium">Invoice Preview - Fullscreen</h3>
-                            <div className="flex items-center gap-2">
-                              {fileData && (
-                                <Button variant="ghost" size="icon" onClick={handleDownload}>
-                                  <Download className="h-4 w-4" />
+                      <DialogPortal>
+                        <DialogOverlay className="fixed inset-0 z-50 bg-black/20 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                          <div className="w-full max-w-[95vw] max-h-[95vh] h-full bg-white rounded-lg shadow-lg overflow-hidden">
+                            <div className="flex flex-col h-full">
+                              <div className="flex items-center justify-between p-4 border-b">
+                                <DialogTitle className="font-medium">Invoice Preview - Fullscreen</DialogTitle>
+                                <Button variant="ghost" size="icon" onClick={() => setIsFullscreenOpen(false)}>
+                                  <X className="h-4 w-4" />
                                 </Button>
-                              )}
-                              <Button variant="ghost" size="icon" onClick={() => setIsFullscreenOpen(false)}>
-                                <X className="h-4 w-4" />
-                              </Button>
+                              </div>
+                              <div className="flex-1 bg-gray-50 overflow-auto">
+                                {renderFilePreview(true)}
+                              </div>
                             </div>
                           </div>
-                          <div className="flex-1 bg-gray-50 overflow-auto">
-                            {renderFilePreview(true)}
-                          </div>
                         </div>
-                      </DialogContent>
+                      </DialogPortal>
                     </Dialog>
                   </div>
                 </div>
