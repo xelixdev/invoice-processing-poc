@@ -132,9 +132,9 @@ export default function UploadInvoicePage() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex min-h-screen bg-background">
       <Sidebar />
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col overflow-auto">
         <header className="border-b">
           <div className="flex h-16 items-center px-4">
             <Link href="/" className="flex items-center text-sm font-medium text-muted-foreground">

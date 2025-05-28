@@ -10,9 +10,9 @@ import Link from "next/link"
 
 export default function Dashboard() {
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex min-h-screen bg-background">
       <Sidebar />
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col overflow-auto">
         <header className="border-b">
           <div className="flex h-16 items-center px-4 gap-6">
             <nav className="flex items-center space-x-4 lg:space-x-6">

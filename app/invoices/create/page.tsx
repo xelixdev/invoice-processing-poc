@@ -107,10 +107,10 @@ export default function InvoiceDetailsPage() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex min-h-screen bg-background">
       <Sidebar />
-      <div className="flex-1 flex flex-col">
-        <header className="border-b">
+      <div className="flex-1 flex flex-col overflow-auto">
+        <header className="border-b sticky top-0 bg-background z-10">
           <div className="flex h-16 items-center px-4 justify-between">
             <div className="flex items-center">
               <Link href="/">

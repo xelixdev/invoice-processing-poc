@@ -13,7 +13,7 @@ import {
 
 export default function Sidebar() {
   return (
-    <div className="w-16 min-w-16 max-w-16 flex-shrink-0 flex flex-col bg-[linear-gradient(rgb(11,11,69)_0%,rgb(59,15,115)_52.08%,rgb(33,8,64)_100%)] text-white">
+    <div className="w-16 min-w-16 max-w-16 flex-shrink-0 flex flex-col bg-[linear-gradient(rgb(11,11,69)_0%,rgb(59,15,115)_52.08%,rgb(33,8,64)_100%)] text-white sticky top-0 h-screen">
       <div className="h-16 flex items-center justify-center">
         <Link href="/" className="flex items-center justify-center">
           <img src="/xelix_logo.svg" alt="Logo" className="w-8 h-8" />

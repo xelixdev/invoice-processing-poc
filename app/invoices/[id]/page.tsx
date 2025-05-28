@@ -13,9 +13,9 @@ export default function InvoiceDetailsPage({ params }: { params: { id: string } 
   const [zoomLevel, setZoomLevel] = useState(100)
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex min-h-screen bg-background">
       <Sidebar />
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col overflow-auto">
         <header className="border-b">
           <div className="flex h-16 items-center px-4 justify-between">
             <div className="flex items-center">
