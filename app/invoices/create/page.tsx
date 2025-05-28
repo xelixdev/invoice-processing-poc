@@ -208,7 +208,7 @@ export default function InvoiceDetailsPage() {
               </div>
 
               {/* Separator */}
-              <div className="h-8 w-px bg-gray-300" />
+              <div className="h-8 w-px bg-gray-100" />
 
               {/* PO Available Balance */}
               <div className="flex items-center gap-3">
@@ -224,7 +224,7 @@ export default function InvoiceDetailsPage() {
               </div>
 
               {/* Separator */}
-              <div className="h-8 w-px bg-gray-300" />
+              <div className="h-8 w-px bg-gray-100" />
 
               {/* Invoice Total */}
               <div className="flex items-center gap-3">
@@ -242,32 +242,48 @@ export default function InvoiceDetailsPage() {
               {/* Variance - only show if there's a PO */}
               {invoice?.po_number && (
                 <>
-                  <div className="h-8 w-px bg-gray-300" />
+                  <div className="h-8 w-px bg-gray-100" />
 
                   {/* Variance */}
                   <div className="flex items-center gap-3">
-                    <div className="p-1.5 bg-amber-50 rounded-lg">
-                      <TrendingUp className="h-4 w-4 text-amber-500" />
+                    <div className="p-1.5 bg-gray-100 rounded-lg">
+                      <TrendingUp className="h-4 w-4 text-gray-500" />
                     </div>
                     <div>
                       <p className="text-[10px] font-medium text-gray-500 tracking-wider">Variance</p>
-                      <p className="text-sm font-semibold text-amber-600 -mt-1">
-                        +{formatCurrency(invoice.amount * 0.2, invoice.currency_code)}
-                      </p>
+                      <div className="flex items-center gap-2 -mt-1">
+                        <p className="text-sm font-semibold text-amber-600">
+                          +{formatCurrency(invoice.amount * 0.2, invoice.currency_code)}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </>
               )}
 
-              {/* Match Status - Right aligned */}
-              <div className="ml-auto flex items-center gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 bg-amber-400 rounded-full"></div>
-                  <span className="text-sm font-medium text-amber-700">
-                    {invoice?.po_number ? "Within Tolerance" : "No PO Match"}
-                  </span>
-                </div>
-              </div>
+              {/* No PO Status - only show if no PO */}
+              {!invoice?.po_number && (
+                <>
+                  <div className="h-8 w-px bg-gray-200" />
+                  
+                  <div className="flex items-center gap-3">
+                    <div className="p-1.5 bg-gray-50 rounded-lg">
+                      <AlertCircle className="h-4 w-4 text-gray-400" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-medium text-gray-500 tracking-wider">Status</p>
+                      <div className="flex items-center gap-2 -mt-1">
+                        <p className="text-sm font-semibold text-gray-600">
+                          Manual Review
+                        </p>
+                        <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 text-[9px] font-medium rounded-full">
+                          No PO Match
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
