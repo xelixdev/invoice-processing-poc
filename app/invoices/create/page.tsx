@@ -113,9 +113,10 @@ export default function InvoiceDetailsPage() {
         <header className="border-b">
           <div className="flex h-16 items-center px-4 justify-between">
             <div className="flex items-center">
-              <Link href="/" className="flex items-center text-sm font-medium text-muted-foreground mr-4">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Invoices
+              <Link href="/">
+                <Button variant="outline" size="icon" className="mr-4">
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
               </Link>
               <h1 className="text-lg font-semibold">Invoice {invoice?.number || 'new'}</h1>
               <Badge className="ml-2 bg-yellow-100 text-yellow-700 hover:bg-yellow-100 hover:text-yellow-700">

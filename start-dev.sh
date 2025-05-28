@@ -13,11 +13,11 @@ cd backend
 
 # Check if Python dependencies are installed
 echo "Checking Python dependencies..."
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 
 # Start the FastAPI server in the background
 echo "Starting FastAPI server at http://localhost:8000"
-python -m uvicorn api:app --host 0.0.0.0 --port 8000 &
+python3 -m uvicorn api:app --host 0.0.0.0 --port 8000 &
 PYTHON_PID=$!
 
 # Wait for the FastAPI server to start
