@@ -184,6 +184,11 @@ export default function InvoiceDetailsPage() {
                     <Button variant="ghost" size="icon">
                       <Search className="h-4 w-4" />
                     </Button>
+                    {fileData && (
+                      <Button variant="ghost" size="icon" onClick={handleDownload}>
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    )}
                     <div className="flex items-center text-sm">
                       <Button
                         variant="ghost"
@@ -209,14 +214,14 @@ export default function InvoiceDetailsPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-center p-4 h-[400px] bg-gray-50 overflow-auto" ref={pdfContainerRef}>
+                <div className="flex items-center justify-center p-2 h-[600px] bg-gray-50 overflow-auto" ref={pdfContainerRef}>
                   {fileData ? (
                     fileType === 'application/pdf' ? (
                       <div className="relative w-full h-full">
                         <iframe 
                           src={fileData} 
-                          className="w-full h-full" 
-                          style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'center center' }}
+                          className="w-full h-full border-0" 
+                          style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}
                         />
                       </div>
                     ) : fileType?.startsWith('image/') ? (
@@ -257,24 +262,6 @@ export default function InvoiceDetailsPage() {
                       </div>
                     </div>
                   </div>
-                  )}
-                </div>
-
-                <div className="border-t p-4 flex justify-center">
-                  {fileData ? (
-                    <Button 
-                      variant="outline" 
-                      className="text-muted-foreground flex items-center gap-2"
-                      onClick={handleDownload}
-                    >
-                      <Download className="h-4 w-4" />
-                      Download Original
-                    </Button>
-                  ) : (
-                  <Button variant="outline" className="text-muted-foreground flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                      Invoice preview
-                  </Button>
                   )}
                 </div>
               </div>
