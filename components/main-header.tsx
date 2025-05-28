@@ -55,15 +55,14 @@ export default function MainHeader({ activePage }: MainHeaderProps) {
           </Link>
         </nav>
         <div className="ml-auto flex items-center space-x-3">
-          <Button variant="ghost" size="icon">
-            <User className="h-5 w-5" />
+          <Button variant="ghost" size="icon" className="relative">
+            <Bell className="h-5 w-5" />
           </Button>
           <Button variant="ghost" size="icon">
             <HelpCircle className="h-5 w-5" />
           </Button>
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-5 w-5" />
-            <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
+          <Button variant="ghost" size="icon">
+            <User className="h-5 w-5" />
           </Button>
         </div>
       </div>
