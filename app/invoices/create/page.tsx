@@ -194,7 +194,7 @@ export default function InvoiceDetailsPage() {
         </header>
 
         <div className="bg-gray-50/50 border-b">
-          <div className="px-6 h-12 flex items-center">
+          <div className="px-6 py-3 flex items-center">
             <div className="flex items-center gap-6">
               {/* PO Reference */}
               <div className="flex items-center gap-3">
@@ -210,7 +210,7 @@ export default function InvoiceDetailsPage() {
               </div>
 
               {/* Separator */}
-              <div className="h-8 w-px bg-gray-100" />
+              <div className="h-8 w-px bg-gray-200" />
 
               {/* PO Available Balance */}
               <div className="flex items-center gap-3">
@@ -226,7 +226,7 @@ export default function InvoiceDetailsPage() {
               </div>
 
               {/* Separator */}
-              <div className="h-8 w-px bg-gray-100" />
+              <div className="h-8 w-px bg-gray-200" />
 
               {/* Invoice Total */}
               <div className="flex items-center gap-3">
@@ -244,7 +244,7 @@ export default function InvoiceDetailsPage() {
               {/* Variance - only show if there's a PO */}
               {invoice?.po_number && (
                 <>
-                  <div className="h-8 w-px bg-gray-100" />
+                  <div className="h-8 w-px bg-gray-200" />
 
                   {/* Variance */}
                   <div className="flex items-center gap-3">
@@ -357,118 +357,120 @@ export default function InvoiceDetailsPage() {
                 </div>
 
                 <TabsContent value="details" className="flex-1 p-0 mt-4">
-                  <div className="border rounded-lg overflow-hidden">
-                    <div className="flex items-center justify-between p-3 border-b h-12">
-                      <h3 className="font-medium">Invoice Information</h3>
-                      <Button variant="ghost" size="sm" className="h-8 gap-1">
-                        <Edit className="h-4 w-4" />
-                        Edit
-                      </Button>
-                    </div>
-
-                    <div className="p-6 space-y-6">
-                      <div className="grid grid-cols-2 gap-6">
-                        <div>
-                          <div className="flex items-center mb-2">
-                            <label className="text-sm font-medium">Invoice Number</label>
-                            <div className="ml-1 text-gray-400">
-                              <Circle className="h-3 w-3" />
-                            </div>
-                          </div>
-                          <div className="border rounded-md p-2.5 bg-gray-50">{invoice?.number || "Not specified"}</div>
-                        </div>
-                        <div>
-                          <div className="flex items-center mb-2">
-                            <label className="text-sm font-medium">Vendor</label>
-                            <div className="ml-1 text-gray-400">
-                              <Circle className="h-3 w-3" />
-                            </div>
-                          </div>
-                          <div className="border rounded-md p-2.5 bg-gray-50">{invoice?.vendor || "Not specified"}</div>
-                        </div>
+                  <div className="border rounded-lg overflow-hidden h-full">
+                    <div className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-semibold">Invoice Details</h2>
+                        <Button variant="ghost" size="sm" className="h-8 gap-1">
+                          <Edit className="h-4 w-4" />
+                          Edit
+                        </Button>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-6">
-                        <div>
-                          <div className="flex items-center mb-2">
-                            <label className="text-sm font-medium">Invoice Date</label>
-                            <div className="ml-1 text-gray-400">
-                              <Circle className="h-3 w-3" />
+                      <div className="space-y-6">
+                        <div className="grid grid-cols-2 gap-6">
+                          <div>
+                            <div className="flex items-center mb-2">
+                              <label className="text-sm font-medium">Invoice Number</label>
+                              <div className="ml-1 text-gray-400">
+                                <Circle className="h-3 w-3" />
+                              </div>
                             </div>
+                            <div className="border rounded-md p-2.5 bg-gray-50 text-sm">{invoice?.number || "Not specified"}</div>
                           </div>
-                          <div className="border rounded-md p-2.5 bg-gray-50">{formatDate(invoice?.date)}</div>
-                        </div>
-                        <div>
-                          <div className="flex items-center mb-2">
-                            <label className="text-sm font-medium">Due Date</label>
-                            <div className="ml-1 text-gray-400">
-                              <Circle className="h-3 w-3" />
+                          <div>
+                            <div className="flex items-center mb-2">
+                              <label className="text-sm font-medium">Vendor</label>
+                              <div className="ml-1 text-gray-400">
+                                <Circle className="h-3 w-3" />
+                              </div>
                             </div>
+                            <div className="border rounded-md p-2.5 bg-gray-50 text-sm">{invoice?.vendor || "Not specified"}</div>
                           </div>
-                          <div className="border rounded-md p-2.5 bg-gray-50">{formatDate(invoice?.due_date)}</div>
                         </div>
-                      </div>
 
-                      <div className="grid grid-cols-2 gap-6">
-                        <div>
-                          <div className="flex items-center mb-2">
-                            <label className="text-sm font-medium">Payment Terms</label>
-                            <div className="ml-1 text-gray-400">
-                              <Circle className="h-3 w-3" />
+                        <div className="grid grid-cols-2 gap-6">
+                          <div>
+                            <div className="flex items-center mb-2">
+                              <label className="text-sm font-medium">Invoice Date</label>
+                              <div className="ml-1 text-gray-400">
+                                <Circle className="h-3 w-3" />
+                              </div>
                             </div>
+                            <div className="border rounded-md p-2.5 bg-gray-50 text-sm">{formatDate(invoice?.date)}</div>
                           </div>
-                          <div className="border rounded-md p-2.5 bg-gray-50">
-                            {invoice?.payment_term_days ? `Net ${invoice.payment_term_days}` : "Not specified"}
+                          <div>
+                            <div className="flex items-center mb-2">
+                              <label className="text-sm font-medium">Due Date</label>
+                              <div className="ml-1 text-gray-400">
+                                <Circle className="h-3 w-3" />
+                              </div>
+                            </div>
+                            <div className="border rounded-md p-2.5 bg-gray-50 text-sm">{formatDate(invoice?.due_date)}</div>
                           </div>
                         </div>
-                        <div>
-                          <div className="flex items-center mb-2">
-                            <label className="text-sm font-medium">Currency</label>
-                            <div className="ml-1 text-gray-400">
-                              <Circle className="h-3 w-3" />
-                            </div>
-                          </div>
-                          <div className="border rounded-md p-2.5 bg-gray-50">{invoice?.currency_code || "USD"}</div>
-                        </div>
-                      </div>
 
-                      <div className="grid grid-cols-2 gap-6">
-                        <div>
-                          <div className="flex items-center mb-2">
-                            <label className="text-sm font-medium">Tax Amount</label>
-                            <div className="ml-1 text-gray-400">
-                              <Circle className="h-3 w-3" />
+                        <div className="grid grid-cols-2 gap-6">
+                          <div>
+                            <div className="flex items-center mb-2">
+                              <label className="text-sm font-medium">Payment Terms</label>
+                              <div className="ml-1 text-gray-400">
+                                <Circle className="h-3 w-3" />
+                              </div>
+                            </div>
+                            <div className="border rounded-md p-2.5 bg-gray-50 text-sm">
+                              {invoice?.payment_term_days ? `Net ${invoice.payment_term_days}` : "Not specified"}
                             </div>
                           </div>
-                          <div className="border rounded-md p-2.5 bg-gray-50">
-                            {invoice?.tax_amount !== undefined ? formatCurrency(invoice.tax_amount, invoice.currency_code) : "Not specified"}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="flex items-center mb-2">
-                            <label className="text-sm font-medium">Total Amount</label>
-                            <div className="ml-1 text-gray-400">
-                              <Circle className="h-3 w-3" />
+                          <div>
+                            <div className="flex items-center mb-2">
+                              <label className="text-sm font-medium">Currency</label>
+                              <div className="ml-1 text-gray-400">
+                                <Circle className="h-3 w-3" />
+                              </div>
                             </div>
-                          </div>
-                          <div className="border rounded-md p-2.5 bg-gray-50">
-                            {invoice?.amount !== undefined ? formatCurrency(invoice.amount, invoice.currency_code) : "Not specified"}
+                            <div className="border rounded-md p-2.5 bg-gray-50 text-sm">{invoice?.currency_code || "USD"}</div>
                           </div>
                         </div>
-                      </div>
 
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <label className="text-sm font-medium">Linked Purchase Orders</label>
-                          <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
-                            <Plus className="h-3 w-3" />
-                            Add PO
-                          </Button>
+                        <div className="grid grid-cols-2 gap-6">
+                          <div>
+                            <div className="flex items-center mb-2">
+                              <label className="text-sm font-medium">Tax Amount</label>
+                              <div className="ml-1 text-gray-400">
+                                <Circle className="h-3 w-3" />
+                              </div>
+                            </div>
+                            <div className="border rounded-md p-2.5 bg-gray-50 text-sm">
+                              {invoice?.tax_amount !== undefined ? formatCurrency(invoice.tax_amount, invoice.currency_code) : "Not specified"}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex items-center mb-2">
+                              <label className="text-sm font-medium">Total Amount</label>
+                              <div className="ml-1 text-gray-400">
+                                <Circle className="h-3 w-3" />
+                              </div>
+                            </div>
+                            <div className="border rounded-md p-2.5 bg-gray-50 text-sm">
+                              {invoice?.amount !== undefined ? formatCurrency(invoice.amount, invoice.currency_code) : "Not specified"}
+                            </div>
+                          </div>
                         </div>
-                        <div className="border rounded-md p-4 bg-gray-50 text-sm text-muted-foreground">
-                          {invoice?.po_number ? 
-                            `PO Number: ${invoice.po_number}` : 
-                            "No purchase orders linked to this invoice. Click \"Add PO\" to link a purchase order."}
+
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <label className="text-sm font-medium">Linked Purchase Orders</label>
+                            <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
+                              <Plus className="h-3 w-3" />
+                              Add PO
+                            </Button>
+                          </div>
+                          <div className="border rounded-md p-4 bg-gray-50 text-sm text-muted-foreground">
+                            {invoice?.po_number ? 
+                              `PO Number: ${invoice.po_number}` : 
+                              "No purchase orders linked to this invoice. Click \"Add PO\" to link a purchase order."}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -478,7 +480,10 @@ export default function InvoiceDetailsPage() {
                 <TabsContent value="activity" className="flex-1 p-0 mt-4">
                   <div className="border rounded-lg overflow-hidden h-full">
                     <div className="p-6">
-                      <h2 className="text-lg font-semibold mb-4">Activity Log</h2>
+                      <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-semibold">Activity Log</h2>
+                        <div></div>
+                      </div>
                       <div className="space-y-4">
                         <div className="flex items-start gap-4">
                           <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
@@ -500,8 +505,8 @@ export default function InvoiceDetailsPage() {
                     <div className="p-6">
                       <div className="flex items-center justify-between mb-4">
                         <h2 className="text-lg font-semibold">Attachments</h2>
-                        <Button className="bg-violet-600 hover:bg-violet-700" size="sm">
-                          <Plus className="h-4 w-4 mr-2" />
+                        <Button variant="ghost" size="sm" className="h-8 gap-1">
+                          <Plus className="h-4 w-4" />
                           Add Attachment
                         </Button>
                       </div>
