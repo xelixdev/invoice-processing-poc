@@ -13,15 +13,15 @@ export default function GoodsReceivedPage() {
         <header className="border-b">
           <div className="flex h-16 items-center px-4 gap-6">
             <nav className="flex items-center space-x-4 lg:space-x-6">
-              <a href="#" className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary">
+              <a href="#" className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary px-3 py-1 rounded-full">
                 Dashboard
               </a>
-              <a href="/" className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary">
+              <a href="/" className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary px-3 py-1 rounded-full">
                 Invoices
               </a>
               <a
                 href="/purchase-orders"
-                className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+                className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary px-3 py-1 rounded-full"
               >
                 Purchase Orders
               </a>

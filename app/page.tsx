@@ -16,7 +16,7 @@ export default function Dashboard() {
         <header className="border-b">
           <div className="flex h-16 items-center px-4 gap-6">
             <nav className="flex items-center space-x-4 lg:space-x-6">
-              <a href="#" className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary">
+              <a href="#" className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary px-3 py-1 rounded-full">
                 Dashboard
               </a>
               <a
@@ -27,13 +27,13 @@ export default function Dashboard() {
               </a>
               <a
                 href="/purchase-orders"
-                className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+                className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary px-3 py-1 rounded-full"
               >
                 Purchase Orders
               </a>
               <a
                 href="/goods-received"
-                className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+                className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary px-3 py-1 rounded-full"
               >
                 Goods Receipt Notes
               </a>
