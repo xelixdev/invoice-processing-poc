@@ -368,6 +368,7 @@ export default function InvoiceDetailsPage() {
                       </div>
 
                       <div className="space-y-6">
+                        {/* Row 1: Invoice Number + Invoice Description */}
                         <div className="grid grid-cols-2 gap-6">
                           <div>
                             <div className="flex items-center mb-2">
@@ -380,6 +381,19 @@ export default function InvoiceDetailsPage() {
                           </div>
                           <div>
                             <div className="flex items-center mb-2">
+                              <label className="text-sm font-medium">Invoice Description</label>
+                              <div className="ml-1 text-gray-400">
+                                <Circle className="h-3 w-3" />
+                              </div>
+                            </div>
+                            <div className="border rounded-md p-2.5 bg-gray-50 text-sm">Professional services - Q4 consulting</div>
+                          </div>
+                        </div>
+
+                        {/* Row 2: Vendor + GL Account/Cost Center */}
+                        <div className="grid grid-cols-2 gap-6">
+                          <div>
+                            <div className="flex items-center mb-2">
                               <label className="text-sm font-medium">Vendor</label>
                               <div className="ml-1 text-gray-400">
                                 <Circle className="h-3 w-3" />
@@ -387,8 +401,18 @@ export default function InvoiceDetailsPage() {
                             </div>
                             <div className="border rounded-md p-2.5 bg-gray-50 text-sm">{invoice?.vendor || "Not specified"}</div>
                           </div>
+                          <div>
+                            <div className="flex items-center mb-2">
+                              <label className="text-sm font-medium">GL Account / Cost Center</label>
+                              <div className="ml-1 text-gray-400">
+                                <Circle className="h-3 w-3" />
+                              </div>
+                            </div>
+                            <div className="border rounded-md p-2.5 bg-gray-50 text-sm">6200-001 - Professional Services</div>
+                          </div>
                         </div>
 
+                        {/* Row 3: Invoice Date + Due Date */}
                         <div className="grid grid-cols-2 gap-6">
                           <div>
                             <div className="flex items-center mb-2">
@@ -410,6 +434,33 @@ export default function InvoiceDetailsPage() {
                           </div>
                         </div>
 
+                        {/* Row 4: Tax Amount + Total Amount */}
+                        <div className="grid grid-cols-2 gap-6">
+                          <div>
+                            <div className="flex items-center mb-2">
+                              <label className="text-sm font-medium">Tax Amount</label>
+                              <div className="ml-1 text-gray-400">
+                                <Circle className="h-3 w-3" />
+                              </div>
+                            </div>
+                            <div className="border rounded-md p-2.5 bg-gray-50 text-sm">
+                              {invoice?.tax_amount !== undefined ? formatCurrency(invoice.tax_amount, invoice.currency_code) : "Not specified"}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex items-center mb-2">
+                              <label className="text-sm font-medium">Total Amount</label>
+                              <div className="ml-1 text-gray-400">
+                                <Circle className="h-3 w-3" />
+                              </div>
+                            </div>
+                            <div className="border rounded-md p-2.5 bg-gray-50 text-sm">
+                              {invoice?.amount !== undefined ? formatCurrency(invoice.amount, invoice.currency_code) : "Not specified"}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Row 5: Payment Terms + Currency */}
                         <div className="grid grid-cols-2 gap-6">
                           <div>
                             <div className="flex items-center mb-2">
@@ -433,27 +484,36 @@ export default function InvoiceDetailsPage() {
                           </div>
                         </div>
 
+                        {/* Row 6: Approval Status + Receipt Confirmation */}
                         <div className="grid grid-cols-2 gap-6">
                           <div>
                             <div className="flex items-center mb-2">
-                              <label className="text-sm font-medium">Tax Amount</label>
+                              <label className="text-sm font-medium">Approval Status</label>
                               <div className="ml-1 text-gray-400">
                                 <Circle className="h-3 w-3" />
                               </div>
                             </div>
                             <div className="border rounded-md p-2.5 bg-gray-50 text-sm">
-                              {invoice?.tax_amount !== undefined ? formatCurrency(invoice.tax_amount, invoice.currency_code) : "Not specified"}
+                              <div className="flex items-center gap-2">
+                                <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs font-medium rounded-full">
+                                  Pending Manager Approval
+                                </span>
+                              </div>
                             </div>
                           </div>
                           <div>
                             <div className="flex items-center mb-2">
-                              <label className="text-sm font-medium">Total Amount</label>
+                              <label className="text-sm font-medium">Receipt Confirmation</label>
                               <div className="ml-1 text-gray-400">
                                 <Circle className="h-3 w-3" />
                               </div>
                             </div>
                             <div className="border rounded-md p-2.5 bg-gray-50 text-sm">
-                              {invoice?.amount !== undefined ? formatCurrency(invoice.amount, invoice.currency_code) : "Not specified"}
+                              <div className="flex items-center gap-2">
+                                <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                                  Goods/Services Received
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </div>
