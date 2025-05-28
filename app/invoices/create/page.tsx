@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { ArrowLeft, FileText, Circle, Edit, Plus, Download, ChevronLeft, ChevronRight, Maximize, X, Receipt, FileCheck, TrendingUp, AlertCircle } from "lucide-react"
+import { ArrowLeft, FileText, Edit, Plus, Download, ChevronLeft, ChevronRight, Maximize, X, Receipt, FileCheck, TrendingUp, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
@@ -42,6 +42,8 @@ export default function InvoiceDetailsPage() {
   const [fileType, setFileType] = useState<string | null>(null)
   const [fileName, setFileName] = useState<string | null>(null)
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false)
+  const [linkedPO, setLinkedPO] = useState<string | null>(null)
+  const [linkedGR, setLinkedGR] = useState<string | null>(null)
   const pdfContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -54,6 +56,10 @@ export default function InvoiceDetailsPage() {
       // Set the first invoice as the current one
       if (parsedData.invoices && parsedData.invoices.length > 0) {
         setInvoice(parsedData.invoices[0])
+        // Initialize linked PO state
+        setLinkedPO(parsedData.invoices[0].po_number)
+        // Initialize with a sample GR for demonstration
+        setLinkedGR("GR-2023-001")
       }
     }
 
@@ -105,6 +111,30 @@ export default function InvoiceDetailsPage() {
       link.click()
       document.body.removeChild(link)
     }
+  }
+
+  // Handle removing linked PO
+  const handleRemovePO = () => {
+    setLinkedPO(null)
+  }
+
+  // Handle adding PO (placeholder for now)
+  const handleAddPO = () => {
+    // This would typically open a PO selection dialog
+    // For now, we'll just add a sample PO
+    setLinkedPO("PO-2023-001")
+  }
+
+  // Handle removing linked GR
+  const handleRemoveGR = () => {
+    setLinkedGR(null)
+  }
+
+  // Handle adding GR (placeholder for now)
+  const handleAddGR = () => {
+    // This would typically open a GR selection dialog
+    // For now, we'll just add a sample GR
+    setLinkedGR("GR-2023-001")
   }
 
   // Render file preview content
@@ -194,7 +224,7 @@ export default function InvoiceDetailsPage() {
         </header>
 
         <div className="bg-gray-50/50 border-b">
-          <div className="px-6 py-3 flex items-center">
+          <div className="px-6 py-3 flex items-center justify-between">
             <div className="flex items-center gap-6">
               {/* PO Reference */}
               <div className="flex items-center gap-3">
@@ -287,6 +317,13 @@ export default function InvoiceDetailsPage() {
                 </>
               )}
             </div>
+
+            {/* Approval Status - Right Side */}
+            <div className="flex items-center">
+              <span className="px-3 py-1.5 bg-yellow-100 text-yellow-700 text-xs font-medium rounded-full">
+                Pending Manager Approval
+              </span>
+            </div>
           </div>
         </div>
 
@@ -373,18 +410,12 @@ export default function InvoiceDetailsPage() {
                           <div>
                             <div className="flex items-center mb-2">
                               <label className="text-sm font-medium">Invoice Number</label>
-                              <div className="ml-1 text-gray-400">
-                                <Circle className="h-3 w-3" />
-                              </div>
                             </div>
                             <div className="border rounded-md p-2.5 bg-gray-50 text-sm">{invoice?.number || "Not specified"}</div>
                           </div>
                           <div>
                             <div className="flex items-center mb-2">
                               <label className="text-sm font-medium">Invoice Description</label>
-                              <div className="ml-1 text-gray-400">
-                                <Circle className="h-3 w-3" />
-                              </div>
                             </div>
                             <div className="border rounded-md p-2.5 bg-gray-50 text-sm">Professional services - Q4 consulting</div>
                           </div>
@@ -395,18 +426,12 @@ export default function InvoiceDetailsPage() {
                           <div>
                             <div className="flex items-center mb-2">
                               <label className="text-sm font-medium">Vendor</label>
-                              <div className="ml-1 text-gray-400">
-                                <Circle className="h-3 w-3" />
-                              </div>
                             </div>
                             <div className="border rounded-md p-2.5 bg-gray-50 text-sm">{invoice?.vendor || "Not specified"}</div>
                           </div>
                           <div>
                             <div className="flex items-center mb-2">
                               <label className="text-sm font-medium">GL Account / Cost Center</label>
-                              <div className="ml-1 text-gray-400">
-                                <Circle className="h-3 w-3" />
-                              </div>
                             </div>
                             <div className="border rounded-md p-2.5 bg-gray-50 text-sm">6200-001 - Professional Services</div>
                           </div>
@@ -417,18 +442,12 @@ export default function InvoiceDetailsPage() {
                           <div>
                             <div className="flex items-center mb-2">
                               <label className="text-sm font-medium">Invoice Date</label>
-                              <div className="ml-1 text-gray-400">
-                                <Circle className="h-3 w-3" />
-                              </div>
                             </div>
                             <div className="border rounded-md p-2.5 bg-gray-50 text-sm">{formatDate(invoice?.date)}</div>
                           </div>
                           <div>
                             <div className="flex items-center mb-2">
                               <label className="text-sm font-medium">Due Date</label>
-                              <div className="ml-1 text-gray-400">
-                                <Circle className="h-3 w-3" />
-                              </div>
                             </div>
                             <div className="border rounded-md p-2.5 bg-gray-50 text-sm">{formatDate(invoice?.due_date)}</div>
                           </div>
@@ -439,9 +458,6 @@ export default function InvoiceDetailsPage() {
                           <div>
                             <div className="flex items-center mb-2">
                               <label className="text-sm font-medium">Tax Amount</label>
-                              <div className="ml-1 text-gray-400">
-                                <Circle className="h-3 w-3" />
-                              </div>
                             </div>
                             <div className="border rounded-md p-2.5 bg-gray-50 text-sm">
                               {invoice?.tax_amount !== undefined ? formatCurrency(invoice.tax_amount, invoice.currency_code) : "Not specified"}
@@ -450,9 +466,6 @@ export default function InvoiceDetailsPage() {
                           <div>
                             <div className="flex items-center mb-2">
                               <label className="text-sm font-medium">Total Amount</label>
-                              <div className="ml-1 text-gray-400">
-                                <Circle className="h-3 w-3" />
-                              </div>
                             </div>
                             <div className="border rounded-md p-2.5 bg-gray-50 text-sm">
                               {invoice?.amount !== undefined ? formatCurrency(invoice.amount, invoice.currency_code) : "Not specified"}
@@ -465,9 +478,6 @@ export default function InvoiceDetailsPage() {
                           <div>
                             <div className="flex items-center mb-2">
                               <label className="text-sm font-medium">Payment Terms</label>
-                              <div className="ml-1 text-gray-400">
-                                <Circle className="h-3 w-3" />
-                              </div>
                             </div>
                             <div className="border rounded-md p-2.5 bg-gray-50 text-sm">
                               {invoice?.payment_term_days ? `Net ${invoice.payment_term_days}` : "Not specified"}
@@ -476,60 +486,88 @@ export default function InvoiceDetailsPage() {
                           <div>
                             <div className="flex items-center mb-2">
                               <label className="text-sm font-medium">Currency</label>
-                              <div className="ml-1 text-gray-400">
-                                <Circle className="h-3 w-3" />
-                              </div>
                             </div>
                             <div className="border rounded-md p-2.5 bg-gray-50 text-sm">{invoice?.currency_code || "USD"}</div>
                           </div>
                         </div>
 
-                        {/* Row 6: Approval Status + Receipt Confirmation */}
-                        <div className="grid grid-cols-2 gap-6">
-                          <div>
-                            <div className="flex items-center mb-2">
-                              <label className="text-sm font-medium">Approval Status</label>
-                              <div className="ml-1 text-gray-400">
-                                <Circle className="h-3 w-3" />
-                              </div>
-                            </div>
-                            <div className="border rounded-md p-2.5 bg-gray-50 text-sm">
-                              <div className="flex items-center gap-2">
-                                <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs font-medium rounded-full">
-                                  Pending Manager Approval
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          <div>
-                            <div className="flex items-center mb-2">
-                              <label className="text-sm font-medium">Receipt Confirmation</label>
-                              <div className="ml-1 text-gray-400">
-                                <Circle className="h-3 w-3" />
-                              </div>
-                            </div>
-                            <div className="border rounded-md p-2.5 bg-gray-50 text-sm">
-                              <div className="flex items-center gap-2">
-                                <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
-                                  Goods/Services Received
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
                         <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <label className="text-sm font-medium">Linked Purchase Orders</label>
-                            <Button variant="ghost" size="sm" className="h-7 text-xs gap-1">
-                              <Plus className="h-3 w-3" />
-                              Add PO
-                            </Button>
+                          <div className="mb-3">
+                            <label className="text-sm font-medium">Linked Documents</label>
                           </div>
-                          <div className="border rounded-md p-4 bg-gray-50 text-sm text-muted-foreground">
-                            {invoice?.po_number ? 
-                              `PO Number: ${invoice.po_number}` : 
-                              "No purchase orders linked to this invoice. Click \"Add PO\" to link a purchase order."}
+                          
+                          {/* Purchase Orders Section */}
+                          <div className="mb-2">
+                            <div className="w-full">
+                              {linkedPO ? (
+                                <div className="border-2 border-solid border-gray-200 rounded-lg p-3 bg-white h-14 flex items-center w-full animate-in fade-in-0 slide-in-from-top-2 duration-300">
+                                  <div className="flex items-center justify-between w-full min-w-0">
+                                    <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
+                                      <div className="flex items-center justify-center w-8 h-8 bg-violet-100 rounded text-xs font-medium text-violet-600 flex-shrink-0">
+                                        PO
+                                      </div>
+                                      <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
+                                        <span className="text-violet-600 font-medium flex-shrink-0">{linkedPO}</span>
+                                        <span className="text-sm text-gray-500 flex-shrink-0 hidden sm:inline">4 of 4 items matched</span>
+                                        <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full flex-shrink-0">
+                                          Matched
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-400 hover:text-gray-600 flex-shrink-0 ml-2 transition-all duration-200 hover:scale-110" onClick={handleRemovePO}>
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div 
+                                  className="border-2 border-dashed border-gray-300 rounded-lg p-3 bg-gray-50 text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50/50 transition-all duration-300 h-14 flex items-center justify-center w-full animate-in fade-in-0 slide-in-from-bottom-2 group hover:shadow-sm"
+                                  onClick={handleAddPO}
+                                >
+                                  <div className="flex items-center justify-center gap-2 text-gray-500 group-hover:text-violet-600 transition-colors duration-200">
+                                    <Plus className="h-4 w-4 transition-transform duration-200 group-hover:rotate-90" />
+                                    <span className="text-sm font-medium">Add PO</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Goods Receipt Notes Section */}
+                          <div>
+                            <div className="w-full">
+                              {linkedGR ? (
+                                <div className="border-2 border-solid border-gray-200 rounded-lg p-3 bg-white h-14 flex items-center w-full animate-in fade-in-0 slide-in-from-top-2 duration-300">
+                                  <div className="flex items-center justify-between w-full min-w-0">
+                                    <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
+                                      <div className="flex items-center justify-center w-8 h-8 bg-violet-100 rounded text-xs font-medium text-violet-600 flex-shrink-0">
+                                        GR
+                                      </div>
+                                      <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
+                                        <span className="text-violet-600 font-medium flex-shrink-0">{linkedGR}</span>
+                                        <span className="text-sm text-gray-500 flex-shrink-0 hidden sm:inline">4 of 4 items received</span>
+                                        <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full flex-shrink-0">
+                                          Received
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-400 hover:text-gray-600 flex-shrink-0 ml-2 transition-all duration-200 hover:scale-110" onClick={handleRemoveGR}>
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div 
+                                  className="border-2 border-dashed border-gray-300 rounded-lg p-3 bg-gray-50 text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50/50 transition-all duration-300 h-14 flex items-center justify-center w-full animate-in fade-in-0 slide-in-from-bottom-2 group hover:shadow-sm"
+                                  onClick={handleAddGR}
+                                >
+                                  <div className="flex items-center justify-center gap-2 text-gray-500 group-hover:text-violet-600 transition-colors duration-200">
+                                    <Plus className="h-4 w-4 transition-transform duration-200 group-hover:rotate-90" />
+                                    <span className="text-sm font-medium">Add GR</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
