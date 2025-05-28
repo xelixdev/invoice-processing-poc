@@ -188,7 +188,7 @@ export default function InvoiceDetailsPage() {
                   Cancel
                 </Button>
               </Link>
-              <Button size="sm" className="bg-violet-600 hover:bg-violet-700">Save Invoice</Button>
+              <Button size="sm" className="bg-violet-600 hover:bg-violet-700">Save</Button>
             </div>
           </div>
         </header>
@@ -198,7 +198,7 @@ export default function InvoiceDetailsPage() {
             <div className="flex items-center gap-6">
               {/* PO Reference */}
               <div className="flex items-center gap-3">
-                <div className="p-1.5 bg-violet-50 rounded-lg">
+                <div className="p-1.5 bg-violet-100 rounded-lg">
                   <FileCheck className="h-4 w-4 text-violet-500" />
                 </div>
                 <div>
@@ -214,7 +214,7 @@ export default function InvoiceDetailsPage() {
 
               {/* PO Available Balance */}
               <div className="flex items-center gap-3">
-                <div className="p-1.5 bg-violet-50 rounded-lg">
+                <div className="p-1.5 bg-violet-100 rounded-lg">
                   <TrendingUp className="h-4 w-4 text-violet-500" />
                 </div>
                 <div>
@@ -230,7 +230,7 @@ export default function InvoiceDetailsPage() {
 
               {/* Invoice Total */}
               <div className="flex items-center gap-3">
-                <div className="p-1.5 bg-violet-50 rounded-lg">
+                <div className="p-1.5 bg-violet-100 rounded-lg">
                   <Receipt className="h-4 w-4 text-violet-500" />
                 </div>
                 <div>
@@ -248,7 +248,7 @@ export default function InvoiceDetailsPage() {
 
                   {/* Variance */}
                   <div className="flex items-center gap-3">
-                    <div className="p-1.5 bg-violet-50 rounded-lg">
+                    <div className="p-1.5 bg-violet-100 rounded-lg">
                       <TrendingUp className="h-4 w-4 text-violet-500" />
                     </div>
                     <div>
@@ -269,7 +269,7 @@ export default function InvoiceDetailsPage() {
                   <div className="h-8 w-px bg-gray-200" />
                   
                   <div className="flex items-center gap-3">
-                    <div className="p-1.5 bg-violet-50 rounded-lg">
+                    <div className="p-1.5 bg-violet-100 rounded-lg">
                       <AlertCircle className="h-4 w-4 text-violet-500" />
                     </div>
                     <div>
