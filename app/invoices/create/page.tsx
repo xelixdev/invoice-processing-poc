@@ -1,11 +1,13 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { ArrowLeft, FileText, Edit, Plus, Download, ChevronLeft, ChevronRight, Maximize, X, Receipt, FileCheck, TrendingUp, AlertCircle } from "lucide-react"
+import { ArrowLeft, FileText, Edit, Plus, Download, ChevronLeft, ChevronRight, Maximize, X, Receipt, FileCheck, TrendingUp, AlertCircle, AlertTriangle, CheckCircle, Calendar, Copy, List } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogOverlay, DialogPortal } from "@/components/ui/dialog"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import Sidebar from "@/components/sidebar"
 import Link from "next/link"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -35,6 +37,15 @@ interface LineItem {
   total: number;
 }
 
+interface ValidationIssue {
+  type: 'error' | 'warning' | 'info'
+  message: string
+  action?: {
+    label: string
+    onClick: () => void
+  }
+}
+
 export default function InvoiceDetailsPage() {
   const [extractedData, setExtractedData] = useState<InvoiceData | null>(null)
   const [invoice, setInvoice] = useState<Invoice | null>(null)
@@ -44,7 +55,18 @@ export default function InvoiceDetailsPage() {
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false)
   const [linkedPO, setLinkedPO] = useState<string | null>(null)
   const [linkedGR, setLinkedGR] = useState<string | null>(null)
+  const [validationIssues, setValidationIssues] = useState<{[key: string]: ValidationIssue[]}>({})
+  const [isIssuesDrawerOpen, setIsIssuesDrawerOpen] = useState(false)
   const pdfContainerRef = useRef<HTMLDivElement>(null)
+
+  // Mock PO data for validation
+  const mockPOData = {
+    vendor: "Globex Corporation",
+    expectedDate: "2024-01-15",
+    maxAmount: 2500.00,
+    currency: "USD",
+    invoiceNumber: "INV-002"
+  }
 
   useEffect(() => {
     // Retrieve the extracted data from sessionStorage
@@ -74,6 +96,215 @@ export default function InvoiceDetailsPage() {
       setFileName(storedFileName)
     }
   }, [])
+
+  // Validation logic
+  useEffect(() => {
+    if (!invoice || !linkedPO) {
+      setValidationIssues({})
+      return
+    }
+
+    const issues: {[key: string]: ValidationIssue[]} = {}
+
+    // Invoice Number validation
+    const invoiceIssues: ValidationIssue[] = []
+    if (invoice.number !== mockPOData.invoiceNumber) {
+      invoiceIssues.push({
+        type: 'warning',
+        message: `Invoice number doesn't match PO expectation (${mockPOData.invoiceNumber})`
+      })
+    }
+    // Add a duplicate check example
+    invoiceIssues.push({
+      type: 'error',
+      message: 'Potential duplicate: Similar invoice found in system',
+      action: {
+        label: 'View Similar',
+        onClick: () => console.log('View similar invoice')
+      }
+    })
+    if (invoiceIssues.length > 0) issues.invoiceNumber = invoiceIssues
+
+    // Vendor validation
+    if (invoice.vendor && invoice.vendor !== mockPOData.vendor) {
+      const vendorIssues: ValidationIssue[] = []
+      
+      // PO mismatch warning
+      vendorIssues.push({
+        type: 'warning',
+        message: `Vendor mismatch: PO expects "${mockPOData.vendor}"`,
+        action: {
+          label: 'Use PO Vendor',
+          onClick: () => console.log('Copy PO vendor')
+        }
+      })
+      
+      // Vendor not validated warning
+      vendorIssues.push({
+        type: 'warning',
+        message: 'Vendor is not validated in the system',
+        action: {
+          label: 'Validate Vendor',
+          onClick: () => console.log('Validate vendor')
+        }
+      })
+      
+      issues.vendor = vendorIssues
+    }
+
+    // Date validation
+    if (invoice.date) {
+      const invoiceDate = new Date(invoice.date)
+      const expectedDate = new Date(mockPOData.expectedDate)
+      const daysDiff = Math.abs((invoiceDate.getTime() - expectedDate.getTime()) / (1000 * 60 * 60 * 24))
+      
+      const dateIssues: ValidationIssue[] = []
+      if (daysDiff > 30) {
+        dateIssues.push({
+          type: 'warning',
+          message: `Invoice date is ${Math.round(daysDiff)} days from expected PO date`,
+          action: {
+            label: 'Copy PO Date',
+            onClick: () => console.log('Copy PO date')
+          }
+        })
+      }
+      if (invoiceDate > new Date()) {
+        dateIssues.push({
+          type: 'error',
+          message: 'Invoice date is in the future'
+        })
+      }
+      if (dateIssues.length > 0) issues.date = dateIssues
+    }
+
+    // Amount validation
+    if (invoice.amount && invoice.amount > mockPOData.maxAmount) {
+      issues.amount = [{
+        type: 'error',
+        message: `Amount exceeds PO limit by ${formatCurrency(invoice.amount - mockPOData.maxAmount, invoice.currency_code)}`
+      }]
+    }
+
+    // Currency validation
+    if (invoice.currency_code && invoice.currency_code !== mockPOData.currency) {
+      issues.currency = [{
+        type: 'warning',
+        message: `Currency mismatch: PO expects ${mockPOData.currency}`,
+        action: {
+          label: 'Use PO Currency',
+          onClick: () => console.log('Copy PO currency')
+        }
+      }]
+    }
+
+    // Due date validation
+    if (invoice.due_date) {
+      const dueDate = new Date(invoice.due_date)
+      const today = new Date()
+      if (dueDate < today) {
+        issues.dueDate = [{
+          type: 'error',
+          message: 'Due date has already passed'
+        }]
+      }
+    }
+
+    setValidationIssues(issues)
+  }, [invoice, linkedPO])
+
+  // Helper function to get the most severe issue type for a field
+  const getMostSevereIssueType = (fieldIssues: ValidationIssue[]): 'error' | 'warning' | 'info' => {
+    if (fieldIssues.some(issue => issue.type === 'error')) return 'error'
+    if (fieldIssues.some(issue => issue.type === 'warning')) return 'warning'
+    return 'info'
+  }
+
+  // Helper function to get field display name
+  const getFieldDisplayName = (fieldKey: string): string => {
+    const fieldNames: {[key: string]: string} = {
+      invoiceNumber: 'Invoice Number',
+      vendor: 'Vendor',
+      date: 'Invoice Date',
+      dueDate: 'Due Date',
+      amount: 'Total Amount',
+      currency: 'Currency'
+    }
+    return fieldNames[fieldKey] || fieldKey
+  }
+
+  // Helper function to get total issue counts
+  const getIssueCounts = () => {
+    const allIssues = Object.values(validationIssues).flat()
+    return {
+      total: allIssues.length,
+      errors: allIssues.filter(issue => issue.type === 'error').length,
+      warnings: allIssues.filter(issue => issue.type === 'warning').length
+    }
+  }
+
+  // Helper function to render validation indicator
+  const renderValidationIndicator = (fieldKey: string) => {
+    const fieldIssues = validationIssues[fieldKey]
+    if (!fieldIssues || fieldIssues.length === 0) return null
+
+    const mostSevere = getMostSevereIssueType(fieldIssues)
+    const hasMultiple = fieldIssues.length > 1
+
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <button className="relative ml-2 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-1 rounded">
+            {mostSevere === 'error' ? (
+              <AlertCircle className="h-4 w-4 text-red-500" />
+            ) : (
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+            )}
+            {hasMultiple && (
+              <span className="absolute -top-1 -right-1 h-3 w-3 bg-gray-600 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
+                {fieldIssues.length}
+              </span>
+            )}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-80 p-0" align="start">
+          <div className="p-4">
+            <h4 className="font-medium text-sm mb-3">
+              {fieldIssues.length === 1 ? 'Validation Issue' : `${fieldIssues.length} Validation Issues`}
+            </h4>
+            <div className="space-y-3">
+              {fieldIssues.map((issue, index) => (
+                <div key={index} className="flex items-start gap-3">
+                  <div className="flex-shrink-0 mt-0.5">
+                    {issue.type === 'error' ? (
+                      <AlertCircle className="h-4 w-4 text-red-500" />
+                    ) : issue.type === 'warning' ? (
+                      <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-blue-500" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-700">{issue.message}</p>
+                    {issue.action && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-2 h-7 text-xs"
+                        onClick={issue.action.onClick}
+                      >
+                        {issue.action.label}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+    )
+  }
 
   // Format date to a more readable format
   const formatDate = (dateString?: string) => {
@@ -209,7 +440,7 @@ export default function InvoiceDetailsPage() {
               </Link>
               <h1 className="text-lg font-semibold">Invoice {invoice?.number || 'new'}</h1>
               <Badge className="ml-2 bg-yellow-100 text-yellow-700 hover:bg-yellow-100 hover:text-yellow-700">
-                Draft
+                Pending Approval
               </Badge>
             </div>
             <div className="flex items-center gap-2">
@@ -320,9 +551,6 @@ export default function InvoiceDetailsPage() {
 
             {/* Approval Status - Right Side */}
             <div className="flex items-center">
-              <span className="px-3 py-1.5 bg-yellow-100 text-yellow-700 text-xs font-medium rounded-full">
-                Pending Manager Approval
-              </span>
             </div>
           </div>
         </div>
@@ -370,7 +598,7 @@ export default function InvoiceDetailsPage() {
             {/* Tabbed Content - Controls right side only */}
             <div className="flex flex-col mt-px">
               <Tabs defaultValue="details" className="flex-1 flex flex-col">
-                <div className="border-b">
+                <div className="border-b flex items-center justify-between">
                   <TabsList className="h-12 bg-transparent p-0 w-auto gap-6">
                     <TabsTrigger
                       value="details"
@@ -391,6 +619,106 @@ export default function InvoiceDetailsPage() {
                       Attachments
                     </TabsTrigger>
                   </TabsList>
+                  
+                  {/* Issues pill at the end of tabs */}
+                  {getIssueCounts().total > 0 && (
+                    <div className="flex items-center h-12">
+                      <Sheet open={isIssuesDrawerOpen} onOpenChange={setIsIssuesDrawerOpen}>
+                        <SheetTrigger asChild>
+                          <button className="px-3 py-1.5 bg-red-100 text-red-700 text-xs font-medium rounded-full hover:bg-red-200 transition-colors flex items-center gap-1.5">
+                            <AlertCircle className="h-3 w-3" />
+                            Issues ({getIssueCounts().total})
+                          </button>
+                        </SheetTrigger>
+                        <SheetContent className="w-[480px] sm:w-[600px] flex flex-col">
+                          <SheetHeader className="flex-shrink-0">
+                            <SheetTitle>Validation Issues</SheetTitle>
+                          </SheetHeader>
+                          
+                          <div className="flex-1 overflow-y-auto mt-6">
+                            {/* Summary */}
+                            <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                              <div className="flex items-center justify-between mb-3">
+                                <h3 className="font-medium text-gray-900">Summary</h3>
+                                <div className="flex items-center gap-4 text-sm">
+                                  {getIssueCounts().errors > 0 && (
+                                    <div className="flex items-center gap-1 text-red-600">
+                                      <AlertCircle className="h-4 w-4" />
+                                      {getIssueCounts().errors} error{getIssueCounts().errors > 1 ? 's' : ''}
+                                    </div>
+                                  )}
+                                  {getIssueCounts().warnings > 0 && (
+                                    <div className="flex items-center gap-1 text-amber-600">
+                                      <AlertTriangle className="h-4 w-4" />
+                                      {getIssueCounts().warnings} warning{getIssueCounts().warnings > 1 ? 's' : ''}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <p className="text-sm text-gray-600">
+                                Review and resolve invoice validation issues.
+                              </p>
+                            </div>
+
+                            {/* Issues by Field */}
+                            <div className="space-y-6">
+                              {Object.entries(validationIssues).map(([fieldKey, fieldIssues]) => (
+                                <div key={fieldKey} className="border rounded-lg p-4">
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <h4 className="font-medium text-gray-900">{getFieldDisplayName(fieldKey)}</h4>
+                                    <Badge variant="secondary" className="text-xs">
+                                      {fieldIssues.length} issue{fieldIssues.length > 1 ? 's' : ''}
+                                    </Badge>
+                                  </div>
+                                  
+                                  <div className="space-y-3">
+                                    {fieldIssues.map((issue, index) => (
+                                      <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-md">
+                                        <div className="flex-shrink-0 mt-0.5">
+                                          {issue.type === 'error' ? (
+                                            <AlertCircle className="h-4 w-4 text-red-500" />
+                                          ) : issue.type === 'warning' ? (
+                                            <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                          ) : (
+                                            <AlertCircle className="h-4 w-4 text-blue-500" />
+                                          )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-sm text-gray-700">{issue.message}</p>
+                                          {issue.action && (
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              className="mt-2 h-7 text-xs"
+                                              onClick={() => {
+                                                issue.action?.onClick()
+                                                setIsIssuesDrawerOpen(false)
+                                              }}
+                                            >
+                                              {issue.action.label}
+                                            </Button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Actions - Fixed at bottom */}
+                          {getIssueCounts().errors === 0 && (
+                            <div className="flex-shrink-0 mt-8 pt-6 border-t">
+                              <Button className="w-full bg-violet-600 hover:bg-violet-700">
+                                Save with Warnings
+                              </Button>
+                            </div>
+                          )}
+                        </SheetContent>
+                      </Sheet>
+                    </div>
+                  )}
                 </div>
 
                 <TabsContent value="details" className="flex-1 p-0 mt-4">
@@ -410,6 +738,7 @@ export default function InvoiceDetailsPage() {
                           <div>
                             <div className="flex items-center mb-2">
                               <label className="text-sm font-medium">Invoice Number</label>
+                              {renderValidationIndicator('invoiceNumber')}
                             </div>
                             <div className="border rounded-md p-2.5 bg-gray-50 text-sm">{invoice?.number || "Not specified"}</div>
                           </div>
@@ -426,6 +755,7 @@ export default function InvoiceDetailsPage() {
                           <div>
                             <div className="flex items-center mb-2">
                               <label className="text-sm font-medium">Vendor</label>
+                              {renderValidationIndicator('vendor')}
                             </div>
                             <div className="border rounded-md p-2.5 bg-gray-50 text-sm">{invoice?.vendor || "Not specified"}</div>
                           </div>
@@ -442,12 +772,14 @@ export default function InvoiceDetailsPage() {
                           <div>
                             <div className="flex items-center mb-2">
                               <label className="text-sm font-medium">Invoice Date</label>
+                              {renderValidationIndicator('date')}
                             </div>
                             <div className="border rounded-md p-2.5 bg-gray-50 text-sm">{formatDate(invoice?.date)}</div>
                           </div>
                           <div>
                             <div className="flex items-center mb-2">
                               <label className="text-sm font-medium">Due Date</label>
+                              {renderValidationIndicator('dueDate')}
                             </div>
                             <div className="border rounded-md p-2.5 bg-gray-50 text-sm">{formatDate(invoice?.due_date)}</div>
                           </div>
@@ -466,6 +798,7 @@ export default function InvoiceDetailsPage() {
                           <div>
                             <div className="flex items-center mb-2">
                               <label className="text-sm font-medium">Total Amount</label>
+                              {renderValidationIndicator('amount')}
                             </div>
                             <div className="border rounded-md p-2.5 bg-gray-50 text-sm">
                               {invoice?.amount !== undefined ? formatCurrency(invoice.amount, invoice.currency_code) : "Not specified"}
@@ -486,6 +819,7 @@ export default function InvoiceDetailsPage() {
                           <div>
                             <div className="flex items-center mb-2">
                               <label className="text-sm font-medium">Currency</label>
+                              {renderValidationIndicator('currency')}
                             </div>
                             <div className="border rounded-md p-2.5 bg-gray-50 text-sm">{invoice?.currency_code || "USD"}</div>
                           </div>
