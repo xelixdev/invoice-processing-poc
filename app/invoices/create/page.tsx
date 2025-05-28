@@ -170,10 +170,10 @@ export default function InvoiceDetailsPage() {
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-auto">
         <header className="border-b sticky top-0 bg-background z-10">
-          <div className="flex h-16 items-center px-4 justify-between">
+          <div className="flex h-16 items-center px-6 justify-between">
             <div className="flex items-center">
               <Link href="/">
-                <Button variant="outline" size="icon" className="mr-4">
+                <Button variant="outline" size="sm" className="mr-4">
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
               </Link>
@@ -183,21 +183,21 @@ export default function InvoiceDetailsPage() {
               </Badge>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" className="text-gray-700">
+              <Button variant="outline" size="sm" className="text-gray-700">
                 Cancel
               </Button>
-              <Button className="bg-violet-600 hover:bg-violet-700">Save Invoice</Button>
+              <Button size="sm" className="bg-violet-600 hover:bg-violet-700">Save Invoice</Button>
             </div>
           </div>
         </header>
 
-        <div className="bg-gradient-to-r from-gray-25 to-gray-50 border-b">
+        <div className="bg-gray-50/50 border-b">
           <div className="px-6 h-12 flex items-center">
             <div className="flex items-center gap-6">
               {/* PO Reference */}
               <div className="flex items-center gap-3">
-                <div className="p-1.5 bg-blue-50 rounded-lg">
-                  <FileCheck className="h-4 w-4 text-blue-500" />
+                <div className="p-1.5 bg-violet-50 rounded-lg">
+                  <FileCheck className="h-4 w-4 text-violet-500" />
                 </div>
                 <div>
                   <p className="text-[10px] font-medium text-gray-500 tracking-wider">Purchase Order</p>
@@ -212,11 +212,11 @@ export default function InvoiceDetailsPage() {
 
               {/* PO Available Balance */}
               <div className="flex items-center gap-3">
-                <div className="p-1.5 bg-green-50 rounded-lg">
-                  <TrendingUp className="h-4 w-4 text-green-500" />
+                <div className="p-1.5 bg-violet-50 rounded-lg">
+                  <TrendingUp className="h-4 w-4 text-violet-500" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-medium text-gray-500 tracking-wider">PO Available</p>
+                  <p className="text-[10px] font-medium text-gray-500 tracking-wider">PO Total</p>
                   <p className="text-sm font-semibold text-gray-900 -mt-1">
                     {invoice?.po_number ? formatCurrency(invoice.amount * 1.2, invoice.currency_code) : "N/A"}
                   </p>
@@ -246,8 +246,8 @@ export default function InvoiceDetailsPage() {
 
                   {/* Variance */}
                   <div className="flex items-center gap-3">
-                    <div className="p-1.5 bg-gray-100 rounded-lg">
-                      <TrendingUp className="h-4 w-4 text-gray-500" />
+                    <div className="p-1.5 bg-violet-50 rounded-lg">
+                      <TrendingUp className="h-4 w-4 text-violet-500" />
                     </div>
                     <div>
                       <p className="text-[10px] font-medium text-gray-500 tracking-wider">Variance</p>
@@ -267,8 +267,8 @@ export default function InvoiceDetailsPage() {
                   <div className="h-8 w-px bg-gray-200" />
                   
                   <div className="flex items-center gap-3">
-                    <div className="p-1.5 bg-gray-50 rounded-lg">
-                      <AlertCircle className="h-4 w-4 text-gray-400" />
+                    <div className="p-1.5 bg-violet-50 rounded-lg">
+                      <AlertCircle className="h-4 w-4 text-violet-500" />
                     </div>
                     <div>
                       <p className="text-[10px] font-medium text-gray-500 tracking-wider">Status</p>
