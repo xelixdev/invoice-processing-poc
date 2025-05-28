@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Bell } from "lucide-react"
+import { Bell, User, HelpCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 type ActivePage = "dashboard" | "invoices" | "purchase-orders" | "goods-received"
@@ -54,7 +54,13 @@ export default function MainHeader({ activePage }: MainHeaderProps) {
             Goods Receipt Notes
           </Link>
         </nav>
-        <div className="ml-auto flex items-center space-x-4">
+        <div className="ml-auto flex items-center space-x-3">
+          <Button variant="ghost" size="icon">
+            <User className="h-5 w-5" />
+          </Button>
+          <Button variant="ghost" size="icon">
+            <HelpCircle className="h-5 w-5" />
+          </Button>
           <Button variant="ghost" size="icon" className="relative">
             <Bell className="h-5 w-5" />
             <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
