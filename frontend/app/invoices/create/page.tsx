@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { ArrowLeft, FileText, Edit, Plus, Download, ChevronLeft, ChevronRight, Maximize, X, Receipt, FileCheck, TrendingUp, AlertCircle, AlertTriangle, CheckCircle, Calendar, Copy, List } from "lucide-react"
+import { ArrowLeft, FileText, Edit, Plus, Download, ChevronLeft, ChevronRight, Maximize, X, Receipt, FileCheck, TrendingUp, AlertCircle, AlertTriangle, CheckCircle, Calendar as CalendarIcon, Copy, List } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
@@ -11,6 +11,11 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import Sidebar from "@/components/sidebar"
 import Link from "next/link"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { cn } from "@/lib/utils"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Calendar } from "@/components/ui/calendar"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { format } from "date-fns"
 
 interface InvoiceData {
   document_type: string;
@@ -57,6 +62,11 @@ export default function InvoiceDetailsPage() {
   const [linkedGR, setLinkedGR] = useState<string | null>(null)
   const [validationIssues, setValidationIssues] = useState<{[key: string]: ValidationIssue[]}>({})
   const [isIssuesDrawerOpen, setIsIssuesDrawerOpen] = useState(false)
+  const [editingField, setEditingField] = useState<string | null>(null)
+  const [fieldValues, setFieldValues] = useState<{[key: string]: string}>({})
+  const [removingVendor, setRemovingVendor] = useState(false)
+  const [resolvingIssues, setResolvingIssues] = useState<Set<string>>(new Set())
+  const [resolvedIssues, setResolvedIssues] = useState<Set<string>>(new Set())
   const pdfContainerRef = useRef<HTMLDivElement>(null)
 
   // Mock PO data for validation
@@ -246,7 +256,15 @@ export default function InvoiceDetailsPage() {
   // Helper function to render validation indicator
   const renderValidationIndicator = (fieldKey: string) => {
     const fieldIssues = validationIssues[fieldKey]
-    if (!fieldIssues || fieldIssues.length === 0) return null
+    
+    // Show green checkmark for fields with no issues
+    if (!fieldIssues || fieldIssues.length === 0) {
+      return (
+        <div className="ml-2">
+          <CheckCircle className="h-4 w-4 text-green-500" />
+        </div>
+      )
+    }
 
     const mostSevere = getMostSevereIssueType(fieldIssues)
     const hasMultiple = fieldIssues.length > 1
@@ -261,7 +279,7 @@ export default function InvoiceDetailsPage() {
               <AlertTriangle className="h-4 w-4 text-amber-500" />
             )}
             {hasMultiple && (
-              <span className="absolute -top-1 -right-1 h-3 w-3 bg-gray-600 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
+              <span className="absolute -top-1 -right-1.5 h-3 w-3 bg-gray-600 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
                 {fieldIssues.length}
               </span>
             )}
@@ -330,6 +348,397 @@ export default function InvoiceDetailsPage() {
       style: 'currency', 
       currency: currencyCode || 'USD' 
     }).format(amount)
+  }
+
+  // Handle field value changes
+  const handleFieldChange = (fieldName: string, value: string) => {
+    setFieldValues(prev => ({ ...prev, [fieldName]: value }))
+  }
+
+  // Handle field blur
+  const handleFieldBlur = (fieldName: string, e?: React.FocusEvent) => {
+    // Check if we're clicking on another editable field
+    const relatedTarget = e?.relatedTarget as HTMLElement
+    if (relatedTarget?.closest('[data-editable-field]')) {
+      // Don't set to null, let the click handler of the new field handle it
+      return
+    }
+    
+    setEditingField(null)
+    // Here you would typically save the value
+    if (fieldName === 'invoiceNumber' && fieldValues.invoiceNumber) {
+      setInvoice(prev => prev ? { ...prev, number: fieldValues.invoiceNumber } : prev)
+    }
+    // Add other field mappings as needed
+  }
+
+  // Get field value
+  const getFieldValue = (fieldName: string, defaultValue: string) => {
+    if (editingField === fieldName && fieldValues[fieldName] !== undefined) {
+      return fieldValues[fieldName]
+    }
+    return defaultValue
+  }
+
+  // Handle resolving issues
+  const handleResolveIssue = (fieldKey: string, issueIndex: number) => {
+    const issueId = `${fieldKey}-${issueIndex}`
+    
+    // Mark as resolving
+    setResolvingIssues(prev => new Set([...prev, issueId]))
+    
+    // After 1.5 seconds, start slide-out animation
+    setTimeout(() => {
+      setResolvedIssues(prev => new Set([...prev, issueId]))
+      
+      // After slide-out animation completes, remove from issues
+      setTimeout(() => {
+        setValidationIssues(prev => {
+          const newIssues = { ...prev }
+          if (newIssues[fieldKey]) {
+            newIssues[fieldKey] = newIssues[fieldKey].filter((_, index) => index !== issueIndex)
+            if (newIssues[fieldKey].length === 0) {
+              delete newIssues[fieldKey]
+            }
+          }
+          return newIssues
+        })
+        
+        setResolvingIssues(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(issueId)
+          return newSet
+        })
+        
+        setResolvedIssues(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(issueId)
+          return newSet
+        })
+      }, 500) // Wait for slide-out animation to complete
+    }, 1500) // Wait 1.5 seconds before starting slide-out
+  }
+
+  // Vendor options
+  const vendorOptions = [
+    { value: "Globex Corporation", label: "Globex Corporation" },
+    { value: "Acme Corp", label: "Acme Corp" },
+    { value: "TechSolutions Inc", label: "TechSolutions Inc" },
+    { value: "Innovation Labs", label: "Innovation Labs" },
+    { value: "Digital Dynamics", label: "Digital Dynamics" }
+  ]
+
+  // EditableField component
+  const EditableField = ({ 
+    fieldName, 
+    label, 
+    value, 
+    placeholder = "Not specified",
+    multiline = false,
+    type = "text",
+    options = []
+  }: {
+    fieldName: string
+    label: string
+    value: string | undefined | null
+    placeholder?: string
+    multiline?: boolean
+    type?: "text" | "date" | "select" | "number"
+    options?: { value: string; label: string }[]
+  }) => {
+    const isEditing = editingField === fieldName
+    const hasValidationIssues = validationIssues[fieldName]
+    const hasError = hasValidationIssues?.some(i => i.type === 'error')
+    const hasWarning = hasValidationIssues?.some(i => i.type === 'warning')
+    
+    const handleFieldClick = (e: React.MouseEvent) => {
+      // Prevent editing when clicking on validation indicator
+      const target = e.target as HTMLElement
+      if (target.closest('[data-validation-indicator]')) {
+        e.stopPropagation()
+        return
+      }
+      setEditingField(fieldName)
+      setFieldValues(prev => ({ ...prev, [fieldName]: value || '' }))
+    }
+    
+    return (
+      <div className="group">
+        <label className="text-xs text-gray-500 font-medium">{label}</label>
+        <div className="mt-0.5 relative">
+          {isEditing ? (
+            <div className="relative" data-editable-field>
+              {fieldName === "vendor" ? (
+                <div className="relative">
+                  {/* Vendor pill container - maintains exact same layout as read mode */}
+                  <div
+                    className={cn(
+                      "relative text-sm py-2 pl-3 pr-10 rounded-md border transition-all duration-200 cursor-text h-[40px] flex items-center",
+                      hasError ? "border-red-200 bg-red-50/50 hover:bg-red-50" : 
+                      hasWarning ? "border-amber-200 bg-amber-50/50 hover:bg-amber-50" : 
+                      hasValidationIssues ? "border-gray-200 bg-gray-50/30 hover:border-violet-200 hover:bg-violet-50/50" :
+                      "border-violet-200 bg-violet-50/50"
+                    )}
+                  >
+                    <div className="flex items-center flex-1 min-w-0 gap-2">
+                      {value && (
+                        <div className="flex items-center gap-1">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex items-center px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-medium rounded-full max-w-full">
+                                  <span className="truncate max-w-[160px]">
+                                    {value}
+                                  </span>
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{value}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              e.preventDefault()
+                              console.log('X button clicked - removing vendor')
+                              handleFieldChange(fieldName, '')
+                              setEditingField(null)
+                            }}
+                            className="hover:bg-gray-200 rounded-full p-0.5 transition-colors flex-shrink-0 bg-white border border-gray-300"
+                          >
+                            <X className="h-2.5 w-2.5" />
+                          </button>
+                        </div>
+                      )}
+                      {/* Blinking cursor */}
+                      <div className="w-0.5 h-4 bg-gray-800 animate-pulse"></div>
+                      {!value && <span className="text-gray-400">Select vendor...</span>}
+                    </div>
+                    <div className="absolute right-3 flex items-center">
+                      <div data-validation-indicator className="flex items-center">{renderValidationIndicator(fieldName)}</div>
+                    </div>
+                  </div>
+                  
+                  {/* Dropdown overlay - positioned absolutely to not affect layout */}
+                  {!removingVendor && (
+                    <div className="absolute top-full left-0 right-0 z-40">
+                      <Select
+                        value=""
+                        onValueChange={(val) => {
+                          handleFieldChange(fieldName, val)
+                          setEditingField(null)
+                        }}
+                        open={true}
+                      >
+                        <SelectTrigger className="opacity-0 pointer-events-none h-0 overflow-hidden">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="mt-0" side="bottom" align="start" sideOffset={-15}>
+                          {vendorOptions.map(opt => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              ) : multiline ? (
+                <textarea
+                  className={cn(
+                    "w-full text-sm text-gray-900 py-2 px-3 pr-10 rounded-md border transition-all duration-200 focus:outline-none focus:border-violet-500 resize-none",
+                    hasError ? "border-red-300 bg-red-50" : 
+                    hasWarning ? "border-amber-300 bg-amber-50" : 
+                    "border-violet-500 bg-white"
+                  )}
+                  value={getFieldValue(fieldName, value || '')}
+                  onChange={(e) => handleFieldChange(fieldName, e.target.value)}
+                  onBlur={(e) => handleFieldBlur(fieldName, e)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      handleFieldBlur(fieldName)
+                    }
+                  }}
+                  autoFocus
+                  rows={2}
+                />
+              ) : type === "select" ? (
+                <Select
+                  value={getFieldValue(fieldName, value || '')}
+                  onValueChange={(val) => {
+                    handleFieldChange(fieldName, val)
+                    setEditingField(null)
+                  }}
+                  open={true}
+                >
+                  <SelectTrigger 
+                    className={cn(
+                      "w-full h-[40px] text-sm",
+                      hasError ? "border-red-300 bg-red-50 focus:ring-0" : 
+                      hasWarning ? "border-amber-300 bg-amber-50 focus:ring-0" : 
+                      "border-violet-500 bg-white focus:ring-0"
+                    )}
+                    onBlur={(e) => handleFieldBlur(fieldName, e)}
+                  >
+                    <SelectValue placeholder={placeholder} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {options.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (fieldName === "vendor" && !value) ? (
+                <Select
+                  value=""
+                  onValueChange={(val) => {
+                    handleFieldChange(fieldName, val)
+                    setEditingField(null)
+                  }}
+                  open={true}
+                >
+                  <SelectTrigger 
+                    className={cn(
+                      "w-full h-[40px] text-sm",
+                      hasError ? "border-red-300 bg-red-50 focus:ring-0" : 
+                      hasWarning ? "border-amber-300 bg-amber-50 focus:ring-0" : 
+                      "border-violet-500 bg-white focus:ring-0"
+                    )}
+                    onBlur={(e) => handleFieldBlur(fieldName, e)}
+                  >
+                    <SelectValue placeholder="Select vendor..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vendorOptions.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : type === "date" ? (
+                <Popover open={true}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full h-[40px] justify-start text-left font-normal text-sm px-3",
+                        !value && "text-gray-400",
+                        hasError ? "border-red-300 bg-red-50 hover:bg-red-50" : 
+                        hasWarning ? "border-amber-300 bg-amber-50 hover:bg-amber-50" : 
+                        "border-violet-500 bg-white hover:bg-white"
+                      )}
+                      onBlur={(e) => handleFieldBlur(fieldName, e)}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {value ? format(new Date(value), "PPP") : placeholder}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={value ? new Date(value) : undefined}
+                      onSelect={(date) => {
+                        if (date) {
+                          handleFieldChange(fieldName, format(date, "yyyy-MM-dd"))
+                          setEditingField(null)
+                        }
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <input
+                  type={type === "number" ? "text" : type}
+                  inputMode={type === "number" ? "decimal" : undefined}
+                  className={cn(
+                    "w-full h-[40px] text-sm text-gray-900 px-3 pr-10 rounded-md border transition-all duration-200 focus:outline-none focus:border-violet-500",
+                    hasError ? "border-red-300 bg-red-50" : 
+                    hasWarning ? "border-amber-300 bg-amber-50" : 
+                    "border-violet-500 bg-white"
+                  )}
+                  value={getFieldValue(fieldName, value || '')}
+                  onChange={(e) => handleFieldChange(fieldName, e.target.value)}
+                  onBlur={(e) => handleFieldBlur(fieldName, e)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleFieldBlur(fieldName, e as any)
+                    }
+                  }}
+                  autoFocus
+                />
+              )}
+              <div data-validation-indicator className="absolute right-3 top-1/2 -translate-y-1/2">
+                {renderValidationIndicator(fieldName)}
+              </div>
+            </div>
+          ) : (
+            <div
+              onClick={handleFieldClick}
+              data-editable-field
+              className={cn(
+                "relative text-sm py-2 pl-3 pr-10 rounded-md border transition-all duration-200 cursor-text flex items-center",
+                multiline ? "min-h-[40px]" : "h-[40px]",
+                hasError ? "border-red-200 bg-red-50/50 hover:bg-red-50" : 
+                hasWarning ? "border-amber-200 bg-amber-50/50 hover:bg-amber-50" : 
+                hasValidationIssues ? "border-gray-200 bg-gray-50/30 hover:border-violet-200 hover:bg-violet-50/50" :
+                "border-gray-200 hover:border-violet-200 hover:bg-violet-50/50"
+              )}
+            >
+              {fieldName === "vendor" && value ? (
+                <>
+                  <div className="flex items-center flex-1 min-w-0">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-medium rounded-full max-w-full">
+                            <span className="truncate max-w-[160px]">
+                              {value}
+                            </span>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{value}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <div className="absolute right-3 flex items-center gap-0.5">
+                    <Edit className="h-3.5 w-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                    <div data-validation-indicator className="flex items-center">{renderValidationIndicator(fieldName)}</div>
+                  </div>
+                </>
+              ) : (
+                <span className={cn(
+                  "flex-1 truncate pr-2",
+                  !value ? "text-gray-400" : "text-gray-900",
+                  multiline && "!whitespace-pre-wrap !truncate-none"
+                )}>
+                  {(() => {
+                    if (!value) return placeholder
+                    if (type === "date") return formatDate(value)
+                    if (type === "number" && (fieldName.includes("amount") || fieldName.includes("Amount"))) {
+                      return formatCurrency(parseFloat(value), invoice?.currency_code)
+                    }
+                    return value
+                  })()}
+                </span>
+              )}
+              <div className="absolute right-3 flex items-center gap-0.5">
+                <Edit className="h-3.5 w-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                <div data-validation-indicator className="flex items-center">{renderValidationIndicator(fieldName)}</div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    )
   }
 
   // Handle download of the original file
@@ -619,23 +1028,31 @@ export default function InvoiceDetailsPage() {
                       Attachments
                     </TabsTrigger>
                   </TabsList>
-                  
-                  {/* Issues pill at the end of tabs */}
-                  {getIssueCounts().total > 0 && (
-                    <div className="flex items-center h-12">
-                      <Sheet open={isIssuesDrawerOpen} onOpenChange={setIsIssuesDrawerOpen}>
-                        <SheetTrigger asChild>
-                          <button className="px-3 py-1.5 bg-red-100 text-red-700 text-xs font-medium rounded-full hover:bg-red-200 transition-colors flex items-center gap-1.5">
-                            <AlertCircle className="h-3 w-3" />
-                            Issues ({getIssueCounts().total})
-                          </button>
-                        </SheetTrigger>
-                        <SheetContent className="w-[480px] sm:w-[600px] flex flex-col">
-                          <SheetHeader className="flex-shrink-0">
-                            <SheetTitle>Validation Issues</SheetTitle>
+                </div>
+
+                <TabsContent value="details" className="flex-1 p-0 mt-4">
+                  <div className="border rounded-lg overflow-hidden h-full">
+                    <div className="p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-semibold">Invoice Details</h2>
+                        {getIssueCounts().total > 0 && (
+                          <Sheet open={isIssuesDrawerOpen} onOpenChange={setIsIssuesDrawerOpen}>
+                            <SheetTrigger asChild>
+                              <button className={cn(
+                                "px-3 py-1.5 text-xs font-medium rounded-full transition-colors",
+                                getIssueCounts().errors > 0 
+                                  ? "bg-red-100 text-red-700 hover:bg-red-200" 
+                                  : "bg-amber-100 text-amber-700 hover:bg-amber-200"
+                              )}>
+                                Mismatches ({getIssueCounts().total})
+                              </button>
+                            </SheetTrigger>
+                            <SheetContent className="w-[700px] sm:w-[900px] flex flex-col">
+                              <SheetHeader className="flex-shrink-0 pb-3">
+                                <SheetTitle>Mismatches</SheetTitle>
                           </SheetHeader>
                           
-                          <div className="flex-1 overflow-y-auto mt-6">
+                          <div className="flex-1 overflow-y-auto mt-3">
                             {/* Summary */}
                             <div className="bg-gray-50 rounded-lg p-4 mb-6">
                               <div className="flex items-center justify-between mb-3">
@@ -656,54 +1073,103 @@ export default function InvoiceDetailsPage() {
                                 </div>
                               </div>
                               <p className="text-sm text-gray-600">
-                                Review and resolve invoice validation issues.
+                                Review and resolve invoice mismatches.
                               </p>
                             </div>
 
                             {/* Issues by Field */}
                             <div className="space-y-6">
-                              {Object.entries(validationIssues).map(([fieldKey, fieldIssues]) => (
-                                <div key={fieldKey} className="border rounded-lg p-4">
-                                  <div className="flex items-center gap-2 mb-3">
-                                    <h4 className="font-medium text-gray-900">{getFieldDisplayName(fieldKey)}</h4>
-                                    <Badge variant="secondary" className="text-xs">
-                                      {fieldIssues.length} issue{fieldIssues.length > 1 ? 's' : ''}
-                                    </Badge>
-                                  </div>
+                              {Object.entries(validationIssues).map(([fieldKey, fieldIssues]) => {
+                                // Filter out resolved issues
+                                const activeIssues = fieldIssues.filter((_, index) => {
+                                  const issueId = `${fieldKey}-${index}`
+                                  return !resolvedIssues.has(issueId)
+                                })
+                                
+                                // Don't render section if no active issues
+                                if (activeIssues.length === 0) return null
+                                
+                                return (
+                                  <div key={fieldKey} className="mb-6">
+                                    <div className="mb-3">
+                                      <h4 className="font-semibold text-gray-900 text-base">{getFieldDisplayName(fieldKey)}</h4>
+                                    </div>
                                   
-                                  <div className="space-y-3">
-                                    {fieldIssues.map((issue, index) => (
-                                      <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-md">
-                                        <div className="flex-shrink-0 mt-0.5">
-                                          {issue.type === 'error' ? (
-                                            <AlertCircle className="h-4 w-4 text-red-500" />
-                                          ) : issue.type === 'warning' ? (
-                                            <AlertTriangle className="h-4 w-4 text-amber-500" />
-                                          ) : (
-                                            <AlertCircle className="h-4 w-4 text-blue-500" />
-                                          )}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                          <p className="text-sm text-gray-700">{issue.message}</p>
-                                          {issue.action && (
-                                            <Button
-                                              variant="outline"
-                                              size="sm"
-                                              className="mt-2 h-7 text-xs"
-                                              onClick={() => {
-                                                issue.action?.onClick()
-                                                setIsIssuesDrawerOpen(false)
-                                              }}
-                                            >
-                                              {issue.action.label}
-                                            </Button>
-                                          )}
-                                        </div>
-                                      </div>
-                                    ))}
+                                    <div className="space-y-4">
+                                      {fieldIssues.map((issue, index) => {
+                                        const issueId = `${fieldKey}-${index}`
+                                        const isResolving = resolvingIssues.has(issueId)
+                                        const isResolved = resolvedIssues.has(issueId)
+                                        
+                                        return (
+                                          <div 
+                                            key={index} 
+                                            className={`relative bg-white border border-gray-200 rounded-lg p-4 shadow-sm transition-all duration-500 ${
+                                              isResolved ? 'transform translate-x-full opacity-0 pointer-events-none' :
+                                              isResolving ? 'border-green-200' : 'hover:shadow-md'
+                                            }`}
+                                            style={{
+                                              height: isResolved ? '0' : 'auto',
+                                              marginBottom: isResolved ? '0' : undefined,
+                                              overflow: isResolved ? 'hidden' : 'visible'
+                                            }}
+                                          >
+                                            <div className="flex items-start gap-4">
+                                              <div className="flex-shrink-0 mt-1">
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                                                  isResolving ? 'bg-green-100' : 
+                                                  issue.type === 'error' ? 'bg-red-100' : 
+                                                  issue.type === 'warning' ? 'bg-amber-100' : 'bg-blue-100'
+                                                }`}>
+                                                  {isResolving ? (
+                                                    <CheckCircle className="h-4 w-4 text-green-600" />
+                                                  ) : issue.type === 'error' ? (
+                                                    <AlertCircle className="h-4 w-4 text-red-600" />
+                                                  ) : issue.type === 'warning' ? (
+                                                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                                                  ) : (
+                                                    <AlertCircle className="h-4 w-4 text-blue-600" />
+                                                  )}
+                                                </div>
+                                              </div>
+                                              <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-gray-900 mb-2 leading-relaxed">{issue.message}</p>
+                                                {issue.action && (
+                                                  <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className={`h-8 text-xs font-medium px-4 transition-all duration-300 ${
+                                                      isResolving 
+                                                        ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-100' 
+                                                        : 'hover:bg-violet-50 hover:border-violet-300 hover:text-violet-700'
+                                                    }`}
+                                                    disabled={isResolving}
+                                                    onClick={() => {
+                                                      if (!isResolving) {
+                                                        issue.action?.onClick()
+                                                        handleResolveIssue(fieldKey, index)
+                                                      }
+                                                    }}
+                                                  >
+                                                    {isResolving ? (
+                                                      <>
+                                                        <CheckCircle className="h-3 w-3 mr-1" />
+                                                        Resolved
+                                                      </>
+                                                    ) : (
+                                                      issue.action.label
+                                                    )}
+                                                  </Button>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        )
+                                      })}
+                                    </div>
                                   </div>
-                                </div>
-                              ))}
+                                )
+                              })}
                             </div>
                           </div>
 
@@ -717,112 +1183,105 @@ export default function InvoiceDetailsPage() {
                           )}
                         </SheetContent>
                       </Sheet>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
 
-                <TabsContent value="details" className="flex-1 p-0 mt-4">
-                  <div className="border rounded-lg overflow-hidden h-full">
-                    <div className="p-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-semibold">Invoice Details</h2>
-                        <Button variant="ghost" size="sm" className="h-8 gap-1">
-                          <Edit className="h-4 w-4" />
-                          Edit
-                        </Button>
-                      </div>
-
-                      <div className="space-y-6">
-                        {/* Row 1: Invoice Number + Invoice Description */}
+                      <div className="space-y-4">
+                        {/* Row 1: Invoice Number + Vendor */}
                         <div className="grid grid-cols-2 gap-6">
-                          <div>
-                            <div className="flex items-center mb-2">
-                              <label className="text-sm font-medium">Invoice Number</label>
-                              {renderValidationIndicator('invoiceNumber')}
-                            </div>
-                            <div className="border rounded-md p-2.5 bg-gray-50 text-sm">{invoice?.number || "Not specified"}</div>
-                          </div>
-                          <div>
-                            <div className="flex items-center mb-2">
-                              <label className="text-sm font-medium">Invoice Description</label>
-                            </div>
-                            <div className="border rounded-md p-2.5 bg-gray-50 text-sm">Professional services - Q4 consulting</div>
-                          </div>
+                          <EditableField
+                            fieldName="invoiceNumber"
+                            label="Invoice Number"
+                            value={invoice?.number}
+                          />
+                          <EditableField
+                            fieldName="vendor"
+                            label="Vendor"
+                            value={invoice?.vendor}
+                          />
                         </div>
 
-                        {/* Row 2: Vendor + GL Account/Cost Center */}
+                        {/* Row 2: GL Account + Invoice Date */}
                         <div className="grid grid-cols-2 gap-6">
-                          <div>
-                            <div className="flex items-center mb-2">
-                              <label className="text-sm font-medium">Vendor</label>
-                              {renderValidationIndicator('vendor')}
-                            </div>
-                            <div className="border rounded-md p-2.5 bg-gray-50 text-sm">{invoice?.vendor || "Not specified"}</div>
-                          </div>
-                          <div>
-                            <div className="flex items-center mb-2">
-                              <label className="text-sm font-medium">GL Account / Cost Center</label>
-                            </div>
-                            <div className="border rounded-md p-2.5 bg-gray-50 text-sm">6200-001 - Professional Services</div>
-                          </div>
+                          <EditableField
+                            fieldName="glAccount"
+                            label="GL Account / Cost Center"
+                            value="6200-001 - Professional Services"
+                            type="select"
+                            options={[
+                              { value: "6200-001 - Professional Services", label: "6200-001 - Professional Services" },
+                              { value: "6100-002 - IT Services", label: "6100-002 - IT Services" },
+                              { value: "5500-003 - Marketing", label: "5500-003 - Marketing" },
+                              { value: "4400-004 - Operations", label: "4400-004 - Operations" }
+                            ]}
+                          />
+                          <EditableField
+                            fieldName="date"
+                            label="Invoice Date"
+                            value={invoice?.date || ''}
+                            type="date"
+                          />
                         </div>
 
-                        {/* Row 3: Invoice Date + Due Date */}
+                        {/* Row 3: Due Date + Tax Amount */}
                         <div className="grid grid-cols-2 gap-6">
-                          <div>
-                            <div className="flex items-center mb-2">
-                              <label className="text-sm font-medium">Invoice Date</label>
-                              {renderValidationIndicator('date')}
-                            </div>
-                            <div className="border rounded-md p-2.5 bg-gray-50 text-sm">{formatDate(invoice?.date)}</div>
-                          </div>
-                          <div>
-                            <div className="flex items-center mb-2">
-                              <label className="text-sm font-medium">Due Date</label>
-                              {renderValidationIndicator('dueDate')}
-                            </div>
-                            <div className="border rounded-md p-2.5 bg-gray-50 text-sm">{formatDate(invoice?.due_date)}</div>
-                          </div>
+                          <EditableField
+                            fieldName="dueDate"
+                            label="Due Date"
+                            value={invoice?.due_date || ''}
+                            type="date"
+                          />
+                          <EditableField
+                            fieldName="taxAmount"
+                            label="Tax Amount"
+                            value={invoice?.tax_amount?.toString() || ''}
+                            type="number"
+                          />
                         </div>
 
-                        {/* Row 4: Tax Amount + Total Amount */}
+                        {/* Row 4: Total Amount + Payment Terms */}
                         <div className="grid grid-cols-2 gap-6">
-                          <div>
-                            <div className="flex items-center mb-2">
-                              <label className="text-sm font-medium">Tax Amount</label>
-                            </div>
-                            <div className="border rounded-md p-2.5 bg-gray-50 text-sm">
-                              {invoice?.tax_amount !== undefined ? formatCurrency(invoice.tax_amount, invoice.currency_code) : "Not specified"}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="flex items-center mb-2">
-                              <label className="text-sm font-medium">Total Amount</label>
-                              {renderValidationIndicator('amount')}
-                            </div>
-                            <div className="border rounded-md p-2.5 bg-gray-50 text-sm">
-                              {invoice?.amount !== undefined ? formatCurrency(invoice.amount, invoice.currency_code) : "Not specified"}
-                            </div>
-                          </div>
+                          <EditableField
+                            fieldName="amount"
+                            label="Total Amount"
+                            value={invoice?.amount?.toString() || ''}
+                            type="number"
+                          />
+                          <EditableField
+                            fieldName="paymentTerms"
+                            label="Payment Terms"
+                            value={invoice?.payment_term_days ? `Net ${invoice.payment_term_days}` : 'Net 30'}
+                            type="select"
+                            options={[
+                              { value: "Net 15", label: "Net 15" },
+                              { value: "Net 30", label: "Net 30" },
+                              { value: "Net 45", label: "Net 45" },
+                              { value: "Net 60", label: "Net 60" },
+                              { value: "Due on Receipt", label: "Due on Receipt" }
+                            ]}
+                          />
                         </div>
 
-                        {/* Row 5: Payment Terms + Currency */}
+                        {/* Row 5: Currency + Invoice Description */}
                         <div className="grid grid-cols-2 gap-6">
-                          <div>
-                            <div className="flex items-center mb-2">
-                              <label className="text-sm font-medium">Payment Terms</label>
-                            </div>
-                            <div className="border rounded-md p-2.5 bg-gray-50 text-sm">
-                              {invoice?.payment_term_days ? `Net ${invoice.payment_term_days}` : "Not specified"}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="flex items-center mb-2">
-                              <label className="text-sm font-medium">Currency</label>
-                              {renderValidationIndicator('currency')}
-                            </div>
-                            <div className="border rounded-md p-2.5 bg-gray-50 text-sm">{invoice?.currency_code || "USD"}</div>
-                          </div>
+                          <EditableField
+                            fieldName="currency"
+                            label="Currency"
+                            value={invoice?.currency_code || "USD"}
+                            type="select"
+                            options={[
+                              { value: "USD", label: "USD - US Dollar" },
+                              { value: "EUR", label: "EUR - Euro" },
+                              { value: "GBP", label: "GBP - British Pound" },
+                              { value: "CAD", label: "CAD - Canadian Dollar" },
+                              { value: "AUD", label: "AUD - Australian Dollar" }
+                            ]}
+                          />
+                          <EditableField
+                            fieldName="invoiceDescription"
+                            label="Invoice Description"
+                            value="Professional services - Q4 consulting"
+                          />
                         </div>
 
                         <div>
@@ -834,14 +1293,14 @@ export default function InvoiceDetailsPage() {
                           <div className="mb-2">
                             <div className="w-full">
                               {linkedPO ? (
-                                <div className="border-2 border-solid border-gray-200 rounded-lg p-3 bg-white h-14 flex items-center w-full animate-in fade-in-0 slide-in-from-top-2 duration-300">
+                                <div className="border border-gray-200 rounded-lg p-2.5 bg-white h-12 flex items-center w-full animate-in fade-in-0 slide-in-from-top-2 duration-300">
                                   <div className="flex items-center justify-between w-full min-w-0">
                                     <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
                                       <div className="flex items-center justify-center w-8 h-8 bg-violet-100 rounded text-xs font-medium text-violet-600 flex-shrink-0">
                                         PO
                                       </div>
                                       <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
-                                        <span className="text-violet-600 font-medium flex-shrink-0">{linkedPO}</span>
+                                        <span className="text-violet-600 font-medium text-sm flex-shrink-0">{linkedPO}</span>
                                         <span className="text-sm text-gray-500 flex-shrink-0 hidden sm:inline">4 of 4 items matched</span>
                                         <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full flex-shrink-0">
                                           Matched
@@ -855,7 +1314,7 @@ export default function InvoiceDetailsPage() {
                                 </div>
                               ) : (
                                 <div 
-                                  className="border-2 border-dashed border-gray-300 rounded-lg p-3 bg-gray-50 text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50/50 transition-all duration-300 h-14 flex items-center justify-center w-full animate-in fade-in-0 slide-in-from-bottom-2 group hover:shadow-sm"
+                                  className="border border-dashed border-gray-300 rounded-lg p-2.5 bg-gray-50 text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50/50 transition-all duration-300 h-12 flex items-center justify-center w-full animate-in fade-in-0 slide-in-from-bottom-2 group hover:shadow-sm"
                                   onClick={handleAddPO}
                                 >
                                   <div className="flex items-center justify-center gap-2 text-gray-500 group-hover:text-violet-600 transition-colors duration-200">
@@ -871,14 +1330,14 @@ export default function InvoiceDetailsPage() {
                           <div>
                             <div className="w-full">
                               {linkedGR ? (
-                                <div className="border-2 border-solid border-gray-200 rounded-lg p-3 bg-white h-14 flex items-center w-full animate-in fade-in-0 slide-in-from-top-2 duration-300">
+                                <div className="border border-gray-200 rounded-lg p-2.5 bg-white h-12 flex items-center w-full animate-in fade-in-0 slide-in-from-top-2 duration-300">
                                   <div className="flex items-center justify-between w-full min-w-0">
                                     <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
                                       <div className="flex items-center justify-center w-8 h-8 bg-violet-100 rounded text-xs font-medium text-violet-600 flex-shrink-0">
                                         GR
                                       </div>
                                       <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
-                                        <span className="text-violet-600 font-medium flex-shrink-0">{linkedGR}</span>
+                                        <span className="text-violet-600 font-medium text-sm flex-shrink-0">{linkedGR}</span>
                                         <span className="text-sm text-gray-500 flex-shrink-0 hidden sm:inline">4 of 4 items received</span>
                                         <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full flex-shrink-0">
                                           Received
@@ -892,7 +1351,7 @@ export default function InvoiceDetailsPage() {
                                 </div>
                               ) : (
                                 <div 
-                                  className="border-2 border-dashed border-gray-300 rounded-lg p-3 bg-gray-50 text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50/50 transition-all duration-300 h-14 flex items-center justify-center w-full animate-in fade-in-0 slide-in-from-bottom-2 group hover:shadow-sm"
+                                  className="border border-dashed border-gray-300 rounded-lg p-2.5 bg-gray-50 text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50/50 transition-all duration-300 h-12 flex items-center justify-center w-full animate-in fade-in-0 slide-in-from-bottom-2 group hover:shadow-sm"
                                   onClick={handleAddGR}
                                 >
                                   <div className="flex items-center justify-center gap-2 text-gray-500 group-hover:text-violet-600 transition-colors duration-200">
