@@ -67,6 +67,8 @@ export default function InvoiceDetailsPage() {
   const [removingVendor, setRemovingVendor] = useState(false)
   const [resolvingIssues, setResolvingIssues] = useState<Set<string>>(new Set())
   const [resolvedIssues, setResolvedIssues] = useState<Set<string>>(new Set())
+  const [isPODrawerOpen, setIsPODrawerOpen] = useState(false)
+  const [isGRDrawerOpen, setIsGRDrawerOpen] = useState(false)
   const pdfContainerRef = useRef<HTMLDivElement>(null)
 
   // Mock PO data for validation
@@ -78,19 +80,24 @@ export default function InvoiceDetailsPage() {
     invoiceNumber: "INV-002"
   }
 
-  // Mock PO line items for matching
+  // Mock PO line items for matching - based on common office furniture items
   const mockPOLines = [
-    { id: "po-line-1", description: "Professional consulting services", quantity: 10, unit_price: 150.00, total: 1500.00 },
-    { id: "po-line-2", description: "Software development services", quantity: 8, unit_price: 200.00, total: 1600.00 },
-    { id: "po-line-3", description: "Project management services", quantity: 5, unit_price: 175.00, total: 875.00 },
-    { id: "po-line-4", description: "Technical documentation", quantity: 2, unit_price: 100.00, total: 200.00 },
+    { id: "po-line-1", description: "Office Chair", quantity: 4, unit_price: 75.00, total: 300.00 },
+    { id: "po-line-2", description: "Office Desk", quantity: 3, unit_price: 200.00, total: 600.00 },
+    { id: "po-line-3", description: "Office TV", quantity: 2, unit_price: 500.00, total: 1000.00 },
+    { id: "po-line-4", description: "Office Couch", quantity: 2, unit_price: 750.00, total: 1500.00 }, // Quantity mismatch - PO has 2, invoice has 1
+    { id: "po-line-5", description: "Office Lamp", quantity: 5, unit_price: 25.00, total: 125.00 },
+    { id: "po-line-6", description: "Office Water Dispenser", quantity: 1, unit_price: 280.00, total: 280.00 },
   ]
 
   // Mock GR line items for matching
   const mockGRLines = [
-    { id: "gr-line-1", description: "Professional consulting services", quantity: 10 },
-    { id: "gr-line-2", description: "Software development services", quantity: 8 },
-    { id: "gr-line-3", description: "Project management services", quantity: 5 },
+    { id: "gr-line-1", description: "Office Chair", quantity: 4 },
+    { id: "gr-line-2", description: "Office Desk", quantity: 3 },
+    { id: "gr-line-3", description: "Office TV", quantity: 2 },
+    { id: "gr-line-4", description: "Office Couch", quantity: 2 }, // Quantity mismatch - GR has 2, invoice has 1
+    { id: "gr-line-5", description: "Office Lamp", quantity: 5 },
+    { id: "gr-line-6", description: "Office Water Dispenser", quantity: 1 },
   ]
 
   // Line item matching state
@@ -907,10 +914,10 @@ export default function InvoiceDetailsPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex h-screen bg-background">
       <Sidebar />
-      <div className="flex-1 flex flex-col overflow-auto">
-        <header className="border-b sticky top-0 bg-background z-10">
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="border-b sticky top-0 bg-background z-20 shadow-sm">
           <div className="flex h-16 items-center px-6 justify-between">
             <div className="flex items-center">
               <Link href="/">
@@ -934,7 +941,8 @@ export default function InvoiceDetailsPage() {
           </div>
         </header>
 
-        <div className="bg-gray-50/50 border-b">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
+          <div className="bg-gray-50/50 border-b">
           <div className="px-6 py-3 flex items-center justify-between">
             <div className="flex items-center gap-6">
               {/* PO Reference */}
@@ -1035,8 +1043,8 @@ export default function InvoiceDetailsPage() {
           </div>
         </div>
 
-        <div className="flex-1 p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="flex-1 p-6 w-full">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
             {/* PDF Preview - Independent */}
             <div className="border rounded-lg overflow-hidden">
               <div className="flex items-center justify-between border-b p-3 h-12">
@@ -1364,14 +1372,19 @@ export default function InvoiceDetailsPage() {
                           <div className="mb-2">
                             <div className="w-full">
                               {linkedPO ? (
-                                <div className="border border-gray-200 rounded-lg p-2.5 bg-white h-12 flex items-center w-full animate-in fade-in-0 slide-in-from-top-2 duration-300">
+                                <div className="border border-gray-200 rounded-lg p-2.5 bg-gray-50/50 h-12 flex items-center w-full animate-in fade-in-0 slide-in-from-top-2 duration-300">
                                   <div className="flex items-center justify-between w-full min-w-0">
                                     <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
                                       <div className="flex items-center justify-center w-8 h-8 bg-violet-100 rounded text-xs font-medium text-violet-600 flex-shrink-0">
                                         PO
                                       </div>
                                       <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
-                                        <span className="text-violet-600 font-medium text-sm flex-shrink-0">{linkedPO}</span>
+                                        <button 
+                                          onClick={() => setIsPODrawerOpen(true)}
+                                          className="text-violet-600 font-medium text-sm flex-shrink-0 hover:text-violet-700 hover:underline transition-colors"
+                                        >
+                                          {linkedPO}
+                                        </button>
                                         <span className="text-sm text-gray-500 flex-shrink-0 hidden sm:inline">4 of 4 items matched</span>
                                         <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full flex-shrink-0">
                                           Matched
@@ -1401,14 +1414,19 @@ export default function InvoiceDetailsPage() {
                           <div>
                             <div className="w-full">
                               {linkedGR ? (
-                                <div className="border border-gray-200 rounded-lg p-2.5 bg-white h-12 flex items-center w-full animate-in fade-in-0 slide-in-from-top-2 duration-300">
+                                <div className="border border-gray-200 rounded-lg p-2.5 bg-gray-50/50 h-12 flex items-center w-full animate-in fade-in-0 slide-in-from-top-2 duration-300">
                                   <div className="flex items-center justify-between w-full min-w-0">
                                     <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
                                       <div className="flex items-center justify-center w-8 h-8 bg-violet-100 rounded text-xs font-medium text-violet-600 flex-shrink-0">
                                         GR
                                       </div>
                                       <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
-                                        <span className="text-violet-600 font-medium text-sm flex-shrink-0">{linkedGR}</span>
+                                        <button 
+                                          onClick={() => setIsGRDrawerOpen(true)}
+                                          className="text-violet-600 font-medium text-sm flex-shrink-0 hover:text-violet-700 hover:underline transition-colors"
+                                        >
+                                          {linkedGR}
+                                        </button>
                                         <span className="text-sm text-gray-500 flex-shrink-0 hidden sm:inline">4 of 4 items received</span>
                                         <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full flex-shrink-0">
                                           Received
@@ -1748,7 +1766,163 @@ export default function InvoiceDetailsPage() {
             )}
           </div>
         </div>
+        </div>
       </div>
+      
+      {/* Purchase Order Preview Drawer */}
+      <Sheet open={isPODrawerOpen} onOpenChange={setIsPODrawerOpen} modal={false}>
+        <SheetContent className="w-[50vw] sm:max-w-[50vw] p-0 overflow-hidden" onInteractOutside={(e) => e.preventDefault()}>
+          <div className="flex flex-col h-full">
+            <SheetHeader className="px-6 py-4 border-b">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-10 h-10 bg-violet-100 rounded-lg">
+                    <FileCheck className="h-5 w-5 text-violet-600" />
+                  </div>
+                  <div>
+                    <SheetTitle className="text-lg">Purchase Order</SheetTitle>
+                    <p className="text-sm text-gray-500 mt-0.5">{linkedPO}</p>
+                  </div>
+                </div>
+              </div>
+            </SheetHeader>
+            
+            <div className="flex-1 overflow-auto bg-gray-50 p-6">
+              {/* PO Header Information */}
+              <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+                <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">PO Number</p>
+                    <p className="text-sm font-medium mt-1">{linkedPO}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">Date</p>
+                    <p className="text-sm font-medium mt-1">January 5, 2024</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">Vendor</p>
+                    <p className="text-sm font-medium mt-1">Globex Corporation</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">Total Amount</p>
+                    <p className="text-sm font-medium mt-1">{formatCurrency(3805.00, "USD")}</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* PO Line Items */}
+              <div className="bg-white rounded-lg shadow-sm border">
+                <div className="px-6 py-4 border-b">
+                  <h3 className="font-medium">Line Items</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Description</th>
+                        <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Qty</th>
+                        <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Unit Price</th>
+                        <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {mockPOLines.map((line) => (
+                        <tr key={line.id}>
+                          <td className="px-6 py-4 text-sm">{line.description}</td>
+                          <td className="px-6 py-4 text-sm text-right">{line.quantity}</td>
+                          <td className="px-6 py-4 text-sm text-right">{formatCurrency(line.unit_price, "USD")}</td>
+                          <td className="px-6 py-4 text-sm text-right font-medium">{formatCurrency(line.total, "USD")}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+      
+      {/* Goods Receipt Preview Drawer */}
+      <Sheet open={isGRDrawerOpen} onOpenChange={setIsGRDrawerOpen} modal={false}>
+        <SheetContent className="w-[50vw] sm:max-w-[50vw] p-0 overflow-hidden" onInteractOutside={(e) => e.preventDefault()}>
+          <div className="flex flex-col h-full">
+            <SheetHeader className="px-6 py-4 border-b">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-10 h-10 bg-violet-100 rounded-lg">
+                    <Receipt className="h-5 w-5 text-violet-600" />
+                  </div>
+                  <div>
+                    <SheetTitle className="text-lg">Goods Receipt</SheetTitle>
+                    <p className="text-sm text-gray-500 mt-0.5">{linkedGR}</p>
+                  </div>
+                </div>
+              </div>
+            </SheetHeader>
+            
+            <div className="flex-1 overflow-auto bg-gray-50 p-6">
+              {/* GR Header Information */}
+              <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+                <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">GR Number</p>
+                    <p className="text-sm font-medium mt-1">{linkedGR}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">Receipt Date</p>
+                    <p className="text-sm font-medium mt-1">January 8, 2024</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">Reference PO</p>
+                    <p className="text-sm font-medium mt-1">{linkedPO || "PO-2023-001"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">Received By</p>
+                    <p className="text-sm font-medium mt-1">John Smith</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* GR Line Items */}
+              <div className="bg-white rounded-lg shadow-sm border">
+                <div className="px-6 py-4 border-b">
+                  <h3 className="font-medium">Received Items</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Description</th>
+                        <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Ordered</th>
+                        <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Received</th>
+                        <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider px-6 py-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {mockGRLines.map((line, index) => {
+                        const poLine = mockPOLines[index]
+                        return (
+                          <tr key={line.id}>
+                            <td className="px-6 py-4 text-sm">{line.description}</td>
+                            <td className="px-6 py-4 text-sm text-right">{poLine?.quantity || "-"}</td>
+                            <td className="px-6 py-4 text-sm text-right">{line.quantity}</td>
+                            <td className="px-6 py-4 text-center">
+                              <Badge variant="secondary" className="bg-green-100 text-green-700">
+                                Complete
+                              </Badge>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
