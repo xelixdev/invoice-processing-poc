@@ -1535,148 +1535,171 @@ export default function InvoiceDetailsPage() {
               </div>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="relative overflow-hidden">
               {invoice?.line_items && invoice.line_items.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-gray-50">
-                      <TableHead className="w-8 text-center text-sm font-medium py-2 px-2">#</TableHead>
-                      <TableHead className="w-20 text-sm font-medium py-2 px-2">Status</TableHead>
-                      <TableHead className="w-64 text-sm font-medium py-2 px-2">Description (Invoice)</TableHead>
-                      <TableHead className="w-12 text-right text-sm font-medium py-2 px-2">Qty</TableHead>
-                      <TableHead className="w-16 text-right text-sm font-medium py-2 px-2">Unit Price</TableHead>
-                      <TableHead className="w-16 text-right text-sm font-medium py-2 px-2 border-r-2 border-violet-300">Total</TableHead>
-                      <TableHead className="w-40 text-sm font-medium py-2 px-2">PO Line Source</TableHead>
-                      <TableHead className="w-56 text-sm font-medium py-2 px-2">PO Description</TableHead>
-                      <TableHead className="w-12 text-right text-sm font-medium py-2 px-2">PO Qty</TableHead>
-                      <TableHead className="w-16 text-right text-sm font-medium py-2 px-2">PO Unit Price</TableHead>
-                      <TableHead className="w-16 text-right text-sm font-medium py-2 px-2 border-r-2 border-violet-300">PO Total</TableHead>
-                      <TableHead className="w-40 text-sm font-medium py-2 px-2">GR Line Source</TableHead>
-                      <TableHead className="w-56 text-sm font-medium py-2 px-2">GR Description</TableHead>
-                      <TableHead className="w-12 text-right text-sm font-medium py-2 px-2 border-r-2 border-violet-300">GR Qty</TableHead>
-                      <TableHead className="w-12 text-center text-sm font-medium py-2 px-2">Comments</TableHead>
-                      <TableHead className="w-12 text-center text-sm font-medium py-2 px-2">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {invoice.line_items.map((item, index) => {
-                      const status = getLineItemStatus(index)
-                      const match = lineItemMatches[index]
-                      const poLine = match?.poLineId ? mockPOLines.find(po => po.id === match.poLineId) : null
-                      const grLine = match?.grLineId ? mockGRLines.find(gr => gr.id === match.grLineId) : null
-                      
-                      return (
-                        <TableRow key={index} className="hover:bg-gray-50">
-                          <TableCell className="text-center text-sm font-medium text-gray-600 py-2 px-2">{index + 1}</TableCell>
-                          <TableCell className="py-2 px-2">
-                            <Badge 
-                              variant="secondary" 
-                              className={cn(
-                                "text-xs font-medium px-1.5 py-0.5",
-                                status === 'matched' && "bg-green-100 text-green-700 hover:bg-green-100",
-                                status === 'mismatch' && "bg-amber-100 text-amber-700 hover:bg-amber-100",
-                                status === 'missing' && "bg-red-100 text-red-700 hover:bg-red-100"
-                              )}
-                            >
-                              {status === 'matched' ? 'Matched' : status === 'mismatch' ? 'Mismatch' : 'Missing'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-sm font-medium py-2 px-2">
-                            <div className="truncate max-w-60" title={item.description}>
-                              {item.description}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right text-sm py-2 px-2">{item.quantity}</TableCell>
-                          <TableCell className="text-right text-sm py-2 px-2">{formatCurrency(item.unit_price, invoice.currency_code)}</TableCell>
-                          <TableCell className="text-right text-sm py-2 px-2 border-r-2 border-violet-300">{formatCurrency(item.total, invoice.currency_code)}</TableCell>
+                <div className="flex">
+                  {/* Frozen Invoice Columns */}
+                  <div className="flex-shrink-0 bg-white z-10 shadow-lg">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-gray-50 h-auto">
+                          <TableHead className="w-8 text-center text-sm font-medium py-2 px-2">#</TableHead>
+                          <TableHead className="w-20 text-sm font-medium py-2 px-2">Status</TableHead>
+                          <TableHead className="w-48 text-sm font-medium py-2 px-2">Description<br/>(Invoice)</TableHead>
+                          <TableHead className="w-12 text-right text-sm font-medium py-2 px-2">Qty</TableHead>
+                          <TableHead className="w-16 text-right text-sm font-medium py-2 px-2">Unit<br/>Price</TableHead>
+                          <TableHead className="w-16 text-right text-sm font-medium py-2 px-2 border-r-2 border-violet-300">Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {invoice.line_items.map((item, index) => {
+                          const status = getLineItemStatus(index)
                           
-                          {/* PO Line Source */}
-                          <TableCell className="py-2 px-2">
-                            <Select
-                              value={match?.poLineId || ""}
-                              onValueChange={(value) => value && handleLineItemMatch(index, 'po', value)}
-                            >
-                              <SelectTrigger className="w-full h-6 text-xs px-2">
-                                <SelectValue placeholder="Select line" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {mockPOLines.map((poLine) => (
-                                  <SelectItem key={poLine.id} value={poLine.id} className="text-sm">
-                                    {poLine.description.substring(0, 35)}...
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
+                          return (
+                            <TableRow key={index} className="hover:bg-gray-50 h-[50px]">
+                              <TableCell className="text-center text-sm font-medium text-gray-600 h-[50px] py-1 px-2 align-middle">{index + 1}</TableCell>
+                              <TableCell className="h-[50px] py-1 px-2 align-middle">
+                                <Badge 
+                                  variant="secondary" 
+                                  className={cn(
+                                    "text-xs font-medium px-1.5 py-0.5",
+                                    status === 'matched' && "bg-green-100 text-green-700 hover:bg-green-100",
+                                    status === 'mismatch' && "bg-amber-100 text-amber-700 hover:bg-amber-100",
+                                    status === 'missing' && "bg-red-100 text-red-700 hover:bg-red-100"
+                                  )}
+                                >
+                                  {status === 'matched' ? 'Matched' : status === 'mismatch' ? 'Mismatch' : 'Missing'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-sm font-medium h-[50px] py-1 px-2 align-middle">
+                                <div className="truncate max-w-44" title={item.description}>
+                                  {item.description}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right text-sm h-[50px] py-1 px-2 align-middle">{item.quantity}</TableCell>
+                              <TableCell className="text-right text-sm h-[50px] py-1 px-2 align-middle">{formatCurrency(item.unit_price, invoice.currency_code)}</TableCell>
+                              <TableCell className="text-right text-sm h-[50px] py-1 px-2 border-r-2 border-violet-300 align-middle">{formatCurrency(item.total, invoice.currency_code)}</TableCell>
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Scrollable PO/GR Columns */}
+                  <div className="flex-1 overflow-x-auto">
+                    <Table className="min-w-[1000px]">
+                      <TableHeader>
+                        <TableRow className="bg-gray-50 h-auto">
+                          <TableHead className="min-w-[160px] text-sm font-medium py-2 px-2">PO Line Source</TableHead>
+                          <TableHead className="min-w-[224px] text-sm font-medium py-2 px-2">PO Description</TableHead>
+                          <TableHead className="min-w-[48px] text-right text-sm font-medium py-2 px-2">PO<br/>Qty</TableHead>
+                          <TableHead className="min-w-[80px] text-right text-sm font-medium py-2 px-2">PO Unit<br/>Price</TableHead>
+                          <TableHead className="min-w-[80px] text-right text-sm font-medium py-2 px-2 border-r-2 border-violet-300">PO<br/>Total</TableHead>
+                          <TableHead className="min-w-[160px] text-sm font-medium py-2 px-2">GR Line Source</TableHead>
+                          <TableHead className="min-w-[224px] text-sm font-medium py-2 px-2">GR Description</TableHead>
+                          <TableHead className="min-w-[48px] text-right text-sm font-medium py-2 px-2 border-r-2 border-violet-300">GR<br/>Qty</TableHead>
+                          <TableHead className="min-w-[48px] text-center text-sm font-medium py-2 px-2">Comments</TableHead>
+                          <TableHead className="min-w-[48px] text-center text-sm font-medium py-2 px-2">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {invoice.line_items.map((_, index) => {
+                          const match = lineItemMatches[index]
+                          const poLine = match?.poLineId ? mockPOLines.find(po => po.id === match.poLineId) : null
+                          const grLine = match?.grLineId ? mockGRLines.find(gr => gr.id === match.grLineId) : null
                           
-                          {/* PO Details */}
-                          <TableCell className="text-sm text-gray-600 py-2 px-2">
-                            <div className="truncate max-w-52" title={poLine?.description || "—"}>
-                              {poLine?.description || "—"}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right text-sm text-gray-600 py-2 px-2">
-                            {poLine?.quantity || "—"}
-                          </TableCell>
-                          <TableCell className="text-right text-sm text-gray-600 py-2 px-2">
-                            {poLine ? formatCurrency(poLine.unit_price, invoice.currency_code) : "—"}
-                          </TableCell>
-                          <TableCell className="text-right text-sm text-gray-600 py-2 px-2 border-r-2 border-violet-300">
-                            {poLine ? formatCurrency(poLine.total, invoice.currency_code) : "—"}
-                          </TableCell>
-                          
-                          {/* GR Line Source */}
-                          <TableCell className="py-2 px-2">
-                            <Select
-                              value={match?.grLineId || ""}
-                              onValueChange={(value) => value && handleLineItemMatch(index, 'gr', value)}
-                            >
-                              <SelectTrigger className="w-full h-6 text-xs px-2">
-                                <SelectValue placeholder="Select line" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {mockGRLines.map((grLine) => (
-                                  <SelectItem key={grLine.id} value={grLine.id} className="text-sm">
-                                    {grLine.description.substring(0, 35)}...
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          
-                          {/* GR Details */}
-                          <TableCell className="text-sm text-gray-600 py-2 px-2">
-                            <div className="truncate max-w-52" title={grLine?.description || "—"}>
-                              {grLine?.description || "—"}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right text-sm text-gray-600 py-2 px-2 border-r-2 border-violet-300">
-                            {grLine?.quantity || "—"}
-                          </TableCell>
-                          
-                          {/* Comments */}
-                          <TableCell className="py-2 px-2 text-center">
-                            <Button variant="ghost" size="sm" className="h-5 w-5 p-0 mx-auto relative">
-                              <MessageCircle className="h-2.5 w-2.5" />
-                              {mockComments[index] && (
-                                <span className="absolute -top-0.5 -right-1 h-3 w-3 bg-gray-600 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
-                                  {mockComments[index]}
-                                </span>
-                              )}
-                            </Button>
-                          </TableCell>
-                          
-                          {/* Actions */}
-                          <TableCell className="py-2 px-2 text-center">
-                            <Button variant="ghost" size="sm" className="h-5 w-5 p-0 mx-auto">
-                              <MoreVertical className="h-2.5 w-2.5" />
-                            </Button>
-                          </TableCell>
+                          return (
+                            <TableRow key={index} className="hover:bg-gray-50 h-[50px]">
+                              {/* PO Line Source */}
+                              <TableCell className="h-[50px] py-1 px-2 align-middle">
+                                <Select
+                                  value={match?.poLineId || ""}
+                                  onValueChange={(value) => value && handleLineItemMatch(index, 'po', value)}
+                                >
+                                  <SelectTrigger className="w-full h-8 text-xs px-2">
+                                    <SelectValue placeholder="Select line" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {mockPOLines.map((poLine) => (
+                                      <SelectItem key={poLine.id} value={poLine.id} className="text-sm">
+                                        {poLine.description.substring(0, 35)}...
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              
+                              {/* PO Details */}
+                              <TableCell className="text-sm text-gray-600 h-[50px] py-1 px-2 align-middle">
+                                <div className="truncate max-w-52" title={poLine?.description || "—"}>
+                                  {poLine?.description || "—"}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right text-sm text-gray-600 h-[50px] py-1 px-2 align-middle">
+                                {poLine?.quantity || "—"}
+                              </TableCell>
+                              <TableCell className="text-right text-sm text-gray-600 h-[50px] py-1 px-2 align-middle">
+                                {poLine ? formatCurrency(poLine.unit_price, invoice.currency_code) : "—"}
+                              </TableCell>
+                              <TableCell className="text-right text-sm text-gray-600 h-[50px] py-1 px-2 border-r-2 border-violet-300 align-middle">
+                                {poLine ? formatCurrency(poLine.total, invoice.currency_code) : "—"}
+                              </TableCell>
+                              
+                              {/* GR Line Source */}
+                              <TableCell className="h-[50px] py-1 px-2 align-middle">
+                                <Select
+                                  value={match?.grLineId || ""}
+                                  onValueChange={(value) => value && handleLineItemMatch(index, 'gr', value)}
+                                >
+                                  <SelectTrigger className="w-full h-8 text-xs px-2">
+                                    <SelectValue placeholder="Select line" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {mockGRLines.map((grLine) => (
+                                      <SelectItem key={grLine.id} value={grLine.id} className="text-sm">
+                                        {grLine.description.substring(0, 35)}...
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              
+                              {/* GR Details */}
+                              <TableCell className="text-sm text-gray-600 h-[50px] py-1 px-2 align-middle">
+                                <div className="truncate max-w-52" title={grLine?.description || "—"}>
+                                  {grLine?.description || "—"}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right text-sm text-gray-600 h-[50px] py-1 px-2 border-r-2 border-violet-300 align-middle">
+                                {grLine?.quantity || "—"}
+                              </TableCell>
+                              
+                              {/* Comments */}
+                              <TableCell className="h-[50px] py-1 px-2 text-center align-middle">
+                                <Button variant="ghost" size="sm" className="h-5 w-5 p-0 mx-auto relative">
+                                  <MessageCircle className="h-2.5 w-2.5" />
+                                  {mockComments[index] && (
+                                    <span className="absolute -top-0.5 -right-1 h-3 w-3 bg-gray-600 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
+                                      {mockComments[index]}
+                                    </span>
+                                  )}
+                                </Button>
+                              </TableCell>
+                              
+                              {/* Actions */}
+                              <TableCell className="h-[50px] py-1 px-2 text-center align-middle">
+                                <Button variant="ghost" size="sm" className="h-5 w-5 p-0 mx-auto">
+                                  <MoreVertical className="h-2.5 w-2.5" />
+                                </Button>
+                              </TableCell>
                         </TableRow>
                       )
                     })}
                   </TableBody>
                 </Table>
+                  </div>
+                </div>
               ) : (
                 <div className="p-8 text-center text-gray-500">
                   <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
@@ -1710,11 +1733,11 @@ export default function InvoiceDetailsPage() {
                         {mockPOLines
                           .filter(poLine => !Object.values(lineItemMatches).some(m => m.poLineId === poLine.id))
                           .map((poLine) => (
-                            <div key={poLine.id} className="flex items-center gap-3 p-1.5 bg-gray-50 rounded text-xs">
-                              <span className="font-medium flex-1 min-w-0 truncate">{poLine.description}</span>
+                            <div key={poLine.id} className="flex items-center gap-2 p-1.5 bg-gray-50 rounded text-xs">
+                              <span className="font-medium min-w-0 truncate max-w-sm">{poLine.description}</span>
                               <span className="text-gray-500 flex-shrink-0">Qty: {poLine.quantity}</span>
-                              <span className="text-gray-500 flex-shrink-0">{formatCurrency(poLine.unit_price, invoice?.currency_code)}</span>
-                              <span className="text-gray-500 flex-shrink-0">{formatCurrency(poLine.total, invoice?.currency_code)}</span>
+                              <span className="text-gray-500 flex-shrink-0">@ {formatCurrency(poLine.unit_price, invoice?.currency_code)}</span>
+                              <span className="text-gray-500 flex-shrink-0 font-medium">= {formatCurrency(poLine.total, invoice?.currency_code)}</span>
                             </div>
                           ))}
                       </div>
