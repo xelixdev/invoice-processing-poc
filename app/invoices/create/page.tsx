@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { ArrowLeft, FileText, Edit, Plus, Download, ChevronLeft, ChevronRight, Maximize, X, Receipt, FileCheck, TrendingUp, AlertCircle, AlertTriangle, CheckCircle, Calendar as CalendarIcon, Copy, List } from "lucide-react"
+import { ArrowLeft, FileText, Edit, Plus, Download, ChevronLeft, ChevronRight, Maximize, X, Receipt, FileCheck, TrendingUp, AlertCircle, AlertTriangle, CheckCircle, Calendar as CalendarIcon, Copy, List, MoreVertical, MessageCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
@@ -76,6 +76,77 @@ export default function InvoiceDetailsPage() {
     maxAmount: 2500.00,
     currency: "USD",
     invoiceNumber: "INV-002"
+  }
+
+  // Mock PO line items for matching
+  const mockPOLines = [
+    { id: "po-line-1", description: "Professional consulting services", quantity: 10, unit_price: 150.00, total: 1500.00 },
+    { id: "po-line-2", description: "Software development services", quantity: 8, unit_price: 200.00, total: 1600.00 },
+    { id: "po-line-3", description: "Project management services", quantity: 5, unit_price: 175.00, total: 875.00 },
+    { id: "po-line-4", description: "Technical documentation", quantity: 2, unit_price: 100.00, total: 200.00 },
+  ]
+
+  // Mock GR line items for matching
+  const mockGRLines = [
+    { id: "gr-line-1", description: "Professional consulting services", quantity: 10 },
+    { id: "gr-line-2", description: "Software development services", quantity: 8 },
+    { id: "gr-line-3", description: "Project management services", quantity: 5 },
+  ]
+
+  // Line item matching state
+  const [lineItemMatches, setLineItemMatches] = useState<{[key: number]: {poLineId?: string, grLineId?: string}}>({})
+  
+  // Mock comment data for some line items
+  const mockComments: {[key: number]: number} = {
+    0: 2, // First line item has 2 comments
+    2: 1  // Third line item has 1 comment
+  }
+  
+  // Line item status calculation
+  const getLineItemStatus = (itemIndex: number) => {
+    const match = lineItemMatches[itemIndex]
+    if (!match?.poLineId) return 'missing'
+    
+    const invoiceItem = invoice?.line_items[itemIndex]
+    const poLine = mockPOLines.find(po => po.id === match.poLineId)
+    
+    if (!poLine || !invoiceItem) return 'missing'
+    
+    // Check for mismatches
+    if (Math.abs(invoiceItem.quantity - poLine.quantity) > 0.1 || 
+        Math.abs(invoiceItem.unit_price - poLine.unit_price) > 0.01) {
+      return 'mismatch'
+    }
+    
+    return 'matched'
+  }
+
+  // Handle line item matching
+  const handleLineItemMatch = (itemIndex: number, type: 'po' | 'gr', lineId: string) => {
+    setLineItemMatches(prev => ({
+      ...prev,
+      [itemIndex]: {
+        ...prev[itemIndex],
+        [type === 'po' ? 'poLineId' : 'grLineId']: lineId
+      }
+    }))
+  }
+
+  // Calculate line item statistics
+  const getLineItemStats = () => {
+    if (!invoice?.line_items) return { total: 0, matched: 0, mismatched: 0, missing: 0 }
+    
+    const stats = { total: 0, matched: 0, mismatched: 0, missing: 0 }
+    
+    invoice.line_items.forEach((_, index) => {
+      stats.total++
+      const status = getLineItemStatus(index)
+      if (status === 'matched') stats.matched++
+      else if (status === 'mismatch') stats.mismatched++
+      else stats.missing++
+    })
+    
+    return stats
   }
 
   useEffect(() => {
@@ -1431,42 +1502,227 @@ export default function InvoiceDetailsPage() {
 
           {/* Line Items Section - Full Width at Bottom */}
           <div className="border rounded-lg overflow-hidden mt-6">
-            <div className="flex items-center justify-between p-3 border-b h-12">
-              <h3 className="font-medium">Line Items</h3>
-              <Button variant="ghost" size="sm" className="h-8 gap-1">
-                <Plus className="h-4 w-4" />
-                Add Item
-              </Button>
+            <div className="flex items-center justify-between p-4 border-b">
+              <div className="flex items-center gap-4">
+                <h3 className="font-semibold text-lg">Line Items</h3>
+                {invoice?.line_items && invoice.line_items.length > 0 && (
+                  <div className="flex items-center gap-3 text-sm">
+                    <span className="text-gray-600">{getLineItemStats().total} items</span>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      <span className="text-gray-600">{getLineItemStats().matched} matched</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 bg-amber-500 rounded-full"></div>
+                      <span className="text-gray-600">{getLineItemStats().mismatched} mismatched</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                      <span className="text-gray-600">{getLineItemStats().missing} missing</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" className="h-8 gap-1 text-gray-600">
+                  <Edit className="h-4 w-4" />
+                  Edit
+                </Button>
+                <Button variant="ghost" size="sm" className="h-8 gap-1">
+                  <Plus className="h-4 w-4" />
+                  Add Item
+                </Button>
+              </div>
             </div>
 
-            <div className="overflow-hidden">
+            <div className="overflow-x-auto">
               {invoice?.line_items && invoice.line_items.length > 0 ? (
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[40%]">Description</TableHead>
-                      <TableHead className="text-right">Quantity</TableHead>
-                      <TableHead className="text-right">Unit Price</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
+                    <TableRow className="bg-gray-50">
+                      <TableHead className="w-8 text-center text-sm font-medium py-2 px-2">#</TableHead>
+                      <TableHead className="w-20 text-sm font-medium py-2 px-2">Status</TableHead>
+                      <TableHead className="w-64 text-sm font-medium py-2 px-2">Description (Invoice)</TableHead>
+                      <TableHead className="w-12 text-right text-sm font-medium py-2 px-2">Qty</TableHead>
+                      <TableHead className="w-16 text-right text-sm font-medium py-2 px-2">Unit Price</TableHead>
+                      <TableHead className="w-16 text-right text-sm font-medium py-2 px-2 border-r-2 border-violet-300">Total</TableHead>
+                      <TableHead className="w-40 text-sm font-medium py-2 px-2">PO Line Source</TableHead>
+                      <TableHead className="w-56 text-sm font-medium py-2 px-2">PO Description</TableHead>
+                      <TableHead className="w-12 text-right text-sm font-medium py-2 px-2">PO Qty</TableHead>
+                      <TableHead className="w-16 text-right text-sm font-medium py-2 px-2">PO Unit Price</TableHead>
+                      <TableHead className="w-16 text-right text-sm font-medium py-2 px-2 border-r-2 border-violet-300">PO Total</TableHead>
+                      <TableHead className="w-40 text-sm font-medium py-2 px-2">GR Line Source</TableHead>
+                      <TableHead className="w-56 text-sm font-medium py-2 px-2">GR Description</TableHead>
+                      <TableHead className="w-12 text-right text-sm font-medium py-2 px-2 border-r-2 border-violet-300">GR Qty</TableHead>
+                      <TableHead className="w-12 text-center text-sm font-medium py-2 px-2">Comments</TableHead>
+                      <TableHead className="w-12 text-center text-sm font-medium py-2 px-2">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {invoice.line_items.map((item, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="font-medium">{item.description}</TableCell>
-                        <TableCell className="text-right">{item.quantity}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.unit_price, invoice.currency_code)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.total, invoice.currency_code)}</TableCell>
-                      </TableRow>
-                    ))}
+                    {invoice.line_items.map((item, index) => {
+                      const status = getLineItemStatus(index)
+                      const match = lineItemMatches[index]
+                      const poLine = match?.poLineId ? mockPOLines.find(po => po.id === match.poLineId) : null
+                      const grLine = match?.grLineId ? mockGRLines.find(gr => gr.id === match.grLineId) : null
+                      
+                      return (
+                        <TableRow key={index} className="hover:bg-gray-50">
+                          <TableCell className="text-center text-sm font-medium text-gray-600 py-2 px-2">{index + 1}</TableCell>
+                          <TableCell className="py-2 px-2">
+                            <Badge 
+                              variant="secondary" 
+                              className={cn(
+                                "text-xs font-medium px-1.5 py-0.5",
+                                status === 'matched' && "bg-green-100 text-green-700 hover:bg-green-100",
+                                status === 'mismatch' && "bg-amber-100 text-amber-700 hover:bg-amber-100",
+                                status === 'missing' && "bg-red-100 text-red-700 hover:bg-red-100"
+                              )}
+                            >
+                              {status === 'matched' ? 'Matched' : status === 'mismatch' ? 'Mismatch' : 'Missing'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm font-medium py-2 px-2">
+                            <div className="truncate max-w-60" title={item.description}>
+                              {item.description}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right text-sm py-2 px-2">{item.quantity}</TableCell>
+                          <TableCell className="text-right text-sm py-2 px-2">{formatCurrency(item.unit_price, invoice.currency_code)}</TableCell>
+                          <TableCell className="text-right text-sm py-2 px-2 border-r-2 border-violet-300">{formatCurrency(item.total, invoice.currency_code)}</TableCell>
+                          
+                          {/* PO Line Source */}
+                          <TableCell className="py-2 px-2">
+                            <Select
+                              value={match?.poLineId || ""}
+                              onValueChange={(value) => value && handleLineItemMatch(index, 'po', value)}
+                            >
+                              <SelectTrigger className="w-full h-6 text-xs px-2">
+                                <SelectValue placeholder="Select line" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {mockPOLines.map((poLine) => (
+                                  <SelectItem key={poLine.id} value={poLine.id} className="text-sm">
+                                    {poLine.description.substring(0, 35)}...
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          
+                          {/* PO Details */}
+                          <TableCell className="text-sm text-gray-600 py-2 px-2">
+                            <div className="truncate max-w-52" title={poLine?.description || "—"}>
+                              {poLine?.description || "—"}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right text-sm text-gray-600 py-2 px-2">
+                            {poLine?.quantity || "—"}
+                          </TableCell>
+                          <TableCell className="text-right text-sm text-gray-600 py-2 px-2">
+                            {poLine ? formatCurrency(poLine.unit_price, invoice.currency_code) : "—"}
+                          </TableCell>
+                          <TableCell className="text-right text-sm text-gray-600 py-2 px-2 border-r-2 border-violet-300">
+                            {poLine ? formatCurrency(poLine.total, invoice.currency_code) : "—"}
+                          </TableCell>
+                          
+                          {/* GR Line Source */}
+                          <TableCell className="py-2 px-2">
+                            <Select
+                              value={match?.grLineId || ""}
+                              onValueChange={(value) => value && handleLineItemMatch(index, 'gr', value)}
+                            >
+                              <SelectTrigger className="w-full h-6 text-xs px-2">
+                                <SelectValue placeholder="Select line" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {mockGRLines.map((grLine) => (
+                                  <SelectItem key={grLine.id} value={grLine.id} className="text-sm">
+                                    {grLine.description.substring(0, 35)}...
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          
+                          {/* GR Details */}
+                          <TableCell className="text-sm text-gray-600 py-2 px-2">
+                            <div className="truncate max-w-52" title={grLine?.description || "—"}>
+                              {grLine?.description || "—"}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right text-sm text-gray-600 py-2 px-2 border-r-2 border-violet-300">
+                            {grLine?.quantity || "—"}
+                          </TableCell>
+                          
+                          {/* Comments */}
+                          <TableCell className="py-2 px-2 text-center">
+                            <Button variant="ghost" size="sm" className="h-5 w-5 p-0 mx-auto relative">
+                              <MessageCircle className="h-2.5 w-2.5" />
+                              {mockComments[index] && (
+                                <span className="absolute -top-0.5 -right-1 h-3 w-3 bg-gray-600 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
+                                  {mockComments[index]}
+                                </span>
+                              )}
+                            </Button>
+                          </TableCell>
+                          
+                          {/* Actions */}
+                          <TableCell className="py-2 px-2 text-center">
+                            <Button variant="ghost" size="sm" className="h-5 w-5 p-0 mx-auto">
+                              <MoreVertical className="h-2.5 w-2.5" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
                   </TableBody>
                 </Table>
               ) : (
-                <div className="p-6 text-center text-muted-foreground">
-                  No line items found. Click "Add Item" to add line items to this invoice.
+                <div className="p-8 text-center text-gray-500">
+                  <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <h4 className="font-medium mb-2">No line items found</h4>
+                  <p className="text-sm mb-4">Click "Add Item" to add line items to this invoice.</p>
+                  <Button variant="outline" size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Item
+                  </Button>
                 </div>
               )}
             </div>
+            
+            {/* PO Lines Not Found Section */}
+            {mockPOLines.length > 0 && (
+              <div className="border-t">
+                <div className="p-3">
+                  <details className="group">
+                    <summary className="flex items-center gap-2 cursor-pointer list-none">
+                      <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" />
+                      <span className="text-sm font-medium text-gray-900">PO Lines Not Found on Invoice</span>
+                      <Badge variant="secondary" className="ml-2 text-xs px-1.5 py-0.5">
+                        {mockPOLines.length - Object.values(lineItemMatches).filter(m => m.poLineId).length}
+                      </Badge>
+                    </summary>
+                    <div className="mt-2 pl-4">
+                      <div className="text-xs text-gray-600 mb-1">
+                        PO-2023-001: {mockPOLines.length - Object.values(lineItemMatches).filter(m => m.poLineId).length} items
+                      </div>
+                      <div className="space-y-1">
+                        {mockPOLines
+                          .filter(poLine => !Object.values(lineItemMatches).some(m => m.poLineId === poLine.id))
+                          .map((poLine) => (
+                            <div key={poLine.id} className="flex items-center gap-3 p-1.5 bg-gray-50 rounded text-xs">
+                              <span className="font-medium flex-1 min-w-0 truncate">{poLine.description}</span>
+                              <span className="text-gray-500 flex-shrink-0">Qty: {poLine.quantity}</span>
+                              <span className="text-gray-500 flex-shrink-0">{formatCurrency(poLine.unit_price, invoice?.currency_code)}</span>
+                              <span className="text-gray-500 flex-shrink-0">{formatCurrency(poLine.total, invoice?.currency_code)}</span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  </details>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
