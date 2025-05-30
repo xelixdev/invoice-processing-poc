@@ -14,9 +14,13 @@ export async function POST(request: NextRequest) {
     const response = await fetch(`${PYTHON_API_URL}/extract-invoice`, {
       method: 'POST',
       body: formData,
-      // Add a timeout to avoid hanging indefinitely
-      signal: AbortSignal.timeout(10000) // 10 second timeout
+      // Increased timeout for production AI processing
+      signal: AbortSignal.timeout(30000) // 30 second timeout for AI processing
     });
+    
+    if (!response.ok) {
+      throw new Error(`Backend responded with status: ${response.status}`);
+    }
     
     // Get the response data
     const data = await response.json();
@@ -33,11 +37,14 @@ export async function POST(request: NextRequest) {
     let errorCode = 'UNKNOWN_ERROR';
     
     if (error.code === 'ECONNREFUSED') {
-      errorMessage = 'Could not connect to Python API server. Is it running?';
+      errorMessage = 'Could not connect to backend API server. Please try again later.';
       errorCode = 'CONNECTION_REFUSED';
-    } else if (error.name === 'AbortError') {
-      errorMessage = 'Connection to Python API timed out';
+    } else if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+      errorMessage = 'Request timed out. Large files may take longer to process.';
       errorCode = 'TIMEOUT';
+    } else if (error.message?.includes('status:')) {
+      errorMessage = `Backend server error: ${error.message}`;
+      errorCode = 'BACKEND_ERROR';
     }
     
     return NextResponse.json(
