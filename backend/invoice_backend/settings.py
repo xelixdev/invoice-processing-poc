@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 import os
 import environ
 from pathlib import Path
+import logging
 
 # Initialize environment variables
 env = environ.Env(
@@ -225,3 +226,12 @@ ANTHROPIC_API_KEY = env('ANTHROPIC_API_KEY', default='')
 AWS_DEFAULT_REGION = env('AWS_DEFAULT_REGION', default='us-east-1')
 AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default='')
 AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default='')
+
+# Log API key status safely (without exposing the actual key)
+logger = logging.getLogger(__name__)
+logger.info(f"ANTHROPIC_API_KEY configured: {bool(ANTHROPIC_API_KEY)}")
+logger.info(f"ANTHROPIC_API_KEY length: {len(ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else 0}")
+if ANTHROPIC_API_KEY:
+    logger.info("AI service will use Anthropic")
+else:
+    logger.warning("No ANTHROPIC_API_KEY found - will return mock data")
