@@ -10,21 +10,43 @@ export async function GET() {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
       // Add timeout
-      signal: AbortSignal.timeout(10000)
+      signal: AbortSignal.timeout(30000) // 30 second timeout
     })
 
+    console.log(`Response status: ${response.status}`)
+    console.log(`Response headers:`, Object.fromEntries(response.headers.entries()))
+
     if (!response.ok) {
-      throw new Error(`Backend API returned ${response.status}`)
+      const errorText = await response.text()
+      console.error(`Backend API error: ${response.status} - ${errorText}`)
+      throw new Error(`Backend API returned ${response.status}: ${errorText}`)
     }
 
     const data = await response.json()
-    console.log(`Successfully fetched ${data.results?.length || 0} invoices from backend`)
+    console.log(`Successfully fetched data from backend:`, {
+      count: data.count,
+      resultsLength: data.results?.length,
+      hasNext: !!data.next,
+      hasPrevious: !!data.previous
+    })
     
-    return NextResponse.json(data)
+    // Transform Django REST Framework pagination format to match frontend expectations
+    const transformedData = data.results || data
+    
+    return NextResponse.json(transformedData)
   } catch (error) {
     console.error("Error fetching invoices from backend:", error)
-    return NextResponse.json({ error: "Failed to fetch invoices" }, { status: 500 })
+    
+    // More detailed error information
+    const errorResponse = {
+      error: "Failed to fetch invoices from backend",
+      details: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString()
+    }
+    
+    return NextResponse.json(errorResponse, { status: 500 })
   }
 }
