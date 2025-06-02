@@ -174,12 +174,18 @@ REST_FRAMEWORK = {
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "https://invoice-processing-frontend-xi.vercel.app",
+    "https://invoice-processing-frontend-kdgqmroth-xelix-projects.vercel.app",
+    "https://*.vercel.app",  # Allow any Vercel deployment
 ])
 
 CORS_ALLOW_CREDENTIALS = True
 
-# For development, allow all origins (remove for production)
+# For development, allow all origins
 if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    # For production, also allow all origins temporarily for debugging
     CORS_ALLOW_ALL_ORIGINS = True
 
 # Celery configuration (for background tasks)
