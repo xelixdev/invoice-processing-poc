@@ -8,11 +8,11 @@ This proof of concept application demonstrates a modern approach to invoice proc
 
 - AI-powered invoice data extraction
 - Clean, responsive interface for managing invoices
-- Seamless integration between Next.js frontend and Python backend
+- Seamless integration between Next.js frontend and Django backend
 
 ## Architecture
 
-The project follows a hybrid architecture:
+The project follows a modern full-stack architecture:
 
 ### Frontend
 
@@ -23,10 +23,12 @@ The project follows a hybrid architecture:
 
 ### Backend
 
-- **FastAPI**: Python-based API server for invoice extraction
-- **OpenAI (Claude)**: AI models for extracting data from invoice images
+- **Django**: Python web framework with Django REST Framework
+- **AI Engineering**: Modular AI services for invoice extraction
+  - **Anthropic Claude**: AI models for extracting data from invoice images
+  - **AWS Bedrock**: Alternative AI service
 - **PyMuPDF**: PDF processing
-- **AWS Bedrock**: Alternative AI service
+- **PostgreSQL/SQLite**: Database for storing invoices and extraction jobs
 
 ## Features
 
@@ -35,12 +37,14 @@ The project follows a hybrid architecture:
 - Preview invoice files
 - Create/edit invoices
 - Dashboard for invoice management
+- Purchase order and goods received tracking
+- Invoice validation and approval workflow
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+ and pnpm
+- Node.js 18+ and npm/pnpm
 - Python 3.11+
 - API keys for Claude/Anthropic or AWS (optional for demo mode)
 
@@ -56,21 +60,37 @@ The project follows a hybrid architecture:
 2. Install frontend dependencies:
 
    ```bash
+   cd frontend
+   npm install
+   # or
    pnpm install
    ```
 
-3. Install backend dependencies:
+3. Set up backend:
 
    ```bash
-   cd backend
+   cd ../backend
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
    pip install -r requirements.txt
    ```
 
-4. Set up environment variables:
-   - Create a `.env.local` file in the root directory
+4. Set up Django:
+
+   ```bash
+   python manage.py migrate
+   python manage.py collectstatic --noinput
+   python manage.py createsuperuser  # Optional
+   ```
+
+5. Set up environment variables:
+   - Create a `.env` file in the backend directory
    - Add your API keys (optional):
      ```
+     SECRET_KEY=your_django_secret_key
      ANTHROPIC_API_KEY=your_api_key_here
+     AWS_ACCESS_KEY_ID=your_aws_key
+     AWS_SECRET_ACCESS_KEY=your_aws_secret
      ```
 
 ### Running the Application
@@ -84,8 +104,23 @@ chmod +x start-dev.sh
 
 This will start:
 
-- FastAPI backend on port 8000
+- Django backend on port 8000
 - Next.js frontend on port 3000
+
+### Manual Development
+
+Alternatively, you can run each part manually:
+
+```bash
+# Terminal 1 - Backend
+cd backend
+source venv/bin/activate
+python manage.py runserver
+
+# Terminal 2 - Frontend
+cd frontend
+npm run dev
+```
 
 ## Development
 
@@ -93,23 +128,28 @@ This will start:
 
 ```
 invoice-processing-poc/
-├── app/                  # Next.js app directory
-│   ├── api/              # Next.js API routes
-│   ├── invoices/         # Invoice pages
+├── frontend/             # Next.js frontend
+│   ├── app/              # Next.js app directory
+│   ├── components/       # React components
+│   ├── public/           # Static assets
+│   ├── package.json      # Frontend dependencies
 │   └── ...
-├── backend/              # Python FastAPI backend
-│   ├── api.py            # Main API endpoints
-│   ├── anthropic_client.py # AI service integration
-│   └── ...
-├── components/           # React components
-├── public/               # Static assets
-└── ...
+├── backend/              # Django backend
+│   ├── ai_engineering/   # AI services and extraction logic
+│   ├── invoices/         # Invoice management app
+│   ├── invoice_extraction/ # AI extraction job management
+│   ├── purchase_orders/  # Purchase order management
+│   ├── goods_received/   # Goods received management
+│   └── manage.py         # Django management
+├── start-dev.sh          # Development startup script
+└── README.md
 ```
 
 ### Adding New Features
 
-1. Backend changes: Add endpoints in `backend/api.py`
-2. Frontend changes: Modify components or add new pages in the `app` directory
+1. Backend changes: Add Django apps, models, views, and API endpoints
+2. AI changes: Modify modules in `backend/ai_engineering/`
+3. Frontend changes: Modify components or add new pages in the `frontend/app/` directory
 
 ## License
 
