@@ -94,7 +94,8 @@ WSGI_APPLICATION = 'invoice_backend.wsgi.application'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 # Default to SQLite for development, PostgreSQL for production
-if env('DATABASE_URL', default=None):
+database_url = env('DATABASE_URL', default=None)
+if database_url and 'postgres' in database_url:
     DATABASES = {
         'default': env.db()
     }
