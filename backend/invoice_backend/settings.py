@@ -222,7 +222,12 @@ LOGGING = {
 }
 
 # Environment-specific settings for AI services
+# Try multiple ways to read the environment variable
 ANTHROPIC_API_KEY = env('ANTHROPIC_API_KEY', default='')
+# Also try direct os.environ access as fallback
+if not ANTHROPIC_API_KEY:
+    ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+
 AWS_DEFAULT_REGION = env('AWS_DEFAULT_REGION', default='us-east-1')
 AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default='')
 AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default='')
@@ -231,6 +236,7 @@ AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default='')
 logger = logging.getLogger(__name__)
 logger.info(f"ANTHROPIC_API_KEY configured: {bool(ANTHROPIC_API_KEY)}")
 logger.info(f"ANTHROPIC_API_KEY length: {len(ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else 0}")
+logger.info(f"Available env vars containing 'ANTHROPIC': {[k for k in os.environ.keys() if 'ANTHROPIC' in k.upper()]}")
 if ANTHROPIC_API_KEY:
     logger.info("AI service will use Anthropic")
 else:
