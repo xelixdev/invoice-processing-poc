@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Company, Vendor, Item, Invoice, InvoiceLineItem
+from datetime import date, timedelta
 
 
 class CompanySerializer(serializers.ModelSerializer):
@@ -45,6 +46,16 @@ class InvoiceSerializer(serializers.ModelSerializer):
     company_id = serializers.CharField(source='company.company_id', read_only=True)
     line_items = InvoiceLineItemSerializer(many=True, read_only=True)
     
+    # Frontend-expected field names
+    invoiceNumber = serializers.CharField(source='invoice_number', read_only=True)
+    dueDate = serializers.DateField(source='due_date', read_only=True)
+    poNumber = serializers.CharField(source='po_number', read_only=True)
+    grNumber = serializers.CharField(source='gr_number', read_only=True)
+    vendor = serializers.CharField(source='vendor.name', read_only=True)
+    amount = serializers.DecimalField(source='total_due', max_digits=12, decimal_places=2, read_only=True)
+    status = serializers.SerializerMethodField()
+    match = serializers.SerializerMethodField()
+    
     class Meta:
         model = Invoice
         fields = [
@@ -56,12 +67,37 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'sub_total', 'discount_amount', 'tax_amount',
             'shipping', 'total_due',
             'line_items',
+            # Frontend-expected fields
+            'invoiceNumber', 'dueDate', 'poNumber', 'grNumber',
+            'amount', 'status', 'match',
             'created_at', 'updated_at'
         ]
         read_only_fields = [
             'id', 'sub_total', 'discount_amount', 'tax_amount', 'total_due',
             'created_at', 'updated_at'
         ]
+    
+    def get_status(self, obj):
+        """Return a status based on due date and other factors."""
+        today = date.today()
+        
+        if not obj.due_date:
+            return "In Approval"  # No due date set
+        elif obj.due_date < today:
+            return "Review"  # Overdue
+        elif obj.due_date <= today + timedelta(days=7):
+            return "In Approval"  # Due soon
+        else:
+            return "Approved"  # Not due yet
+    
+    def get_match(self, obj):
+        """Return a match color based on PO/GR linking."""
+        if obj.po_number and obj.gr_number:
+            return "green"  # Fully matched
+        elif obj.po_number or obj.gr_number:
+            return "yellow"  # Partially matched
+        else:
+            return "red"  # No matching
 
 
 class InvoiceCreateSerializer(serializers.ModelSerializer):

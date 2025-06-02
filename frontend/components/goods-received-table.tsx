@@ -5,7 +5,9 @@ import { Badge } from "@/components/ui/badge"
 import { useEffect, useState } from "react"
 import type { GoodsReceived } from "@/lib/data-utils"
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'https://invoice-processing-poc-production.up.railway.app'
+const BACKEND_URL = process.env.NODE_ENV === 'development' 
+  ? (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
+  : (process.env.NEXT_PUBLIC_API_URL || 'https://invoice-processing-poc-production.up.railway.app')
 
 export default function GoodsReceivedTable() {
   const [goodsReceived, setGoodsReceived] = useState<GoodsReceived[]>([])

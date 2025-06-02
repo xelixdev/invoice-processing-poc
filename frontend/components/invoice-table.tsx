@@ -6,7 +6,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useEffect, useState } from "react"
 import type { Invoice } from "@/lib/data-utils"
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'https://invoice-processing-poc-production.up.railway.app'
+const BACKEND_URL = process.env.NODE_ENV === 'development' 
+  ? (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
+  : (process.env.NEXT_PUBLIC_API_URL || 'https://invoice-processing-poc-production.up.railway.app')
 
 export default function InvoiceTable() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
@@ -112,7 +114,12 @@ export default function InvoiceTable() {
               </TableCell>
               <TableCell className="font-medium text-violet-600">{invoice.invoiceNumber}</TableCell>
               <TableCell>{invoice.vendor}</TableCell>
-              <TableCell>{invoice.amount}</TableCell>
+              <TableCell>
+                {typeof invoice.amount === 'string' 
+                  ? invoice.amount 
+                  : `$${Number(invoice.amount || invoice.total_due || 0).toFixed(2)}`
+                }
+              </TableCell>
               <TableCell>{invoice.currency}</TableCell>
               <TableCell>{invoice.date}</TableCell>
               <TableCell>{invoice.dueDate}</TableCell>

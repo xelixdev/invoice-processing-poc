@@ -26,6 +26,12 @@ class GoodsReceivedSerializer(serializers.ModelSerializer):
     po_number = serializers.CharField(source='purchase_order.po_number', read_only=True)
     line_items = GoodsReceivedLineItemSerializer(many=True, read_only=True)
     
+    # Frontend-expected field names
+    grNumber = serializers.CharField(source='gr_number', read_only=True)
+    poNumber = serializers.CharField(source='purchase_order.po_number', read_only=True)
+    vendor = serializers.CharField(source='vendor.name', read_only=True)
+    status = serializers.CharField(source='overall_status', read_only=True)
+    
     class Meta:
         model = GoodsReceived
         fields = [
@@ -35,6 +41,8 @@ class GoodsReceivedSerializer(serializers.ModelSerializer):
             'company', 'company_id', 'company_name',
             'overall_status', 'notes',
             'line_items',
+            # Frontend-expected fields
+            'grNumber', 'poNumber', 'status',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'overall_status', 'created_at', 'updated_at']

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Ensure we're using the full URL with protocol
-const PYTHON_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const PYTHON_API_URL = process.env.NODE_ENV === 'development' 
+  ? (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
+  : (process.env.NEXT_PUBLIC_API_URL || 'https://invoice-processing-poc-production.up.railway.app');
 
 export async function POST(request: NextRequest) {
   try {

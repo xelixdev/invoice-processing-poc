@@ -5,7 +5,9 @@ import { Badge } from "@/components/ui/badge"
 import { useEffect, useState } from "react"
 import type { PurchaseOrder } from "@/lib/data-utils"
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'https://invoice-processing-poc-production.up.railway.app'
+const BACKEND_URL = process.env.NODE_ENV === 'development' 
+  ? (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
+  : (process.env.NEXT_PUBLIC_API_URL || 'https://invoice-processing-poc-production.up.railway.app')
 
 export default function PurchaseOrderTable() {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([])
@@ -97,7 +99,7 @@ export default function PurchaseOrderTable() {
               <TableCell>{po.date}</TableCell>
               <TableCell>{po.vendorName}</TableCell>
               <TableCell>{po.companyName}</TableCell>
-              <TableCell>${po.totalAmount.toFixed(2)}</TableCell>
+              <TableCell>${Number(po.totalAmount || po.total_amount || 0).toFixed(2)}</TableCell>
               <TableCell>{po.currency}</TableCell>
               <TableCell>
                 <Badge

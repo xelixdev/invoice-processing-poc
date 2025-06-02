@@ -24,6 +24,12 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
     company_id = serializers.CharField(source='company.company_id', read_only=True)
     line_items = PurchaseOrderLineItemSerializer(many=True, read_only=True)
     
+    # Frontend-expected field names
+    poNumber = serializers.CharField(source='po_number', read_only=True)
+    vendorName = serializers.CharField(source='vendor.name', read_only=True)
+    companyName = serializers.CharField(source='company.name', read_only=True)
+    totalAmount = serializers.DecimalField(source='total_amount', max_digits=12, decimal_places=2, read_only=True)
+    
     class Meta:
         model = PurchaseOrder
         fields = [
@@ -32,6 +38,8 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             'company', 'company_id', 'company_name',
             'currency', 'status', 'total_amount',
             'line_items',
+            # Frontend-expected fields
+            'poNumber', 'vendorName', 'companyName', 'totalAmount',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'total_amount', 'created_at', 'updated_at']
