@@ -34,7 +34,14 @@ SECRET_KEY = env('SECRET_KEY', default='django-insecure-change-me-in-production'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env('DEBUG', default=True)
 
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1', '0.0.0.0'])
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[
+    'localhost', 
+    '127.0.0.1', 
+    '0.0.0.0',
+    'invoice-processing-poc-production.up.railway.app',
+    '*.railway.app',  # Allow any Railway subdomain
+    '*.up.railway.app'  # Allow any Railway production subdomain
+])
 
 # Application definition
 
