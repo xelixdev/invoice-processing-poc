@@ -31,16 +31,26 @@ class Command(BaseCommand):
             )
             return
 
-        # Load data in order (dependencies first)
-        self.load_companies_and_vendors(fixtures_path)
-        self.load_items(fixtures_path)
-        self.load_purchase_orders(fixtures_path)
-        self.load_goods_received(fixtures_path)
-        self.load_invoices(fixtures_path)
-
         self.stdout.write(
-            self.style.SUCCESS('Successfully loaded all CSV data!')
+            self.style.SUCCESS(f'Starting CSV data loading from: {fixtures_path}')
         )
+
+        # Load data in order (dependencies first)
+        try:
+            self.load_companies_and_vendors(fixtures_path)
+            self.load_items(fixtures_path)
+            self.load_purchase_orders(fixtures_path)
+            self.load_goods_received(fixtures_path)
+            self.load_invoices(fixtures_path)
+
+            self.stdout.write(
+                self.style.SUCCESS('Successfully loaded all CSV data!')
+            )
+        except Exception as e:
+            self.stdout.write(
+                self.style.ERROR(f'Error loading CSV data: {e}')
+            )
+            raise
 
     def load_companies_and_vendors(self, fixtures_path):
         """Load companies and vendors from CSV files."""
@@ -62,20 +72,26 @@ class Command(BaseCommand):
                             vendors.add((row['Vendor_ID'], row['Vendor_Name']))
 
         # Create companies
+        companies_created = 0
         for company_id, company_name in companies:
-            Company.objects.get_or_create(
+            company, created = Company.objects.get_or_create(
                 company_id=company_id,
                 defaults={'name': company_name}
             )
+            if created:
+                companies_created += 1
 
         # Create vendors
+        vendors_created = 0
         for vendor_id, vendor_name in vendors:
-            Vendor.objects.get_or_create(
+            vendor, created = Vendor.objects.get_or_create(
                 vendor_id=vendor_id,
                 defaults={'name': vendor_name}
             )
+            if created:
+                vendors_created += 1
 
-        self.stdout.write(f'Created {len(companies)} companies and {len(vendors)} vendors')
+        self.stdout.write(f'Created {companies_created} new companies and {vendors_created} new vendors')
 
     def load_items(self, fixtures_path):
         """Load items from CSV files."""
@@ -94,13 +110,16 @@ class Command(BaseCommand):
                             items.add((row['Item_Code'], row['Description']))
 
         # Create items
+        items_created = 0
         for item_code, description in items:
-            Item.objects.get_or_create(
+            item, created = Item.objects.get_or_create(
                 item_code=item_code,
                 defaults={'description': description}
             )
+            if created:
+                items_created += 1
 
-        self.stdout.write(f'Created {len(items)} items')
+        self.stdout.write(f'Created {items_created} new items')
 
     def load_purchase_orders(self, fixtures_path):
         """Load purchase orders from CSV."""
@@ -111,7 +130,7 @@ class Command(BaseCommand):
 
         self.stdout.write('Loading purchase orders...')
         
-        pos_created = {}
+        pos_created = 0
         line_items_created = 0
 
         with open(csv_path, 'r') as file:
@@ -120,35 +139,46 @@ class Command(BaseCommand):
                 po_number = row['PO_Number']
                 
                 # Create PO if it doesn't exist
-                if po_number not in pos_created:
+                try:
                     vendor = Vendor.objects.get(vendor_id=row['Vendor_ID'])
                     company = Company.objects.get(company_id=row['Company_ID'])
                     
-                    po = PurchaseOrder.objects.create(
+                    po, created = PurchaseOrder.objects.get_or_create(
                         po_number=po_number,
-                        date=datetime.strptime(row['Date'], '%Y-%m-%d').date(),
-                        required_delivery_date=datetime.strptime(row['Required_Delivery_Date'], '%Y-%m-%d').date(),
-                        vendor=vendor,
-                        company=company,
-                        currency=row['Currency'],
-                        status=row['PO_Status'].upper()
+                        defaults={
+                            'date': datetime.strptime(row['Date'], '%Y-%m-%d').date(),
+                            'required_delivery_date': datetime.strptime(row['Required_Delivery_Date'], '%Y-%m-%d').date(),
+                            'vendor': vendor,
+                            'company': company,
+                            'currency': row['Currency'],
+                            'status': row['PO_Status'].upper()
+                        }
                     )
-                    pos_created[po_number] = po
+                    
+                    if created:
+                        pos_created += 1
 
-                # Create line item
-                po = pos_created[po_number]
-                item = Item.objects.get(item_code=row['Item_Code'])
-                
-                PurchaseOrderLineItem.objects.create(
-                    purchase_order=po,
-                    item=item,
-                    quantity=Decimal(row['Quantity']),
-                    unit_price=Decimal(row['Unit_Price']),
-                    total=Decimal(row['Total'])
-                )
-                line_items_created += 1
+                    # Create line item if it doesn't exist
+                    item = Item.objects.get(item_code=row['Item_Code'])
+                    
+                    line_item, created = PurchaseOrderLineItem.objects.get_or_create(
+                        purchase_order=po,
+                        item=item,
+                        defaults={
+                            'quantity': Decimal(row['Quantity']),
+                            'unit_price': Decimal(row['Unit_Price']),
+                            'total': Decimal(row['Total'])
+                        }
+                    )
+                    
+                    if created:
+                        line_items_created += 1
+                        
+                except (Vendor.DoesNotExist, Company.DoesNotExist, Item.DoesNotExist) as e:
+                    self.stdout.write(f'Skipping PO {po_number}: {e}')
+                    continue
 
-        self.stdout.write(f'Created {len(pos_created)} purchase orders with {line_items_created} line items')
+        self.stdout.write(f'Created {pos_created} purchase orders with {line_items_created} line items')
 
     def load_goods_received(self, fixtures_path):
         """Load goods received from CSV."""
@@ -159,7 +189,7 @@ class Command(BaseCommand):
 
         self.stdout.write('Loading goods received...')
         
-        grs_created = {}
+        grs_created = 0
         line_items_created = 0
 
         with open(csv_path, 'r') as file:
@@ -167,8 +197,7 @@ class Command(BaseCommand):
             for row in reader:
                 gr_number = row['GR_Number']
                 
-                # Create GR if it doesn't exist
-                if gr_number not in grs_created:
+                try:
                     vendor = Vendor.objects.get(vendor_id=row['Vendor_ID'])
                     company = Company.objects.get(company_id=row['Company_ID'])
                     
@@ -180,30 +209,41 @@ class Command(BaseCommand):
                         except PurchaseOrder.DoesNotExist:
                             pass
                     
-                    gr = GoodsReceived.objects.create(
+                    gr, created = GoodsReceived.objects.get_or_create(
                         gr_number=gr_number,
-                        date=datetime.strptime(row['Date'], '%Y-%m-%d').date(),
-                        purchase_order=po,
-                        vendor=vendor,
-                        company=company,
-                        notes=row.get('Notes', '')
+                        defaults={
+                            'date': datetime.strptime(row['Date'], '%Y-%m-%d').date(),
+                            'purchase_order': po,
+                            'vendor': vendor,
+                            'company': company,
+                            'notes': row.get('Notes', '')
+                        }
                     )
-                    grs_created[gr_number] = gr
+                    
+                    if created:
+                        grs_created += 1
 
-                # Create line item
-                gr = grs_created[gr_number]
-                item = Item.objects.get(item_code=row['Item_Code'])
-                
-                GoodsReceivedLineItem.objects.create(
-                    goods_received=gr,
-                    item=item,
-                    quantity_ordered=Decimal(row['Quantity_Ordered']),
-                    quantity_received=Decimal(row['Quantity_Received']),
-                    notes=row.get('Notes', '')
-                )
-                line_items_created += 1
+                    # Create line item if it doesn't exist
+                    item = Item.objects.get(item_code=row['Item_Code'])
+                    
+                    line_item, created = GoodsReceivedLineItem.objects.get_or_create(
+                        goods_received=gr,
+                        item=item,
+                        defaults={
+                            'quantity_ordered': Decimal(row['Quantity_Ordered']),
+                            'quantity_received': Decimal(row['Quantity_Received']),
+                            'notes': row.get('Notes', '')
+                        }
+                    )
+                    
+                    if created:
+                        line_items_created += 1
+                        
+                except (Vendor.DoesNotExist, Company.DoesNotExist, Item.DoesNotExist) as e:
+                    self.stdout.write(f'Skipping GR {gr_number}: {e}')
+                    continue
 
-        self.stdout.write(f'Created {len(grs_created)} goods received with {line_items_created} line items')
+        self.stdout.write(f'Created {grs_created} goods received with {line_items_created} line items')
 
     def load_invoices(self, fixtures_path):
         """Load invoices from CSV."""
@@ -214,7 +254,7 @@ class Command(BaseCommand):
 
         self.stdout.write('Loading invoices...')
         
-        invoices_created = {}
+        invoices_created = 0
         line_items_created = 0
 
         with open(csv_path, 'r') as file:
@@ -222,39 +262,49 @@ class Command(BaseCommand):
             for row in reader:
                 invoice_number = row['Invoice_Number']
                 
-                # Create invoice if it doesn't exist
-                if invoice_number not in invoices_created:
+                try:
                     vendor = Vendor.objects.get(vendor_id=row['Vendor_ID'])
                     company = Company.objects.get(company_id=row['Company_ID'])
                     
-                    invoice = Invoice.objects.create(
+                    invoice, created = Invoice.objects.get_or_create(
                         invoice_number=invoice_number,
-                        date=datetime.strptime(row['Date'], '%Y-%m-%d').date(),
-                        due_date=datetime.strptime(row['Due_Date'], '%Y-%m-%d').date(),
-                        po_number=row.get('PO_Number', ''),
-                        gr_number=row.get('GR_Number', ''),
-                        vendor=vendor,
-                        company=company,
-                        currency=row['Currency'],
-                        payment_terms=row['Payment_Terms'],
-                        shipping=Decimal(row.get('Shipping', '0'))
+                        defaults={
+                            'date': datetime.strptime(row['Date'], '%Y-%m-%d').date(),
+                            'due_date': datetime.strptime(row['Due_Date'], '%Y-%m-%d').date(),
+                            'po_number': row.get('PO_Number', ''),
+                            'gr_number': row.get('GR_Number', ''),
+                            'vendor': vendor,
+                            'company': company,
+                            'currency': row['Currency'],
+                            'payment_terms': row['Payment_Terms'],
+                            'shipping': Decimal(row.get('Shipping', '0'))
+                        }
                     )
-                    invoices_created[invoice_number] = invoice
+                    
+                    if created:
+                        invoices_created += 1
 
-                # Create line item
-                invoice = invoices_created[invoice_number]
-                item = Item.objects.get(item_code=row['Item_Code'])
-                
-                InvoiceLineItem.objects.create(
-                    invoice=invoice,
-                    item=item,
-                    quantity=Decimal(row['Quantity']),
-                    unit_price=Decimal(row['Unit_Price']),
-                    total=Decimal(row['Total']),
-                    discount_percent=Decimal(row.get('Discount_Percent', '0')),
-                    discount_amount=Decimal(row.get('Discount_Amount', '0')),
-                    tax_rate=Decimal(row.get('Tax_Rate', '0'))
-                )
-                line_items_created += 1
+                    # Create line item if it doesn't exist
+                    item = Item.objects.get(item_code=row['Item_Code'])
+                    
+                    line_item, created = InvoiceLineItem.objects.get_or_create(
+                        invoice=invoice,
+                        item=item,
+                        defaults={
+                            'quantity': Decimal(row['Quantity']),
+                            'unit_price': Decimal(row['Unit_Price']),
+                            'total': Decimal(row['Total']),
+                            'discount_percent': Decimal(row.get('Discount_Percent', '0')),
+                            'discount_amount': Decimal(row.get('Discount_Amount', '0')),
+                            'tax_rate': Decimal(row.get('Tax_Rate', '0'))
+                        }
+                    )
+                    
+                    if created:
+                        line_items_created += 1
+                        
+                except (Vendor.DoesNotExist, Company.DoesNotExist, Item.DoesNotExist) as e:
+                    self.stdout.write(f'Skipping Invoice {invoice_number}: {e}')
+                    continue
 
-        self.stdout.write(f'Created {len(invoices_created)} invoices with {line_items_created} line items') 
+        self.stdout.write(f'Created {invoices_created} invoices with {line_items_created} line items') 
