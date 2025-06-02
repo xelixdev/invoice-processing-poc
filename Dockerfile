@@ -34,5 +34,9 @@ RUN mkdir -p /app/backend/staticfiles
 EXPOSE $PORT
 
 # Command to run the application
-# Migrations and collectstatic run at startup when database is available
-CMD cd backend && python manage.py migrate && python manage.py collectstatic --noinput && gunicorn invoice_backend.wsgi:application --bind 0.0.0.0:$PORT 
+# Migrations, load fixtures, collectstatic, then start server
+CMD cd backend && \
+    python manage.py migrate && \
+    python manage.py load_csv_data && \
+    python manage.py collectstatic --noinput && \
+    gunicorn invoice_backend.wsgi:application --bind 0.0.0.0:$PORT 
