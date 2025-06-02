@@ -228,6 +228,12 @@ ANTHROPIC_API_KEY = env('ANTHROPIC_API_KEY', default='')
 if not ANTHROPIC_API_KEY:
     ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 
+# Debug prints that will definitely show up in Railway logs
+print(f"[DJANGO SETTINGS] ANTHROPIC_API_KEY configured: {bool(ANTHROPIC_API_KEY)}")
+print(f"[DJANGO SETTINGS] ANTHROPIC_API_KEY length: {len(ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else 0}")
+print(f"[DJANGO SETTINGS] Available env vars containing 'ANTHROPIC': {[k for k in os.environ.keys() if 'ANTHROPIC' in k.upper()]}")
+print(f"[DJANGO SETTINGS] Total environment variables: {len(os.environ)}")
+
 AWS_DEFAULT_REGION = env('AWS_DEFAULT_REGION', default='us-east-1')
 AWS_ACCESS_KEY_ID = env('AWS_ACCESS_KEY_ID', default='')
 AWS_SECRET_ACCESS_KEY = env('AWS_SECRET_ACCESS_KEY', default='')
