@@ -107,25 +107,25 @@ export default function UploadInvoicePage() {
             sessionStorage.setItem("invoiceFileType", file.type)
             sessionStorage.setItem("invoiceFileName", file.name)
             
-            console.log("Navigating to create page...")
-            // Navigate to the create page
-            router.push("/invoices/create")
+            console.log("Navigating to extraction review page...")
+            // Navigate to the extraction review page
+            router.push("/invoices/extraction-review")
           }
         }
         reader.onerror = () => {
           // If file reading fails, continue without preview
           console.error("Error reading file for preview")
-          console.log("Navigating to create page without preview...")
-          router.push("/invoices/create")
+          console.log("Navigating to extraction review page without preview...")
+          router.push("/invoices/extraction-review")
         }
         reader.readAsDataURL(file)
       } else {
-        console.log("CSV file, no preview needed. Navigating to create page...")
+        console.log("CSV file, no preview needed. Navigating to extraction review page...")
         // For CSV files, we don't need a preview
         sessionStorage.removeItem("invoiceFileData")
         sessionStorage.removeItem("invoiceFileType")
         sessionStorage.removeItem("invoiceFileName")
-        router.push("/invoices/create")
+        router.push("/invoices/extraction-review")
       }
     } catch (error) {
       console.error("Error processing invoice:", error)
@@ -227,8 +227,9 @@ export default function UploadInvoicePage() {
               <ol className="space-y-3 list-decimal list-inside text-muted-foreground">
                 <li>Your invoice will be processed using AI extraction</li>
                 <li>Invoice information will be automatically extracted including line items</li>
-                <li>You can review and edit the extracted information</li>
-                <li>Once approved, the invoice will be added to your system</li>
+                <li>You can review and edit the extracted information to ensure accuracy</li>
+                <li>Mark invoice as incomplete if essential information is missing</li>
+                <li>Once confirmed, proceed to invoice matching and approval workflow</li>
               </ol>
             </div>
           </div>
