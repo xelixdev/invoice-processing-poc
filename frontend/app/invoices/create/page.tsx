@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { ArrowLeft, FileText, Edit, Plus, Download, ChevronLeft, ChevronRight, Maximize, X, Receipt, FileCheck, TrendingUp, AlertCircle, AlertTriangle, CheckCircle, Calendar as CalendarIcon, Copy, List, MoreVertical, MessageCircle } from "lucide-react"
+import { ArrowLeft, FileText, Edit, Plus, Download, ChevronLeft, ChevronRight, Maximize, X, Receipt, FileCheck, TrendingUp, AlertCircle, AlertTriangle, CheckCircle, Calendar as CalendarIcon, Copy, List, MoreVertical, MessageCircle, Save, XIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
@@ -13,9 +13,12 @@ import Link from "next/link"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Calendar } from "@/components/ui/calendar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Input } from "@/components/ui/input"
 import { format } from "date-fns"
+import { LineItemSelector } from "@/components/line-item-selector"
 
 interface InvoiceData {
   document_type: string;
@@ -67,6 +70,9 @@ export default function InvoiceDetailsPage() {
   const [removingVendor, setRemovingVendor] = useState(false)
   const [resolvingIssues, setResolvingIssues] = useState<Set<string>>(new Set())
   const [resolvedIssues, setResolvedIssues] = useState<Set<string>>(new Set())
+  const [editingLineItem, setEditingLineItem] = useState<number | null>(null)
+  const [lineItemValues, setLineItemValues] = useState<{[key: number]: Partial<LineItem>}>({})
+  const [forcedMatchedItems, setForcedMatchedItems] = useState<Set<number>>(new Set())
   const pdfContainerRef = useRef<HTMLDivElement>(null)
 
   // Mock PO data for validation
@@ -80,17 +86,17 @@ export default function InvoiceDetailsPage() {
 
   // Mock PO line items for matching
   const mockPOLines = [
-    { id: "po-line-1", description: "Professional consulting services", quantity: 10, unit_price: 150.00, total: 1500.00 },
-    { id: "po-line-2", description: "Software development services", quantity: 8, unit_price: 200.00, total: 1600.00 },
-    { id: "po-line-3", description: "Project management services", quantity: 5, unit_price: 175.00, total: 875.00 },
-    { id: "po-line-4", description: "Technical documentation", quantity: 2, unit_price: 100.00, total: 200.00 },
+    { id: "PO-001-1", description: "Professional consulting services", quantity: 10, unit_price: 150.00, total: 1500.00 },
+    { id: "PO-001-2", description: "Software development services", quantity: 8, unit_price: 200.00, total: 1600.00 },
+    { id: "PO-001-3", description: "Project management services", quantity: 5, unit_price: 175.00, total: 875.00 },
+    { id: "PO-001-4", description: "Technical documentation", quantity: 2, unit_price: 100.00, total: 200.00 },
   ]
 
   // Mock GR line items for matching
   const mockGRLines = [
-    { id: "gr-line-1", description: "Professional consulting services", quantity: 10 },
-    { id: "gr-line-2", description: "Software development services", quantity: 8 },
-    { id: "gr-line-3", description: "Project management services", quantity: 5 },
+    { id: "GR-001-1", description: "Professional consulting services", quantity: 10 },
+    { id: "GR-001-2", description: "Software development services", quantity: 8 },
+    { id: "GR-001-3", description: "Project management services", quantity: 5 },
   ]
 
   // Line item matching state
@@ -104,6 +110,11 @@ export default function InvoiceDetailsPage() {
   
   // Line item status calculation
   const getLineItemStatus = (itemIndex: number) => {
+    // Check if this item is forced to be matched
+    if (forcedMatchedItems.has(itemIndex)) {
+      return 'matched'
+    }
+    
     const match = lineItemMatches[itemIndex]
     if (!match?.poLineId) return 'missing'
     
@@ -121,15 +132,238 @@ export default function InvoiceDetailsPage() {
     return 'matched'
   }
 
-  // Handle line item matching
-  const handleLineItemMatch = (itemIndex: number, type: 'po' | 'gr', lineId: string) => {
-    setLineItemMatches(prev => ({
+  // Handle line item editing
+  const handleEditLineItem = (index: number) => {
+    if (!invoice?.line_items || !invoice.line_items[index]) {
+      console.error('Cannot edit line item: item not found at index', index)
+      return
+    }
+    
+    setEditingLineItem(index)
+    // Initialize editing values with current line item data
+    const currentItem = invoice.line_items[index]
+    setLineItemValues(prev => ({
       ...prev,
-      [itemIndex]: {
-        ...prev[itemIndex],
-        [type === 'po' ? 'poLineId' : 'grLineId']: lineId
+      [index]: {
+        description: currentItem.description,
+        quantity: currentItem.quantity,
+        unit_price: currentItem.unit_price,
+        total: currentItem.total
       }
     }))
+  }
+
+  const handleLineItemValueChange = (index: number, field: keyof LineItem, value: string | number) => {
+    setLineItemValues(prev => {
+      const updated = {
+        ...prev,
+        [index]: {
+          ...prev[index],
+          [field]: value
+        }
+      }
+      
+      // Auto-calculate total if quantity or unit_price changes
+      if (field === 'quantity' || field === 'unit_price') {
+        const quantity = field === 'quantity' ? Number(value) : Number(updated[index]?.quantity || 0)
+        const unitPrice = field === 'unit_price' ? Number(value) : Number(updated[index]?.unit_price || 0)
+        updated[index] = {
+          ...updated[index],
+          total: quantity * unitPrice
+        }
+      }
+      
+      return updated
+    })
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleSaveLineItem(index)
+    }
+  }
+
+  const handleMarkAsMatched = (index: number) => {
+    setForcedMatchedItems(prev => new Set(prev).add(index))
+  }
+
+  const handleResetForcedMatches = () => {
+    setForcedMatchedItems(new Set())
+  }
+
+  const handleSaveLineItem = (index: number) => {
+    const editedValues = lineItemValues[index]
+    if (!editedValues || !invoice?.line_items || !invoice.line_items[index]) {
+      console.error('Cannot save line item: invalid data')
+      return
+    }
+    
+    // Update the invoice data
+    const updatedLineItems = [...invoice.line_items]
+    updatedLineItems[index] = {
+      ...updatedLineItems[index],
+      ...editedValues
+    }
+    
+    setInvoice(prev => prev ? {
+      ...prev,
+      line_items: updatedLineItems
+    } : prev)
+    
+    // Reset forced matches when invoice data is edited
+    handleResetForcedMatches()
+    
+    setEditingLineItem(null)
+    setLineItemValues(prev => {
+      const { [index]: removed, ...rest } = prev
+      return rest
+    })
+  }
+
+  const handleCancelEditLineItem = () => {
+    setEditingLineItem(null)
+    setLineItemValues(prev => {
+      if (editingLineItem !== null) {
+        const { [editingLineItem]: removed, ...rest } = prev
+        return rest
+      }
+      return prev
+    })
+  }
+
+  const handleAddLineItem = () => {
+    if (!invoice) {
+      console.error('Cannot add line item: invoice not loaded')
+      return
+    }
+    
+    const newLineItem: LineItem = {
+      description: "",
+      quantity: 1,
+      unit_price: 0,
+      total: 0
+    }
+    
+    const updatedLineItems = [...invoice.line_items, newLineItem]
+    const newIndex = updatedLineItems.length - 1
+    
+    // Update invoice state
+    setInvoice(prev => prev ? {
+      ...prev,
+      line_items: updatedLineItems
+    } : prev)
+    
+    // Directly set edit state without calling handleEditLineItem
+    setEditingLineItem(newIndex)
+    setLineItemValues(prev => ({
+      ...prev,
+      [newIndex]: {
+        description: newLineItem.description,
+        quantity: newLineItem.quantity,
+        unit_price: newLineItem.unit_price,
+        total: newLineItem.total
+      }
+    }))
+  }
+
+  const handleRemoveLineItem = (index: number) => {
+    if (!invoice) {
+      console.error('Cannot remove line item: invoice not loaded')
+      return
+    }
+
+    // Remove the line item from the invoice
+    const updatedLineItems = invoice.line_items.filter((_, i) => i !== index)
+    
+    setInvoice(prev => prev ? {
+      ...prev,
+      line_items: updatedLineItems
+    } : prev)
+
+    // Update line item matches - remove the match for this index and shift down higher indices
+    setLineItemMatches(prev => {
+      const updated = { ...prev }
+      
+      // Remove the match for the deleted line
+      delete updated[index]
+      
+      // Shift down all matches for indices greater than the deleted one
+      Object.keys(updated).forEach(key => {
+        const idx = parseInt(key)
+        if (idx > index) {
+          updated[idx - 1] = updated[idx]
+          delete updated[idx]
+        }
+      })
+      
+      return updated
+    })
+
+    // Update forced matched items - remove and shift indices
+    setForcedMatchedItems(prev => {
+      const updated = new Set<number>()
+      prev.forEach(idx => {
+        if (idx < index) {
+          updated.add(idx)
+        } else if (idx > index) {
+          updated.add(idx - 1)
+        }
+        // Skip idx === index (the deleted item)
+      })
+      return updated
+    })
+
+    // Clear editing state if we were editing the deleted item or an item after it
+    if (editingLineItem !== null) {
+      if (editingLineItem === index) {
+        setEditingLineItem(null)
+        setLineItemValues(prev => {
+          const { [index]: removed, ...rest } = prev
+          return rest
+        })
+      } else if (editingLineItem > index) {
+        setEditingLineItem(editingLineItem - 1)
+        // Shift the editing values down
+        setLineItemValues(prev => {
+          const updated = { ...prev }
+          if (prev[editingLineItem]) {
+            updated[editingLineItem - 1] = prev[editingLineItem]
+            delete updated[editingLineItem]
+          }
+          return updated
+        })
+      }
+    }
+  }
+
+  // Handle line item matching
+  const handleLineItemMatch = (itemIndex: number, type: 'po' | 'gr', lineId: string) => {
+    setLineItemMatches(prev => {
+      const updated = { ...prev }
+      
+      // If lineId is empty, remove the selection
+      if (!lineId) {
+        if (updated[itemIndex]) {
+          // Remove the specific field but keep other fields if they exist
+          const { [type === 'po' ? 'poLineId' : 'grLineId']: removed, ...rest } = updated[itemIndex]
+          // If no other fields remain, remove the entire entry
+          if (Object.keys(rest).length === 0) {
+            delete updated[itemIndex]
+          } else {
+            updated[itemIndex] = rest
+          }
+        }
+      } else {
+        // Set the new selection
+        updated[itemIndex] = {
+          ...updated[itemIndex],
+          [type === 'po' ? 'poLineId' : 'grLineId']: lineId
+        }
+      }
+      
+      return updated
+    })
   }
 
   // Calculate line item statistics
@@ -1506,32 +1740,27 @@ export default function InvoiceDetailsPage() {
               <div className="flex items-center gap-4">
                 <h3 className="font-semibold text-lg">Line Items</h3>
                 {invoice?.line_items && invoice.line_items.length > 0 && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <span className="text-gray-600">{getLineItemStats().total} items</span>
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                      <span className="text-gray-600">{getLineItemStats().matched} matched</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 bg-amber-500 rounded-full"></div>
-                      <span className="text-gray-600">{getLineItemStats().mismatched} mismatched</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                      <span className="text-gray-600">{getLineItemStats().missing} missing</span>
-                    </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    {getLineItemStats().matched > 0 && (
+                      <div className="flex items-center gap-1.5 px-2 py-1 bg-white border border-gray-200 rounded-full">
+                        <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                        <span className="text-gray-700 text-xs">{getLineItemStats().matched} matched</span>
+                      </div>
+                    )}
+                    {getLineItemStats().mismatched > 0 && (
+                      <div className="flex items-center gap-1.5 px-2 py-1 bg-white border border-gray-200 rounded-full">
+                        <div className="w-1.5 h-1.5 bg-amber-500 rounded-full"></div>
+                        <span className="text-gray-700 text-xs">{getLineItemStats().mismatched} mismatched</span>
+                      </div>
+                    )}
+                    {getLineItemStats().missing > 0 && (
+                      <div className="flex items-center gap-1.5 px-2 py-1 bg-white border border-gray-200 rounded-full">
+                        <div className="w-1.5 h-1.5 bg-red-500 rounded-full"></div>
+                        <span className="text-gray-700 text-xs">{getLineItemStats().missing} missing</span>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" className="h-8 gap-1 text-gray-600">
-                  <Edit className="h-4 w-4" />
-                  Edit
-                </Button>
-                <Button variant="ghost" size="sm" className="h-8 gap-1">
-                  <Plus className="h-4 w-4" />
-                  Add Item
-                </Button>
               </div>
             </div>
 
@@ -1554,6 +1783,9 @@ export default function InvoiceDetailsPage() {
                       <TableBody>
                         {invoice.line_items.map((item, index) => {
                           const status = getLineItemStatus(index)
+                          const match = lineItemMatches[index]
+                          const poLine = match?.poLineId ? mockPOLines.find(po => po.id === match.poLineId) : null
+                          const grLine = match?.grLineId ? mockGRLines.find(gr => gr.id === match.grLineId) : null
                           
                           return (
                             <TableRow key={index} className="hover:bg-gray-50 h-[50px]">
@@ -1572,13 +1804,61 @@ export default function InvoiceDetailsPage() {
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-sm font-medium h-[50px] py-1 px-2 align-middle">
-                                <div className="truncate max-w-44" title={item.description}>
-                                  {item.description}
-                                </div>
+                                {editingLineItem === index ? (
+                                  <Input
+                                    value={lineItemValues[index]?.description || ''}
+                                    onChange={(e) => handleLineItemValueChange(index, 'description', e.target.value)}
+                                    onKeyDown={(e) => handleKeyDown(e, index)}
+                                    className="h-8 text-sm px-2 py-1"
+                                    placeholder="Enter description"
+                                  />
+                                ) : (
+                                  <div className="truncate max-w-44" title={item.description}>
+                                    {item.description}
+                                  </div>
+                                )}
                               </TableCell>
-                              <TableCell className="text-right text-sm h-[50px] py-1 px-2 align-middle">{item.quantity}</TableCell>
-                              <TableCell className="text-right text-sm h-[50px] py-1 px-2 align-middle">{formatCurrency(item.unit_price, invoice.currency_code)}</TableCell>
-                              <TableCell className="text-right text-sm h-[50px] py-1 px-2 border-r-2 border-violet-300 align-middle">{formatCurrency(item.total, invoice.currency_code)}</TableCell>
+                              <TableCell className={cn(
+                                "text-right text-sm h-[50px] py-1 px-2 align-middle",
+                                !forcedMatchedItems.has(index) && ((poLine && Number(item.quantity) !== Number(poLine.quantity)) || (grLine && Number(item.quantity) !== Number(grLine.quantity))) && "bg-amber-50"
+                              )}>
+                                {editingLineItem === index ? (
+                                  <Input
+                                    type="number"
+                                    value={lineItemValues[index]?.quantity || ''}
+                                    onChange={(e) => handleLineItemValueChange(index, 'quantity', parseFloat(e.target.value) || 0)}
+                                    onKeyDown={(e) => handleKeyDown(e, index)}
+                                    className="h-8 text-sm text-right px-2 py-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    placeholder="0"
+                                  />
+                                ) : (
+                                  item.quantity
+                                )}
+                              </TableCell>
+                              <TableCell className={cn(
+                                "text-right text-sm h-[50px] py-1 px-2 align-middle",
+                                !forcedMatchedItems.has(index) && (poLine && Number(item.unit_price) !== Number(poLine.unit_price)) && "bg-amber-50"
+                              )}>
+                                {editingLineItem === index ? (
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    value={lineItemValues[index]?.unit_price || ''}
+                                    onChange={(e) => handleLineItemValueChange(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                                    onKeyDown={(e) => handleKeyDown(e, index)}
+                                    className="h-8 text-sm text-right px-2 py-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    placeholder="0.00"
+                                  />
+                                ) : (
+                                  formatCurrency(item.unit_price, invoice.currency_code)
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right text-sm h-[50px] py-1 px-2 border-r-2 border-violet-300 align-middle">
+                                {editingLineItem === index ? 
+                                  formatCurrency(lineItemValues[index]?.total || 0, invoice.currency_code) :
+                                  formatCurrency(item.total, invoice.currency_code)
+                                }
+                              </TableCell>
                             </TableRow>
                           )
                         })}
@@ -1587,93 +1867,146 @@ export default function InvoiceDetailsPage() {
                   </div>
 
                   {/* Scrollable PO/GR Columns */}
-                  <div className="flex-1 overflow-x-auto">
-                    <Table className="min-w-[1000px]">
+                  <div className="flex-1 overflow-x-auto bg-white shadow-lg">
+                    <Table className={cn(
+                      "min-w-[200px]",
+                      linkedPO && linkedGR && "min-w-[840px]",
+                      linkedPO && !linkedGR && "min-w-[516px]",
+                      !linkedPO && linkedGR && "min-w-[404px]",
+                      !linkedPO && !linkedGR && "w-full"
+                    )}>
                       <TableHeader>
                         <TableRow className="bg-gray-50 h-auto">
-                          <TableHead className="min-w-[160px] text-sm font-medium py-2 px-2">PO Line Source</TableHead>
-                          <TableHead className="min-w-[224px] text-sm font-medium py-2 px-2">PO Description</TableHead>
-                          <TableHead className="min-w-[48px] text-right text-sm font-medium py-2 px-2">PO<br/>Qty</TableHead>
-                          <TableHead className="min-w-[80px] text-right text-sm font-medium py-2 px-2">PO Unit<br/>Price</TableHead>
-                          <TableHead className="min-w-[80px] text-right text-sm font-medium py-2 px-2 border-r-2 border-violet-300">PO<br/>Total</TableHead>
-                          <TableHead className="min-w-[160px] text-sm font-medium py-2 px-2">GR Line Source</TableHead>
-                          <TableHead className="min-w-[224px] text-sm font-medium py-2 px-2">GR Description</TableHead>
-                          <TableHead className="min-w-[48px] text-right text-sm font-medium py-2 px-2 border-r-2 border-violet-300">GR<br/>Qty</TableHead>
-                          <TableHead className="min-w-[48px] text-center text-sm font-medium py-2 px-2">Comments</TableHead>
-                          <TableHead className="min-w-[48px] text-center text-sm font-medium py-2 px-2">Actions</TableHead>
+                          {linkedPO && (
+                            <>
+                              <TableHead className="min-w-[80px] text-sm font-medium py-2 px-2">PO Line<br/>Source</TableHead>
+                              <TableHead className="min-w-[224px] text-sm font-medium py-2 px-2">PO Description</TableHead>
+                              <TableHead className="min-w-[48px] text-right text-sm font-medium py-2 px-2">PO<br/>Qty</TableHead>
+                              <TableHead className="min-w-[80px] text-right text-sm font-medium py-2 px-2">PO Unit<br/>Price</TableHead>
+                              <TableHead className={cn(
+                                "min-w-[80px] text-right text-sm font-medium py-2 px-2",
+                                !linkedGR && "border-r-2 border-violet-300"
+                              )}>PO<br/>Total</TableHead>
+                            </>
+                          )}
+                          {linkedGR && (
+                            <>
+                              <TableHead className={cn(
+                                "min-w-[80px] text-sm font-medium py-2 px-2",
+                                linkedPO && "border-l-2 border-violet-300"
+                              )}>GR Line<br/>Source</TableHead>
+                              <TableHead className="min-w-[224px] text-sm font-medium py-2 px-2">GR Description</TableHead>
+                              <TableHead className="min-w-[48px] text-right text-sm font-medium py-2 px-2 border-r-2 border-violet-300">GR<br/>Qty</TableHead>
+                            </>
+                          )}
+                          <TableHead className={cn(
+                            "text-center text-sm font-medium py-2 px-2",
+                            !linkedPO && !linkedGR ? "w-1/2" : "min-w-[48px]"
+                          )}>Comments</TableHead>
+                          <TableHead className={cn(
+                            "text-center text-sm font-medium py-2 px-2",
+                            !linkedPO && !linkedGR ? "w-1/2" : "min-w-[48px]"
+                          )}>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {invoice.line_items.map((_, index) => {
+                        {invoice.line_items.map((item, index) => {
                           const match = lineItemMatches[index]
                           const poLine = match?.poLineId ? mockPOLines.find(po => po.id === match.poLineId) : null
                           const grLine = match?.grLineId ? mockGRLines.find(gr => gr.id === match.grLineId) : null
                           
+                          // Get all selected PO and GR items for this dropdown
+                          const selectedPOItems = Object.values(lineItemMatches)
+                            .filter(m => m.poLineId)
+                            .map(m => m.poLineId!)
+                          const selectedGRItems = Object.values(lineItemMatches)
+                            .filter(m => m.grLineId)
+                            .map(m => m.grLineId!)
+                          
                           return (
                             <TableRow key={index} className="hover:bg-gray-50 h-[50px]">
-                              {/* PO Line Source */}
-                              <TableCell className="h-[50px] py-1 px-2 align-middle">
-                                <Select
-                                  value={match?.poLineId || ""}
-                                  onValueChange={(value) => value && handleLineItemMatch(index, 'po', value)}
-                                >
-                                  <SelectTrigger className="w-full h-8 text-xs px-2">
-                                    <SelectValue placeholder="Select line" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {mockPOLines.map((poLine) => (
-                                      <SelectItem key={poLine.id} value={poLine.id} className="text-sm">
-                                        {poLine.description.substring(0, 35)}...
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </TableCell>
+                              {/* PO Columns - only show if PO is linked */}
+                              {linkedPO && (
+                                <>
+                                  {/* PO Line Source */}
+                                  <TableCell className="h-[50px] py-1 px-2 align-middle">
+                                    <LineItemSelector
+                                      items={mockPOLines}
+                                      value={match?.poLineId}
+                                      onSelect={(value) => handleLineItemMatch(index, 'po', value)}
+                                      placeholder="Select line"
+                                      type="po"
+                                      lineNumber={match?.poLineId ? parseInt(match.poLineId.split('-').pop() || '0') : undefined}
+                                      isEmpty={!match?.poLineId}
+                                      formatCurrency={formatCurrency}
+                                      currency={invoice.currency_code}
+                                      selectedItems={selectedPOItems}
+                                    />
+                                  </TableCell>
+                                  
+                                  {/* PO Details */}
+                                  <TableCell className="text-sm text-gray-600 h-[50px] py-1 px-2 align-middle">
+                                    <div className="truncate w-full" title={poLine?.description || "—"}>
+                                      {poLine?.description || "—"}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className={cn(
+                                    "text-right text-sm text-gray-600 h-[50px] py-1 px-2 align-middle",
+                                    !forcedMatchedItems.has(index) && poLine && Number(item.quantity) !== Number(poLine.quantity) && "bg-amber-50"
+                                  )}>
+                                    {poLine?.quantity || "—"}
+                                  </TableCell>
+                                  <TableCell className={cn(
+                                    "text-right text-sm text-gray-600 h-[50px] py-1 px-2 align-middle",
+                                    !forcedMatchedItems.has(index) && poLine && Number(item.unit_price) !== Number(poLine.unit_price) && "bg-amber-50"
+                                  )}>
+                                    {poLine ? formatCurrency(poLine.unit_price, invoice.currency_code) : "—"}
+                                  </TableCell>
+                                  <TableCell className={cn(
+                                    "text-right text-sm text-gray-600 h-[50px] py-1 px-2 align-middle",
+                                    !linkedGR && "border-r-2 border-violet-300"
+                                  )}>
+                                    {poLine ? formatCurrency(poLine.total, invoice.currency_code) : "—"}
+                                  </TableCell>
+                                </>
+                              )}
                               
-                              {/* PO Details */}
-                              <TableCell className="text-sm text-gray-600 h-[50px] py-1 px-2 align-middle">
-                                <div className="truncate max-w-52" title={poLine?.description || "—"}>
-                                  {poLine?.description || "—"}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-right text-sm text-gray-600 h-[50px] py-1 px-2 align-middle">
-                                {poLine?.quantity || "—"}
-                              </TableCell>
-                              <TableCell className="text-right text-sm text-gray-600 h-[50px] py-1 px-2 align-middle">
-                                {poLine ? formatCurrency(poLine.unit_price, invoice.currency_code) : "—"}
-                              </TableCell>
-                              <TableCell className="text-right text-sm text-gray-600 h-[50px] py-1 px-2 border-r-2 border-violet-300 align-middle">
-                                {poLine ? formatCurrency(poLine.total, invoice.currency_code) : "—"}
-                              </TableCell>
-                              
-                              {/* GR Line Source */}
-                              <TableCell className="h-[50px] py-1 px-2 align-middle">
-                                <Select
-                                  value={match?.grLineId || ""}
-                                  onValueChange={(value) => value && handleLineItemMatch(index, 'gr', value)}
-                                >
-                                  <SelectTrigger className="w-full h-8 text-xs px-2">
-                                    <SelectValue placeholder="Select line" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {mockGRLines.map((grLine) => (
-                                      <SelectItem key={grLine.id} value={grLine.id} className="text-sm">
-                                        {grLine.description.substring(0, 35)}...
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </TableCell>
-                              
-                              {/* GR Details */}
-                              <TableCell className="text-sm text-gray-600 h-[50px] py-1 px-2 align-middle">
-                                <div className="truncate max-w-52" title={grLine?.description || "—"}>
-                                  {grLine?.description || "—"}
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-right text-sm text-gray-600 h-[50px] py-1 px-2 border-r-2 border-violet-300 align-middle">
-                                {grLine?.quantity || "—"}
-                              </TableCell>
+                              {/* GR Columns - only show if GR is linked */}
+                              {linkedGR && (
+                                <>
+                                  {/* GR Line Source */}
+                                  <TableCell className={cn(
+                                    "h-[50px] py-1 px-2 align-middle",
+                                    linkedPO && "border-l-2 border-violet-300"
+                                  )}>
+                                    <LineItemSelector
+                                      items={mockGRLines}
+                                      value={match?.grLineId}
+                                      onSelect={(value) => handleLineItemMatch(index, 'gr', value)}
+                                      placeholder="Select line"
+                                      type="gr"
+                                      lineNumber={match?.grLineId ? parseInt(match.grLineId.split('-').pop() || '0') : undefined}
+                                      isEmpty={!match?.grLineId}
+                                      formatCurrency={formatCurrency}
+                                      currency={invoice.currency_code}
+                                      selectedItems={selectedGRItems}
+                                    />
+                                  </TableCell>
+                                  
+                                  {/* GR Details */}
+                                  <TableCell className="text-sm text-gray-600 h-[50px] py-1 px-2 align-middle">
+                                    <div className="truncate w-full" title={grLine?.description || "—"}>
+                                      {grLine?.description || "—"}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className={cn(
+                                    "text-right text-sm text-gray-600 h-[50px] py-1 px-2 border-r-2 border-violet-300 align-middle",
+                                    !forcedMatchedItems.has(index) && grLine && Number(item.quantity) !== Number(grLine.quantity) && "bg-amber-50"
+                                  )}>
+                                    {grLine?.quantity || "—"}
+                                  </TableCell>
+                                </>
+                              )}
                               
                               {/* Comments */}
                               <TableCell className="h-[50px] py-1 px-2 text-center align-middle">
@@ -1689,9 +2022,57 @@ export default function InvoiceDetailsPage() {
                               
                               {/* Actions */}
                               <TableCell className="h-[50px] py-1 px-2 text-center align-middle">
-                                <Button variant="ghost" size="sm" className="h-5 w-5 p-0 mx-auto">
-                                  <MoreVertical className="h-2.5 w-2.5" />
-                                </Button>
+                                <div className="flex items-center justify-center gap-1">
+                                  {editingLineItem === index ? (
+                                    <>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-6 w-6 p-0 hover:bg-green-100"
+                                        onClick={() => handleSaveLineItem(index)}
+                                      >
+                                        <CheckCircle className="h-3 w-3 text-green-600" />
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-6 w-6 p-0 hover:bg-red-100"
+                                        onClick={handleCancelEditLineItem}
+                                      >
+                                        <X className="h-3 w-3 text-red-600" />
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-6 w-6 p-0 hover:bg-violet-100"
+                                        onClick={() => handleEditLineItem(index)}
+                                      >
+                                        <Edit className="h-3 w-3 text-violet-600" />
+                                      </Button>
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-gray-100">
+                                            <MoreVertical className="h-3 w-3 text-gray-600" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-48">
+                                          <DropdownMenuItem onClick={() => handleMarkAsMatched(index)}>
+                                            Mark as Matched
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => console.log('Mark as Exception')}>
+                                            Mark as Exception
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => handleRemoveLineItem(index)} className="text-red-600 focus:text-red-600">
+                                            Remove Line
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </>
+                                  )}
+                                </div>
                               </TableCell>
                         </TableRow>
                       )
@@ -1705,7 +2086,26 @@ export default function InvoiceDetailsPage() {
                   <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                   <h4 className="font-medium mb-2">No line items found</h4>
                   <p className="text-sm mb-4">Click "Add Item" to add line items to this invoice.</p>
-                  <Button variant="outline" size="sm">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleAddLineItem}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Item
+                  </Button>
+                </div>
+              )}
+              
+              {/* Add Item Button - Always visible when there are line items */}
+              {invoice?.line_items && invoice.line_items.length > 0 && (
+                <div className="p-4 border-t bg-gray-50">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleAddLineItem}
+                    className="hover:bg-blue-50 hover:border-blue-300"
+                  >
                     <Plus className="h-4 w-4 mr-2" />
                     Add Item
                   </Button>

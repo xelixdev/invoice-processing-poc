@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ArrowLeft, Search, Maximize, FileText, Circle, Edit, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
@@ -11,6 +11,25 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 export default function InvoiceDetailsPage({ params }: { params: { id: string } }) {
   const [zoomLevel, setZoomLevel] = useState(100)
+  const [fileData, setFileData] = useState<string | null>(null)
+  const [fileType, setFileType] = useState<string | null>(null)
+  const [fileName, setFileName] = useState<string | null>(null)
+
+  // Mock data - in production this would come from your API
+  useEffect(() => {
+    // Simulate loading invoice data including file information
+    // In production, fetch from API endpoint like /api/invoices/${params.id}
+    
+    // For demo purposes, let's show an image of an invoice
+    // In production, this would be determined by the actual file type
+    setFileType('image/png')
+    setFileName('invoice-sample.png')
+    
+    // Using a local sample invoice image for demonstration
+    // In production, this would be the actual file URL from your backend
+    // For example: setFileData(`${API_URL}/media/invoice_uploads/${invoiceFile}`)
+    setFileData('/sample-invoice.png')
+  }, [params.id])
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -113,33 +132,54 @@ export default function InvoiceDetailsPage({ params }: { params: { id: string } 
                 </div>
 
                 <div className="flex items-center justify-center p-8 h-[400px] bg-gray-50">
-                  <div className="bg-white shadow-sm p-8 max-w-xs mx-auto">
-                    <div className="space-y-4">
-                      <div className="h-8 bg-gray-200 w-3/4 rounded"></div>
-                      <div className="h-4 bg-gray-200 w-1/2 rounded"></div>
-                      <div className="h-4 bg-gray-200 w-full rounded"></div>
-                      <div className="h-4 bg-gray-200 w-3/4 rounded"></div>
-                      <div className="h-4 bg-gray-200 w-full rounded"></div>
-                      <div className="flex justify-between mt-8">
-                        <div className="h-6 bg-gray-200 w-1/4 rounded"></div>
-                        <div className="h-6 bg-violet-200 w-1/4 rounded"></div>
-                      </div>
-                      <div className="flex justify-between">
-                        <div className="h-6 bg-gray-200 w-1/3 rounded"></div>
-                        <div className="h-6 bg-gray-200 w-1/4 rounded"></div>
-                      </div>
-                      <div className="flex justify-between">
-                        <div className="h-6 bg-gray-200 w-1/4 rounded"></div>
-                        <div className="h-6 bg-violet-200 w-1/4 rounded"></div>
+                  {!fileData ? (
+                    <div className="bg-white shadow-sm p-8 max-w-xs mx-auto">
+                      <div className="space-y-4">
+                        <div className="h-8 bg-gray-200 w-3/4 rounded"></div>
+                        <div className="h-4 bg-gray-200 w-1/2 rounded"></div>
+                        <div className="h-4 bg-gray-200 w-full rounded"></div>
+                        <div className="h-4 bg-gray-200 w-3/4 rounded"></div>
+                        <div className="h-4 bg-gray-200 w-full rounded"></div>
+                        <div className="flex justify-between mt-8">
+                          <div className="h-6 bg-gray-200 w-1/4 rounded"></div>
+                          <div className="h-6 bg-violet-200 w-1/4 rounded"></div>
+                        </div>
+                        <div className="flex justify-between">
+                          <div className="h-6 bg-gray-200 w-1/3 rounded"></div>
+                          <div className="h-6 bg-gray-200 w-1/4 rounded"></div>
+                        </div>
+                        <div className="flex justify-between">
+                          <div className="h-6 bg-gray-200 w-1/4 rounded"></div>
+                          <div className="h-6 bg-violet-200 w-1/4 rounded"></div>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ) : fileType === 'application/pdf' ? (
+                    <iframe 
+                      src={fileData} 
+                      className="w-full h-full border-0 rounded" 
+                      style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center' }}
+                    />
+                  ) : fileType?.startsWith('image/') ? (
+                    <img 
+                      src={fileData} 
+                      alt="Invoice preview" 
+                      className="max-w-full max-h-full object-contain"
+                      style={{ transform: `scale(${zoomLevel / 100})` }}
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center text-center p-8">
+                      <FileText className="h-16 w-16 text-muted-foreground mb-4" />
+                      <p className="text-lg font-medium mb-2">File Preview</p>
+                      <p className="text-sm text-muted-foreground">Unable to preview this file type.</p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="border-t p-4 flex justify-center">
                   <Button variant="outline" className="text-muted-foreground flex items-center gap-2">
                     <FileText className="h-4 w-4" />
-                    Invoice PDF preview
+                    {fileName || 'Invoice preview'}
                   </Button>
                 </div>
               </div>
