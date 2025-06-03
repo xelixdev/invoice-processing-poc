@@ -1753,108 +1753,6 @@ export default function InvoiceDetailsPage() {
                         </div>
 
 
-                        {/* BUDGET OVERVIEW Section - Collapsible */}
-                        <div className="space-y-4 pt-2">
-                          <div 
-                            className="flex items-center gap-2 cursor-pointer group"
-                            onClick={() => setBudgetSectionExpanded(!budgetSectionExpanded)}
-                          >
-                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Budget Overview</span>
-                            
-                            {/* Budget Status Indicators when collapsed */}
-                            {!budgetSectionExpanded && (
-                              <div className="flex items-center gap-2 text-xs">
-                                {/* Budget Usage Bar */}
-                                <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                  <div 
-                                    className="h-full bg-orange-400 rounded-full transition-all duration-500"
-                                    style={{ width: '85%' }}
-                                  />
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <span className="text-gray-500 font-medium">85%</span>
-                                  <AlertTriangle className="h-3 w-3 text-amber-600" />
-                                </div>
-                              </div>
-                            )}
-                            
-                            <div className="flex-1 h-[2px] bg-gray-200"></div>
-                            <button className="text-gray-400 hover:text-gray-600 transition-colors">
-                              {budgetSectionExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                            </button>
-                          </div>
-                          
-                          {budgetSectionExpanded && (
-                            <div className="grid grid-cols-2 gap-6 animate-in slide-in-from-top-2 duration-300">
-                              <div>
-                                <label className="text-xs text-gray-500 font-medium">Budget Status</label>
-                                <div className="mt-2 border border-gray-200 rounded-lg p-4">
-                                  <div className="flex items-center justify-between text-sm mb-2">
-                                    <span className="font-medium text-gray-700">Q1 Professional Services</span>
-                                    <span className="text-gray-600 font-medium">85%</span>
-                                  </div>
-                                  <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden mb-3">
-                                    <div 
-                                      className="h-full bg-gradient-to-r from-orange-400 to-orange-500 rounded-full transition-all duration-500"
-                                      style={{ width: '85%' }}
-                                    />
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-4 text-sm">
-                                    <div>
-                                      <p className="text-gray-500 text-xs">Total Budget</p>
-                                      <p className="font-medium text-gray-900">$47,000</p>
-                                    </div>
-                                    <div>
-                                      <p className="text-gray-500 text-xs">Used</p>
-                                      <p className="font-medium text-gray-900">$40,463</p>
-                                    </div>
-                                    <div>
-                                      <p className="text-gray-500 text-xs">Remaining</p>
-                                      <p className="font-medium text-green-600">$6,537</p>
-                                    </div>
-                                    <div>
-                                      <p className="text-gray-500 text-xs">Days Left</p>
-                                      <p className="font-medium text-gray-900">24 days</p>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                              
-                              <div>
-                                <label className="text-xs text-gray-500 font-medium">Budget Impact</label>
-                                <div className="mt-2 border border-gray-200 rounded-lg p-4">
-                                  <div className="flex items-center justify-between text-sm mb-2">
-                                    <span className="font-medium text-gray-700">This Invoice Impact</span>
-                                    <span className="text-amber-600 font-medium">53%</span>
-                                  </div>
-                                  <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden mb-3">
-                                    <div 
-                                      className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-500"
-                                      style={{ width: '53%' }}
-                                    />
-                                  </div>
-                                  <div className="grid grid-cols-2 gap-4 text-sm">
-                                    <div>
-                                      <p className="text-gray-500 text-xs">Invoice Amount</p>
-                                      <p className="font-medium text-gray-900">$3,463</p>
-                                    </div>
-                                    <div>
-                                      <p className="text-gray-500 text-xs">% of Remaining Budget</p>
-                                      <p className="font-medium text-gray-900">53%</p>
-                                    </div>
-                                  </div>
-                                  <div className="pt-2 border-t">
-                                    <p className="text-xs text-amber-600">
-                                      <Info className="h-3 w-3 inline mr-1" />
-                                      Approval will leave $3,074 for the remaining quarter
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
                         {/* LINKED DOCUMENTS Section */}
                         <div className="space-y-4 pt-2">
                           <div className="flex items-center gap-2">
@@ -1973,6 +1871,108 @@ export default function InvoiceDetailsPage() {
                               </div>
                             )}
                           </div>
+                        </div>
+
+                        {/* BUDGET OVERVIEW Section - Collapsible */}
+                        <div className="space-y-4 pt-2">
+                          <div 
+                            className="flex items-center gap-2 cursor-pointer group"
+                            onClick={() => setBudgetSectionExpanded(!budgetSectionExpanded)}
+                          >
+                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Budget Overview</span>
+                            
+                            {/* Budget Status Indicators when collapsed */}
+                            {!budgetSectionExpanded && (
+                              <div className="flex items-center gap-2 text-xs">
+                                {/* Budget Usage Bar */}
+                                <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full bg-orange-400 rounded-full transition-all duration-500"
+                                    style={{ width: '85%' }}
+                                  />
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-gray-500 font-medium">85%</span>
+                                  <AlertTriangle className="h-3 w-3 text-amber-600" />
+                                </div>
+                              </div>
+                            )}
+                            
+                            <div className="flex-1 h-[2px] bg-gray-200"></div>
+                            <button className="text-gray-400 hover:text-gray-600 transition-colors">
+                              {budgetSectionExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            </button>
+                          </div>
+                          
+                          {budgetSectionExpanded && (
+                            <div className="grid grid-cols-2 gap-6 animate-in slide-in-from-top-2 duration-300">
+                              <div>
+                                <label className="text-xs text-gray-500 font-medium">Budget Status</label>
+                                <div className="mt-2 border border-gray-200 rounded-lg p-4">
+                                  <div className="flex items-center justify-between text-sm mb-2">
+                                    <span className="font-medium text-gray-700">Q1 Professional Services</span>
+                                    <span className="text-gray-600 font-medium">85%</span>
+                                  </div>
+                                  <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden mb-3">
+                                    <div 
+                                      className="h-full bg-gradient-to-r from-orange-400 to-orange-500 rounded-full transition-all duration-500"
+                                      style={{ width: '85%' }}
+                                    />
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                      <p className="text-gray-500 text-xs">Total Budget</p>
+                                      <p className="font-medium text-gray-900">$47,000</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-gray-500 text-xs">Used</p>
+                                      <p className="font-medium text-gray-900">$40,463</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-gray-500 text-xs">Remaining</p>
+                                      <p className="font-medium text-green-600">$6,537</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-gray-500 text-xs">Days Left</p>
+                                      <p className="font-medium text-gray-900">24 days</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div>
+                                <label className="text-xs text-gray-500 font-medium">Budget Impact</label>
+                                <div className="mt-2 border border-gray-200 rounded-lg p-4">
+                                  <div className="flex items-center justify-between text-sm mb-2">
+                                    <span className="font-medium text-gray-700">This Invoice Impact</span>
+                                    <span className="text-amber-600 font-medium">53%</span>
+                                  </div>
+                                  <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden mb-3">
+                                    <div 
+                                      className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-500"
+                                      style={{ width: '53%' }}
+                                    />
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                      <p className="text-gray-500 text-xs">Invoice Amount</p>
+                                      <p className="font-medium text-gray-900">$3,463</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-gray-500 text-xs">% of Remaining Budget</p>
+                                      <p className="font-medium text-gray-900">53%</p>
+                                    </div>
+                                  </div>
+                                  <div className="pt-2 border-t">
+                                    <p className="text-xs text-amber-600">
+                                      <Info className="h-3 w-3 inline mr-1" />
+                                      Approval will leave $3,074 for the remaining quarter
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
