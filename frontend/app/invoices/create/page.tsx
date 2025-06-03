@@ -1503,113 +1503,133 @@ export default function InvoiceDetailsPage() {
                     )}
                   </div>
 
-                      <div className="space-y-4">
-                        {/* Row 1: Invoice Number + Vendor */}
-                        <div className="grid grid-cols-2 gap-6">
-                          <EditableField
-                            fieldName="invoiceNumber"
-                            label="Invoice Number"
-                            value={invoice?.number}
-                          />
-                          <EditableField
-                            fieldName="vendor"
-                            label="Vendor"
-                            value={invoice?.vendor}
-                          />
+                      <div className="space-y-6">
+                        {/* MATCHING INFO Section */}
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Matching Info</span>
+                            <div className="flex-1 h-[1px] bg-gray-100"></div>
+                          </div>
+                          
+                          {/* Critical matching fields in 3 columns */}
+                          <div className="grid grid-cols-3 gap-4">
+                            <EditableField
+                              fieldName="invoiceNumber"
+                              label="Invoice Number"
+                              value={invoice?.number}
+                            />
+                            <EditableField
+                              fieldName="vendor"
+                              label="Vendor"
+                              value={invoice?.vendor}
+                            />
+                            <EditableField
+                              fieldName="amount"
+                              label="Total Amount"
+                              value={invoice?.amount?.toString() || ''}
+                              type="number"
+                            />
+                          </div>
                         </div>
 
-                        {/* Row 2: GL Account + Invoice Date */}
-                        <div className="grid grid-cols-2 gap-6">
-                          <EditableField
-                            fieldName="glAccount"
-                            label="GL Account / Cost Center"
-                            value="6200-001 - Professional Services"
-                            type="select"
-                            options={[
-                              { value: "6200-001 - Professional Services", label: "6200-001 - Professional Services" },
-                              { value: "6100-002 - IT Services", label: "6100-002 - IT Services" },
-                              { value: "5500-003 - Marketing", label: "5500-003 - Marketing" },
-                              { value: "4400-004 - Operations", label: "4400-004 - Operations" }
-                            ]}
-                          />
-                          <EditableField
-                            fieldName="date"
-                            label="Invoice Date"
-                            value={invoice?.date || ''}
-                            type="date"
-                          />
+                        {/* FINANCIAL Section */}
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Financial</span>
+                            <div className="flex-1 h-[1px] bg-gray-100"></div>
+                          </div>
+                          
+                          <div className="grid grid-cols-3 gap-4">
+                            <EditableField
+                              fieldName="taxRate"
+                              label="Tax Rate (%)"
+                              value={invoice?.tax_rate?.toString() || '8.25'}
+                              type="number"
+                            />
+                            <EditableField
+                              fieldName="taxAmount"
+                              label="Tax Amount"
+                              value={invoice?.tax_amount?.toString() || ''}
+                              type="number"
+                            />
+                            <EditableField
+                              fieldName="currency"
+                              label="Currency"
+                              value={invoice?.currency_code || "USD"}
+                              type="select"
+                              options={[
+                                { value: "USD", label: "USD - US Dollar" },
+                                { value: "EUR", label: "EUR - Euro" },
+                                { value: "GBP", label: "GBP - British Pound" },
+                                { value: "CAD", label: "CAD - Canadian Dollar" },
+                                { value: "AUD", label: "AUD - Australian Dollar" }
+                              ]}
+                            />
+                          </div>
                         </div>
 
-                        {/* Row 3: Due Date + Tax Rate */}
-                        <div className="grid grid-cols-2 gap-6">
-                          <EditableField
-                            fieldName="dueDate"
-                            label="Due Date"
-                            value={invoice?.due_date || ''}
-                            type="date"
-                          />
-                          <EditableField
-                            fieldName="taxRate"
-                            label="Tax Rate (%)"
-                            value={invoice?.tax_rate?.toString() || '8.25'}
-                            type="number"
-                          />
+                        {/* TERMS & DATES Section */}
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Terms & Dates</span>
+                            <div className="flex-1 h-[1px] bg-gray-100"></div>
+                          </div>
+                          
+                          <div className="grid grid-cols-3 gap-4">
+                            <EditableField
+                              fieldName="date"
+                              label="Invoice Date"
+                              value={invoice?.date || ''}
+                              type="date"
+                            />
+                            <EditableField
+                              fieldName="dueDate"
+                              label="Due Date"
+                              value={invoice?.due_date || ''}
+                              type="date"
+                            />
+                            <EditableField
+                              fieldName="paymentTerms"
+                              label="Payment Terms"
+                              value={invoice?.payment_term_days ? `Net ${invoice.payment_term_days}` : 'Net 30'}
+                              type="select"
+                              options={[
+                                { value: "Net 15", label: "Net 15" },
+                                { value: "Net 30", label: "Net 30" },
+                                { value: "Net 45", label: "Net 45" },
+                                { value: "Net 60", label: "Net 60" },
+                                { value: "Due on Receipt", label: "Due on Receipt" }
+                              ]}
+                            />
+                          </div>
                         </div>
 
-                        {/* Row 3.5: Tax Amount + Total Amount */}
-                        <div className="grid grid-cols-2 gap-6">
-                          <EditableField
-                            fieldName="taxAmount"
-                            label="Tax Amount"
-                            value={invoice?.tax_amount?.toString() || ''}
-                            type="number"
-                          />
-                          <EditableField
-                            fieldName="amount"
-                            label="Total Amount"
-                            value={invoice?.amount?.toString() || ''}
-                            type="number"
-                          />
-                        </div>
-
-                        {/* Row 4: Payment Terms + Invoice Description */}
-                        <div className="grid grid-cols-2 gap-6">
-                          <EditableField
-                            fieldName="paymentTerms"
-                            label="Payment Terms"
-                            value={invoice?.payment_term_days ? `Net ${invoice.payment_term_days}` : 'Net 30'}
-                            type="select"
-                            options={[
-                              { value: "Net 15", label: "Net 15" },
-                              { value: "Net 30", label: "Net 30" },
-                              { value: "Net 45", label: "Net 45" },
-                              { value: "Net 60", label: "Net 60" },
-                              { value: "Due on Receipt", label: "Due on Receipt" }
-                            ]}
-                          />
-                          <EditableField
-                            fieldName="invoiceDescription"
-                            label="Invoice Description"
-                            value="Professional services - Q4 consulting"
-                          />
-                        </div>
-
-                        {/* Row 5: Currency */}
-                        <div className="grid grid-cols-2 gap-6">
-                          <EditableField
-                            fieldName="currency"
-                            label="Currency"
-                            value={invoice?.currency_code || "USD"}
-                            type="select"
-                            options={[
-                              { value: "USD", label: "USD - US Dollar" },
-                              { value: "EUR", label: "EUR - Euro" },
-                              { value: "GBP", label: "GBP - British Pound" },
-                              { value: "CAD", label: "CAD - Canadian Dollar" },
-                              { value: "AUD", label: "AUD - Australian Dollar" }
-                            ]}
-                          />
-                          <div></div>
+                        {/* CLASSIFICATION Section */}
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Classification</span>
+                            <div className="flex-1 h-[1px] bg-gray-100"></div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4">
+                            <EditableField
+                              fieldName="glAccount"
+                              label="GL Account / Cost Center"
+                              value="6200-001 - Professional Services"
+                              type="select"
+                              options={[
+                                { value: "6200-001 - Professional Services", label: "6200-001 - Professional Services" },
+                                { value: "6100-002 - IT Services", label: "6100-002 - IT Services" },
+                                { value: "5500-003 - Marketing", label: "5500-003 - Marketing" },
+                                { value: "4400-004 - Operations", label: "4400-004 - Operations" }
+                              ]}
+                            />
+                            <EditableField
+                              fieldName="invoiceDescription"
+                              label="Invoice Description"
+                              value="Professional services - Q4 consulting"
+                            />
+                          </div>
                         </div>
 
                         <div>
