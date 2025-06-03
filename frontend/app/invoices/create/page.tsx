@@ -1963,7 +1963,7 @@ export default function InvoiceDetailsPage() {
                                       <p className="font-medium text-gray-900">53%</p>
                                     </div>
                                   </div>
-                                  <div className="pt-2 border-t">
+                                  <div className="pt-2 mt-4 border-t">
                                     <p className="text-xs text-amber-600">
                                       <Info className="h-3 w-3 inline mr-1" />
                                       Approval will leave $3,074 for the remaining quarter
