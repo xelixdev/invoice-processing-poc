@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { ArrowLeft, FileText, Edit, Plus, Download, ChevronLeft, ChevronRight, Maximize, X, Receipt, FileCheck, TrendingUp, AlertCircle, AlertTriangle, CheckCircle, Calendar as CalendarIcon, Copy, List, MoreVertical, MessageCircle, Save, XIcon } from "lucide-react"
+import { ArrowLeft, FileText, Edit, Plus, Download, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Maximize, X, Receipt, FileCheck, TrendingUp, AlertCircle, AlertTriangle, CheckCircle, Calendar as CalendarIcon, Copy, List, MoreVertical, MessageCircle, Save, XIcon, Clock, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
@@ -29,6 +29,7 @@ interface Invoice {
   number: string;
   po_number: string;
   amount: number;
+  subtotal?: number;
   tax_amount: number;
   tax_rate?: number;
   currency_code: string;
@@ -36,6 +37,15 @@ interface Invoice {
   due_date: string;
   payment_term_days: number;
   vendor: string;
+  vendor_status?: string;
+  payment_history?: string;
+  billing_address?: string;
+  payment_method?: string;
+  bank_details?: string;
+  spend_category?: string;
+  unspsc_code?: string;
+  budget_status?: string;
+  budget_impact?: string;
   line_items: LineItem[];
 }
 
@@ -74,6 +84,7 @@ export default function InvoiceDetailsPage() {
   const [editingLineItem, setEditingLineItem] = useState<number | null>(null)
   const [lineItemValues, setLineItemValues] = useState<{[key: number]: Partial<LineItem>}>({})
   const [forcedMatchedItems, setForcedMatchedItems] = useState<Set<number>>(new Set())
+  const [budgetSectionExpanded, setBudgetSectionExpanded] = useState(false)
   const pdfContainerRef = useRef<HTMLDivElement>(null)
   const descriptionInputRefs = useRef<{[key: number]: HTMLInputElement | null}>({})
 
@@ -380,16 +391,16 @@ export default function InvoiceDetailsPage() {
 
   // Calculate line item statistics
   const getLineItemStats = () => {
-    if (!invoice?.line_items) return { total: 0, matched: 0, mismatched: 0, missing: 0 }
+    if (!invoice?.line_items) return { total: 0, matched: 0, variances: 0, unmatched: 0 }
     
-    const stats = { total: 0, matched: 0, mismatched: 0, missing: 0 }
+    const stats = { total: 0, matched: 0, variances: 0, unmatched: 0 }
     
     invoice.line_items.forEach((_, index) => {
       stats.total++
       const status = getLineItemStatus(index)
       if (status === 'matched') stats.matched++
-      else if (status === 'mismatch') stats.mismatched++
-      else stats.missing++
+      else if (status === 'mismatch') stats.variances++
+      else stats.unmatched++
     })
     
     return stats
@@ -404,9 +415,16 @@ export default function InvoiceDetailsPage() {
       
       // Set the first invoice as the current one
       if (parsedData.invoices && parsedData.invoices.length > 0) {
-        setInvoice(parsedData.invoices[0])
+        const firstInvoice = parsedData.invoices[0]
+        
+        // Calculate subtotal if not present
+        if (!firstInvoice.subtotal && firstInvoice.amount && firstInvoice.tax_amount) {
+          firstInvoice.subtotal = firstInvoice.amount - firstInvoice.tax_amount
+        }
+        
+        setInvoice(firstInvoice)
         // Initialize linked PO state
-        setLinkedPO(parsedData.invoices[0].po_number)
+        setLinkedPO(firstInvoice.po_number)
         // Initialize with a sample GR for demonstration
         setLinkedGR("GR-2023-001")
       }
@@ -459,7 +477,7 @@ export default function InvoiceDetailsPage() {
       // PO mismatch warning
       vendorIssues.push({
         type: 'warning',
-        message: `Vendor mismatch: PO expects "${mockPOData.vendor}"`,
+        message: `Vendor exception: PO expects "${mockPOData.vendor}"`,
         action: {
           label: 'Use PO Vendor',
           onClick: () => console.log('Copy PO vendor')
@@ -517,7 +535,7 @@ export default function InvoiceDetailsPage() {
     if (invoice.currency_code && invoice.currency_code !== mockPOData.currency) {
       issues.currency = [{
         type: 'warning',
-        message: `Currency mismatch: PO expects ${mockPOData.currency}`,
+        message: `Currency variance: PO expects ${mockPOData.currency}`,
         action: {
           label: 'Use PO Currency',
           onClick: () => console.log('Copy PO currency')
@@ -1361,12 +1379,12 @@ export default function InvoiceDetailsPage() {
                                   ? "bg-red-100 text-red-700 hover:bg-red-200" 
                                   : "bg-amber-100 text-amber-700 hover:bg-amber-200"
                               )}>
-                                Mismatches ({getIssueCounts().total})
+                                Exceptions ({getIssueCounts().total})
                               </button>
                             </SheetTrigger>
                             <SheetContent className="w-[700px] sm:w-[900px] flex flex-col">
                               <SheetHeader className="flex-shrink-0 pb-3">
-                                <SheetTitle>Mismatches</SheetTitle>
+                                <SheetTitle>Matching Exceptions</SheetTitle>
                           </SheetHeader>
                           
                           <div className="flex-1 overflow-y-auto mt-3">
@@ -1390,7 +1408,7 @@ export default function InvoiceDetailsPage() {
                                 </div>
                               </div>
                               <p className="text-sm text-gray-600">
-                                Review and resolve invoice mismatches.
+                                Review and resolve matching exceptions for approval.
                               </p>
                             </div>
 
@@ -1503,115 +1521,174 @@ export default function InvoiceDetailsPage() {
                     )}
                   </div>
 
-                      <div className="space-y-6">
-                        {/* MATCHING INFO Section */}
+                      <div className="space-y-8">
+                        {/* GENERAL INFO Section */}
                         <div className="space-y-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Matching Info</span>
-                            <div className="flex-1 h-[1px] bg-gray-100"></div>
+                          <div className="flex items-center gap-2 pt-2">
+                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Invoice Header</span>
+                            <div className="flex-1 h-[2px] bg-gray-200"></div>
                           </div>
                           
-                          {/* Critical matching fields in 3 columns */}
-                          <div className="grid grid-cols-3 gap-4">
-                            <EditableField
-                              fieldName="invoiceNumber"
-                              label="Invoice Number"
-                              value={invoice?.number}
-                            />
-                            <EditableField
-                              fieldName="vendor"
-                              label="Vendor"
-                              value={invoice?.vendor}
-                            />
-                            <EditableField
-                              fieldName="amount"
-                              label="Total Amount"
-                              value={invoice?.amount?.toString() || ''}
-                              type="number"
-                            />
+                          {/* Critical matching fields */}
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <EditableField
+                                fieldName="invoiceNumber"
+                                label="Invoice Number"
+                                value={invoice?.number}
+                              />
+                              <div className="space-y-1">
+                                <EditableField
+                                  fieldName="vendor"
+                                  label="Vendor"
+                                  value={invoice?.vendor}
+                                />
+                                {invoice?.vendor && (
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="text-green-600 font-medium flex items-center gap-1">
+                                      <CheckCircle className="h-3 w-3" />
+                                      Approved
+                                    </span>
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <button className="flex items-center gap-1 text-gray-600 hover:text-gray-800 transition-colors">
+                                            <Clock className="h-3 w-3" />
+                                            <span className="font-medium">92%</span>
+                                          </button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <div className="text-sm">
+                                            <p className="font-medium">Payment History</p>
+                                            <p className="text-gray-300">92% on-time payments</p>
+                                            <p className="text-gray-300 text-xs mt-1">46 of 50 invoices paid on schedule</p>
+                                          </div>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </div>
 
                         {/* FINANCIAL Section */}
                         <div className="space-y-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Financial</span>
-                            <div className="flex-1 h-[1px] bg-gray-100"></div>
+                          <div className="flex items-center gap-2 pt-2">
+                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Financial Details</span>
+                            <div className="flex-1 h-[2px] bg-gray-200"></div>
                           </div>
                           
-                          <div className="grid grid-cols-3 gap-4">
-                            <EditableField
-                              fieldName="taxRate"
-                              label="Tax Rate (%)"
-                              value={invoice?.tax_rate?.toString() || '8.25'}
-                              type="number"
-                            />
-                            <EditableField
-                              fieldName="taxAmount"
-                              label="Tax Amount"
-                              value={invoice?.tax_amount?.toString() || ''}
-                              type="number"
-                            />
-                            <EditableField
-                              fieldName="currency"
-                              label="Currency"
-                              value={invoice?.currency_code || "USD"}
-                              type="select"
-                              options={[
-                                { value: "USD", label: "USD - US Dollar" },
-                                { value: "EUR", label: "EUR - Euro" },
-                                { value: "GBP", label: "GBP - British Pound" },
-                                { value: "CAD", label: "CAD - Canadian Dollar" },
-                                { value: "AUD", label: "AUD - Australian Dollar" }
-                              ]}
-                            />
+                          <div className="space-y-4">
+                            {/* Row 1: Total Amount, Subtotal */}
+                            <div className="grid grid-cols-2 gap-4">
+                              <EditableField
+                                fieldName="amount"
+                                label="Total Amount"
+                                value={invoice?.amount?.toString() || ''}
+                                type="number"
+                              />
+                              <EditableField
+                                fieldName="subtotal"
+                                label="Subtotal"
+                                value={invoice?.subtotal?.toString() || (invoice?.amount && invoice?.tax_amount ? (invoice.amount - invoice.tax_amount).toString() : '')}
+                                type="number"
+                              />
+                            </div>
+                            
+                            {/* Row 2: Tax Rate, Tax Amount */}
+                            <div className="grid grid-cols-2 gap-4">
+                              <EditableField
+                                fieldName="taxRate"
+                                label="Tax Rate"
+                                value={invoice?.tax_rate ? `${invoice.tax_rate}% VAT` : '15% VAT'}
+                                type="select"
+                                options={[
+                                  { value: "0% VAT", label: "0% VAT" },
+                                  { value: "5% VAT", label: "5% VAT" },
+                                  { value: "10% VAT", label: "10% VAT" },
+                                  { value: "15% VAT", label: "15% VAT" },
+                                  { value: "20% VAT", label: "20% VAT" }
+                                ]}
+                              />
+                              <EditableField
+                                fieldName="taxAmount"
+                                label="Tax Amount"
+                                value={invoice?.tax_amount?.toString() || ''}
+                                type="number"
+                              />
+                            </div>
+                            
+                            {/* Row 3: Currency (first column only) */}
+                            <div className="grid grid-cols-2 gap-4">
+                              <EditableField
+                                fieldName="currency"
+                                label="Currency"
+                                value={invoice?.currency_code || "USD"}
+                                type="select"
+                                options={[
+                                  { value: "USD", label: "USD - US Dollar" },
+                                  { value: "EUR", label: "EUR - Euro" },
+                                  { value: "GBP", label: "GBP - British Pound" },
+                                  { value: "CAD", label: "CAD - Canadian Dollar" },
+                                  { value: "AUD", label: "AUD - Australian Dollar" }
+                                ]}
+                              />
+                              <div></div>
+                            </div>
                           </div>
                         </div>
 
-                        {/* TERMS & DATES Section */}
+                        {/* PAYMENT Section */}
                         <div className="space-y-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Terms & Dates</span>
-                            <div className="flex-1 h-[1px] bg-gray-100"></div>
-                          </div>
-                          
-                          <div className="grid grid-cols-3 gap-4">
-                            <EditableField
-                              fieldName="date"
-                              label="Invoice Date"
-                              value={invoice?.date || ''}
-                              type="date"
-                            />
-                            <EditableField
-                              fieldName="dueDate"
-                              label="Due Date"
-                              value={invoice?.due_date || ''}
-                              type="date"
-                            />
-                            <EditableField
-                              fieldName="paymentTerms"
-                              label="Payment Terms"
-                              value={invoice?.payment_term_days ? `Net ${invoice.payment_term_days}` : 'Net 30'}
-                              type="select"
-                              options={[
-                                { value: "Net 15", label: "Net 15" },
-                                { value: "Net 30", label: "Net 30" },
-                                { value: "Net 45", label: "Net 45" },
-                                { value: "Net 60", label: "Net 60" },
-                                { value: "Due on Receipt", label: "Due on Receipt" }
-                              ]}
-                            />
-                          </div>
-                        </div>
-
-                        {/* CLASSIFICATION Section */}
-                        <div className="space-y-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Classification</span>
-                            <div className="flex-1 h-[1px] bg-gray-100"></div>
+                          <div className="flex items-center gap-2 pt-2">
+                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Payment Terms</span>
+                            <div className="flex-1 h-[2px] bg-gray-200"></div>
                           </div>
                           
                           <div className="grid grid-cols-2 gap-4">
+                            <EditableField
+                              fieldName="billingAddress"
+                              label="Billing Address"
+                              value={invoice?.billing_address || "Richmond, VA, USA"}
+                              multiline={true}
+                            />
+                            <div className="space-y-1">
+                              <EditableField
+                                fieldName="paymentMethod"
+                                label="Payment Method"
+                                value={invoice?.payment_method || "ACH Transfer"}
+                                type="select"
+                                options={[
+                                  { value: "ACH Transfer", label: "ACH Transfer" },
+                                  { value: "Wire Transfer", label: "Wire Transfer" },
+                                  { value: "Check", label: "Check" },
+                                  { value: "Credit Card", label: "Credit Card" }
+                                ]}
+                              />
+                              {invoice?.payment_method === "ACH Transfer" && (
+                                <div className="text-xs text-gray-600">
+                                  Bank: Wells Fargo ***1234
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4">
+                            <EditableField
+                              fieldName="paymentTerms"
+                              label="Payment Terms"
+                              value={invoice?.payment_term_days ? `Net ${invoice.payment_term_days}` : 'Net 7'}
+                              type="select"
+                              options={[
+                                { value: "Net 7", label: "Net 7 (No early payment discount)" },
+                                { value: "Net 15", label: "Net 15" },
+                                { value: "Net 30", label: "Net 30" },
+                                { value: "2/10 Net 30", label: "2/10 Net 30 (2% discount if paid in 10 days)" },
+                                { value: "Due on Receipt", label: "Due on Receipt" }
+                              ]}
+                            />
                             <EditableField
                               fieldName="glAccount"
                               label="GL Account / Cost Center"
@@ -1624,91 +1701,275 @@ export default function InvoiceDetailsPage() {
                                 { value: "4400-004 - Operations", label: "4400-004 - Operations" }
                               ]}
                             />
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4">
                             <EditableField
-                              fieldName="invoiceDescription"
-                              label="Invoice Description"
-                              value="Professional services - Q4 consulting"
+                              fieldName="spendCategory"
+                              label="Spend Category"
+                              value={invoice?.spend_category || "Professional Services"}
+                              type="select"
+                              options={[
+                                { value: "Professional Services", label: "Professional Services (UNSPSC: 81111500)" },
+                                { value: "IT Services", label: "IT Services (UNSPSC: 81101500)" },
+                                { value: "Marketing Services", label: "Marketing Services (UNSPSC: 82101500)" },
+                                { value: "Facilities Management", label: "Facilities Management (UNSPSC: 72100000)" }
+                              ]}
                             />
+                            <div></div>
                           </div>
                         </div>
 
-                        <div>
-                          <div className="mb-3">
-                            <label className="text-sm font-medium">Linked Documents</label>
+                        {/* PAYMENT SCHEDULE Section */}
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2 pt-2">
+                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Payment Schedule</span>
+                            <div className="flex-1 h-[2px] bg-gray-200"></div>
                           </div>
                           
-                          {/* Purchase Orders Section */}
-                          <div className="mb-2">
-                            <div className="w-full">
-                              {linkedPO ? (
-                                <div className="border border-gray-200 rounded-lg p-2.5 bg-white h-12 flex items-center w-full animate-in fade-in-0 slide-in-from-top-2 duration-300">
-                                  <div className="flex items-center justify-between w-full min-w-0">
-                                    <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
-                                      <div className="flex items-center justify-center w-8 h-8 bg-violet-100 rounded text-xs font-medium text-violet-600 flex-shrink-0">
-                                        PO
-                                      </div>
-                                      <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
-                                        <span className="text-violet-600 font-medium text-sm flex-shrink-0">{linkedPO}</span>
-                                        <span className="text-sm text-gray-500 flex-shrink-0 hidden sm:inline">4 of 4 items matched</span>
-                                        <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full flex-shrink-0">
-                                          Matched
-                                        </span>
-                                      </div>
-                                    </div>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-400 hover:text-gray-600 flex-shrink-0 ml-2 transition-all duration-200 hover:scale-110" onClick={handleRemovePO}>
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div 
-                                  className="border border-dashed border-gray-300 rounded-lg p-2.5 bg-gray-50 text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50/50 transition-all duration-300 h-12 flex items-center justify-center w-full animate-in fade-in-0 slide-in-from-bottom-2 group hover:shadow-sm"
-                                  onClick={handleAddPO}
-                                >
-                                  <div className="flex items-center justify-center gap-2 text-gray-500 group-hover:text-violet-600 transition-colors duration-200">
-                                    <Plus className="h-4 w-4 transition-transform duration-200 group-hover:rotate-90" />
-                                    <span className="text-sm font-medium">Add PO</span>
-                                  </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <EditableField
+                              fieldName="date"
+                              label="Invoice Date"
+                              value={invoice?.date || ''}
+                              type="date"
+                            />
+                            <div className="space-y-1">
+                              <EditableField
+                                fieldName="dueDate"
+                                label="Due Date"
+                                value={invoice?.due_date || ''}
+                                type="date"
+                              />
+                              {invoice?.due_date && new Date(invoice.due_date) < new Date() && (
+                                <div className="text-xs text-red-600 font-medium">
+                                  Overdue by {Math.floor((new Date().getTime() - new Date(invoice.due_date).getTime()) / (1000 * 60 * 60 * 24))} days
                                 </div>
                               )}
                             </div>
                           </div>
+                        </div>
 
-                          {/* Goods Receipt Notes Section */}
-                          <div>
-                            <div className="w-full">
-                              {linkedGR ? (
-                                <div className="border border-gray-200 rounded-lg p-2.5 bg-white h-12 flex items-center w-full animate-in fade-in-0 slide-in-from-top-2 duration-300">
-                                  <div className="flex items-center justify-between w-full min-w-0">
-                                    <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
-                                      <div className="flex items-center justify-center w-8 h-8 bg-violet-100 rounded text-xs font-medium text-violet-600 flex-shrink-0">
-                                        GR
-                                      </div>
-                                      <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
-                                        <span className="text-violet-600 font-medium text-sm flex-shrink-0">{linkedGR}</span>
-                                        <span className="text-sm text-gray-500 flex-shrink-0 hidden sm:inline">4 of 4 items received</span>
-                                        <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full flex-shrink-0">
-                                          Received
-                                        </span>
-                                      </div>
+
+                        {/* BUDGET OVERVIEW Section - Collapsible */}
+                        <div className="space-y-4 pt-2">
+                          <div 
+                            className="flex items-center gap-2 cursor-pointer group"
+                            onClick={() => setBudgetSectionExpanded(!budgetSectionExpanded)}
+                          >
+                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Budget Overview</span>
+                            
+                            {/* Budget Status Indicators when collapsed */}
+                            {!budgetSectionExpanded && (
+                              <div className="flex items-center gap-2 text-xs">
+                                {/* Budget Usage Bar */}
+                                <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                  <div 
+                                    className="h-full bg-orange-400 rounded-full transition-all duration-500"
+                                    style={{ width: '85%' }}
+                                  />
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-gray-500 font-medium">85%</span>
+                                  <AlertTriangle className="h-3 w-3 text-amber-600" />
+                                </div>
+                              </div>
+                            )}
+                            
+                            <div className="flex-1 h-[2px] bg-gray-200"></div>
+                            <button className="text-gray-400 hover:text-gray-600 transition-colors">
+                              {budgetSectionExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            </button>
+                          </div>
+                          
+                          {budgetSectionExpanded && (
+                            <div className="grid grid-cols-2 gap-6 animate-in slide-in-from-top-2 duration-300">
+                              <div>
+                                <label className="text-xs text-gray-500 font-medium">Budget Status</label>
+                                <div className="mt-2 border border-gray-200 rounded-lg p-4">
+                                  <div className="flex items-center justify-between text-sm mb-2">
+                                    <span className="font-medium text-gray-700">Q1 Professional Services</span>
+                                    <span className="text-gray-600 font-medium">85%</span>
+                                  </div>
+                                  <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden mb-3">
+                                    <div 
+                                      className="h-full bg-gradient-to-r from-orange-400 to-orange-500 rounded-full transition-all duration-500"
+                                      style={{ width: '85%' }}
+                                    />
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                      <p className="text-gray-500 text-xs">Total Budget</p>
+                                      <p className="font-medium text-gray-900">$47,000</p>
                                     </div>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-400 hover:text-gray-600 flex-shrink-0 ml-2 transition-all duration-200 hover:scale-110" onClick={handleRemoveGR}>
-                                      <X className="h-4 w-4" />
-                                    </Button>
+                                    <div>
+                                      <p className="text-gray-500 text-xs">Used</p>
+                                      <p className="font-medium text-gray-900">$40,463</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-gray-500 text-xs">Remaining</p>
+                                      <p className="font-medium text-green-600">$6,537</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-gray-500 text-xs">Days Left</p>
+                                      <p className="font-medium text-gray-900">24 days</p>
+                                    </div>
                                   </div>
                                 </div>
-                              ) : (
-                                <div 
-                                  className="border border-dashed border-gray-300 rounded-lg p-2.5 bg-gray-50 text-center cursor-pointer hover:border-violet-400 hover:bg-violet-50/50 transition-all duration-300 h-12 flex items-center justify-center w-full animate-in fade-in-0 slide-in-from-bottom-2 group hover:shadow-sm"
+                              </div>
+                              
+                              <div>
+                                <label className="text-xs text-gray-500 font-medium">Budget Impact</label>
+                                <div className="mt-2 border border-gray-200 rounded-lg p-4">
+                                  <div className="flex items-center justify-between text-sm mb-2">
+                                    <span className="font-medium text-gray-700">This Invoice Impact</span>
+                                    <span className="text-amber-600 font-medium">53%</span>
+                                  </div>
+                                  <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden mb-3">
+                                    <div 
+                                      className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-500"
+                                      style={{ width: '53%' }}
+                                    />
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                      <p className="text-gray-500 text-xs">Invoice Amount</p>
+                                      <p className="font-medium text-gray-900">$3,463</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-gray-500 text-xs">% of Remaining Budget</p>
+                                      <p className="font-medium text-gray-900">53%</p>
+                                    </div>
+                                  </div>
+                                  <div className="pt-2 border-t">
+                                    <p className="text-xs text-amber-600">
+                                      <Info className="h-3 w-3 inline mr-1" />
+                                      Approval will leave $3,074 for the remaining quarter
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* LINKED DOCUMENTS Section */}
+                        <div className="space-y-4 pt-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Document Matching</span>
+                            <div className="flex-1 h-[2px] bg-gray-200"></div>
+                          </div>
+                          
+                          <div className="space-y-3">
+                            {/* Purchase Order Link */}
+                            {linkedPO ? (
+                              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors animate-in fade-in-0 slide-in-from-top-2 duration-300">
+                                <div className="flex items-center gap-3">
+                                  <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                                    <FileText className="h-4 w-4 text-blue-600" />
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm font-medium text-gray-900">PO {linkedPO}</span>
+                                      <span className="text-xs text-gray-500">- 4 of 4 items matched</span>
+                                    </div>
+                                    <div className="text-xs text-gray-500">Purchase Order</div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Badge 
+                                    variant="secondary" 
+                                    className="bg-green-50 text-green-700 border-green-200 hover:bg-green-50"
+                                  >
+                                    Matched
+                                  </Badge>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-6 w-6 text-gray-400 hover:text-gray-600 transition-all duration-200 hover:scale-110" 
+                                    onClick={handleRemovePO}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between p-4 border-2 border-dashed border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
+                                <div className="flex items-center gap-3">
+                                  <div className="h-8 w-8 rounded-lg bg-gray-50 flex items-center justify-center">
+                                    <FileText className="h-4 w-4 text-gray-400" />
+                                  </div>
+                                  <div>
+                                    <div className="text-sm font-medium text-gray-500">No Purchase Order linked</div>
+                                    <div className="text-xs text-gray-400">Link PO to enable 3-way match validation</div>
+                                  </div>
+                                </div>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-8 gap-1 text-xs" 
+                                  onClick={handleAddPO}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                  Link PO
+                                </Button>
+                              </div>
+                            )}
+
+                            {/* Goods Receipt Link */}
+                            {linkedGR ? (
+                              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors animate-in fade-in-0 slide-in-from-top-2 duration-300">
+                                <div className="flex items-center gap-3">
+                                  <div className="h-8 w-8 rounded-lg bg-green-50 flex items-center justify-center">
+                                    <Receipt className="h-4 w-4 text-green-600" />
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm font-medium text-gray-900">GR {linkedGR}</span>
+                                      <span className="text-xs text-gray-500">- 4 of 4 items received</span>
+                                    </div>
+                                    <div className="text-xs text-gray-500">Goods Receipt</div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Badge 
+                                    variant="secondary" 
+                                    className="bg-green-50 text-green-700 border-green-200 hover:bg-green-50"
+                                  >
+                                    Received
+                                  </Badge>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-6 w-6 text-gray-400 hover:text-gray-600 transition-all duration-200 hover:scale-110" 
+                                    onClick={handleRemoveGR}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between p-4 border-2 border-dashed border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
+                                <div className="flex items-center gap-3">
+                                  <div className="h-8 w-8 rounded-lg bg-gray-50 flex items-center justify-center">
+                                    <Receipt className="h-4 w-4 text-gray-400" />
+                                  </div>
+                                  <div>
+                                    <div className="text-sm font-medium text-gray-500">No Goods Receipt linked</div>
+                                    <div className="text-xs text-gray-400">Link GR to confirm goods receipt</div>
+                                  </div>
+                                </div>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-8 gap-1 text-xs" 
                                   onClick={handleAddGR}
                                 >
-                                  <div className="flex items-center justify-center gap-2 text-gray-500 group-hover:text-violet-600 transition-colors duration-200">
-                                    <Plus className="h-4 w-4 transition-transform duration-200 group-hover:rotate-90" />
-                                    <span className="text-sm font-medium">Add GR</span>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
+                                  <Plus className="h-3 w-3" />
+                                  Link GR
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1790,16 +2051,16 @@ export default function InvoiceDetailsPage() {
                         <span className="text-gray-700 text-xs">{getLineItemStats().matched} matched</span>
                       </div>
                     )}
-                    {getLineItemStats().mismatched > 0 && (
+                    {getLineItemStats().variances > 0 && (
                       <div className="flex items-center gap-1.5 px-2 py-1 bg-white border border-gray-200 rounded-full">
                         <div className="w-1.5 h-1.5 bg-amber-500 rounded-full"></div>
-                        <span className="text-gray-700 text-xs">{getLineItemStats().mismatched} mismatched</span>
+                        <span className="text-gray-700 text-xs">{getLineItemStats().variances} variances</span>
                       </div>
                     )}
-                    {getLineItemStats().missing > 0 && (
+                    {getLineItemStats().unmatched > 0 && (
                       <div className="flex items-center gap-1.5 px-2 py-1 bg-white border border-gray-200 rounded-full">
                         <div className="w-1.5 h-1.5 bg-red-500 rounded-full"></div>
-                        <span className="text-gray-700 text-xs">{getLineItemStats().missing} missing</span>
+                        <span className="text-gray-700 text-xs">{getLineItemStats().unmatched} unmatched</span>
                       </div>
                     )}
                   </div>
@@ -1811,7 +2072,7 @@ export default function InvoiceDetailsPage() {
               {invoice?.line_items && invoice.line_items.length > 0 ? (
                 <div className="flex">
                   {/* Frozen Invoice Columns */}
-                  <div className="flex-shrink-0 bg-white z-10 shadow-lg">
+                  <div className="flex-shrink-0 bg-white z-10 shadow-sm" style={{ boxShadow: '4px 0 8px -2px rgba(0, 0, 0, 0.1)' }}>
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-gray-50 h-auto">
@@ -1843,7 +2104,7 @@ export default function InvoiceDetailsPage() {
                                     status === 'missing' && "bg-red-100 text-red-700 hover:bg-red-100"
                                   )}
                                 >
-                                  {status === 'matched' ? 'Matched' : status === 'mismatch' ? 'Mismatch' : 'Missing'}
+                                  {status === 'matched' ? 'Matched' : status === 'mismatch' ? 'Variance' : 'Unmatched'}
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-sm font-medium h-[50px] py-1 px-2 align-middle">
@@ -1911,7 +2172,7 @@ export default function InvoiceDetailsPage() {
                   </div>
 
                   {/* Scrollable PO/GR Columns */}
-                  <div className="flex-1 overflow-x-auto bg-white shadow-lg">
+                  <div className="flex-1 overflow-x-auto bg-white shadow-sm">
                     <Table className={cn(
                       "min-w-[200px]",
                       linkedPO && linkedGR && "min-w-[840px]",
@@ -2129,13 +2390,13 @@ export default function InvoiceDetailsPage() {
                 <div className="p-8 text-center text-gray-500">
                   <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                   <h4 className="font-medium mb-2">No line items found</h4>
-                  <p className="text-sm mb-4">Click "Add Item" to add line items to this invoice.</p>
+                  <p className="text-sm mb-4">Click "Add Item" to add line items for matching.</p>
                   <Button 
                     variant="outline" 
                     size="sm"
                     onClick={handleAddLineItem}
                   >
-                    <Plus className="h-4 w-4 mr-2" />
+                    <Plus className="h-4 w-4 mr-1" />
                     Add Item
                   </Button>
                 </div>
@@ -2150,7 +2411,7 @@ export default function InvoiceDetailsPage() {
                     onClick={handleAddLineItem}
                     className="hover:bg-blue-50 hover:border-blue-300"
                   >
-                    <Plus className="h-4 w-4 mr-2" />
+                    <Plus className="h-4 w-4 mr-1" />
                     Add Item
                   </Button>
                 </div>
