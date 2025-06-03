@@ -1112,6 +1112,7 @@ export default function InvoiceDetailsPage() {
     setLinkedGR("GR-2023-001")
   }
 
+
   // Render file preview content
   const renderFilePreview = (isFullscreen = false) => {
     if (!fileData) {
@@ -1293,16 +1294,17 @@ export default function InvoiceDetailsPage() {
               )}
             </div>
 
-            {/* Approval Status - Right Side */}
-            <div className="flex items-center">
+            {/* Assignee - Right Side */}
+            <div className="flex items-center justify-center w-7 h-7 bg-violet-500 text-white rounded-full text-xs font-medium">
+              SC
             </div>
           </div>
         </div>
 
-        <div className="flex-1 p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="flex-1 p-6 flex flex-col">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
             {/* PDF Preview - Independent */}
-            <div className="border rounded-lg overflow-hidden">
+            <div className="border rounded-lg overflow-hidden flex flex-col">
               <div className="flex items-center justify-between border-b p-3 h-12">
                 <h3 className="font-medium">Invoice Preview</h3>
                 <div className="flex items-center gap-2">
@@ -1323,7 +1325,7 @@ export default function InvoiceDetailsPage() {
                                 <X className="h-4 w-4" />
                               </Button>
                             </div>
-                            <div className="flex-1 bg-gray-50 overflow-auto">
+                            <div className="flex-1 bg-gray-100 overflow-auto">
                               {renderFilePreview(true)}
                             </div>
                           </div>
@@ -1334,13 +1336,13 @@ export default function InvoiceDetailsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-center p-2 h-[650px] bg-gray-50 overflow-auto" ref={pdfContainerRef}>
+              <div className="flex-1 flex items-center justify-center p-2 bg-gray-100 overflow-auto" ref={pdfContainerRef}>
                 {renderFilePreview()}
               </div>
             </div>
 
             {/* Tabbed Content - Controls right side only */}
-            <div className="flex flex-col mt-px">
+            <div className="flex flex-col flex-1">
               <Tabs defaultValue="details" className="flex-1 flex flex-col">
                 <div className="border-b flex items-center justify-between">
                   <TabsList className="h-12 bg-transparent p-0 w-auto gap-6">
