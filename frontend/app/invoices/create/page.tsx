@@ -30,6 +30,7 @@ interface Invoice {
   po_number: string;
   amount: number;
   tax_amount: number;
+  tax_rate?: number;
   currency_code: string;
   date: string;
   due_date: string;
@@ -1539,7 +1540,7 @@ export default function InvoiceDetailsPage() {
                           />
                         </div>
 
-                        {/* Row 3: Due Date + Tax Amount */}
+                        {/* Row 3: Due Date + Tax Rate */}
                         <div className="grid grid-cols-2 gap-6">
                           <EditableField
                             fieldName="dueDate"
@@ -1548,21 +1549,31 @@ export default function InvoiceDetailsPage() {
                             type="date"
                           />
                           <EditableField
+                            fieldName="taxRate"
+                            label="Tax Rate (%)"
+                            value={invoice?.tax_rate?.toString() || '8.25'}
+                            type="number"
+                          />
+                        </div>
+
+                        {/* Row 3.5: Tax Amount + Total Amount */}
+                        <div className="grid grid-cols-2 gap-6">
+                          <EditableField
                             fieldName="taxAmount"
                             label="Tax Amount"
                             value={invoice?.tax_amount?.toString() || ''}
                             type="number"
                           />
-                        </div>
-
-                        {/* Row 4: Total Amount + Payment Terms */}
-                        <div className="grid grid-cols-2 gap-6">
                           <EditableField
                             fieldName="amount"
                             label="Total Amount"
                             value={invoice?.amount?.toString() || ''}
                             type="number"
                           />
+                        </div>
+
+                        {/* Row 4: Payment Terms + Invoice Description */}
+                        <div className="grid grid-cols-2 gap-6">
                           <EditableField
                             fieldName="paymentTerms"
                             label="Payment Terms"
@@ -1576,9 +1587,14 @@ export default function InvoiceDetailsPage() {
                               { value: "Due on Receipt", label: "Due on Receipt" }
                             ]}
                           />
+                          <EditableField
+                            fieldName="invoiceDescription"
+                            label="Invoice Description"
+                            value="Professional services - Q4 consulting"
+                          />
                         </div>
 
-                        {/* Row 5: Currency + Invoice Description */}
+                        {/* Row 5: Currency */}
                         <div className="grid grid-cols-2 gap-6">
                           <EditableField
                             fieldName="currency"
@@ -1593,11 +1609,7 @@ export default function InvoiceDetailsPage() {
                               { value: "AUD", label: "AUD - Australian Dollar" }
                             ]}
                           />
-                          <EditableField
-                            fieldName="invoiceDescription"
-                            label="Invoice Description"
-                            value="Professional services - Q4 consulting"
-                          />
+                          <div></div>
                         </div>
 
                         <div>
