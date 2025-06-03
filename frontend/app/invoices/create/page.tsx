@@ -74,6 +74,7 @@ export default function InvoiceDetailsPage() {
   const [lineItemValues, setLineItemValues] = useState<{[key: number]: Partial<LineItem>}>({})
   const [forcedMatchedItems, setForcedMatchedItems] = useState<Set<number>>(new Set())
   const pdfContainerRef = useRef<HTMLDivElement>(null)
+  const descriptionInputRefs = useRef<{[key: number]: HTMLInputElement | null}>({})
 
   // Mock PO data for validation
   const mockPOData = {
@@ -151,6 +152,11 @@ export default function InvoiceDetailsPage() {
         total: currentItem.total
       }
     }))
+    
+    // Focus the description input after state update
+    setTimeout(() => {
+      descriptionInputRefs.current[index]?.focus()
+    }, 0)
   }
 
   const handleLineItemValueChange = (index: number, field: keyof LineItem, value: string | number) => {
@@ -265,6 +271,11 @@ export default function InvoiceDetailsPage() {
         total: newLineItem.total
       }
     }))
+    
+    // Focus the description input for the new line item
+    setTimeout(() => {
+      descriptionInputRefs.current[newIndex]?.focus()
+    }, 0)
   }
 
   const handleRemoveLineItem = (index: number) => {
@@ -1806,6 +1817,7 @@ export default function InvoiceDetailsPage() {
                               <TableCell className="text-sm font-medium h-[50px] py-1 px-2 align-middle">
                                 {editingLineItem === index ? (
                                   <Input
+                                    ref={(el) => { descriptionInputRefs.current[index] = el }}
                                     value={lineItemValues[index]?.description || ''}
                                     onChange={(e) => handleLineItemValueChange(index, 'description', e.target.value)}
                                     onKeyDown={(e) => handleKeyDown(e, index)}
