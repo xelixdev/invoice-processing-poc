@@ -1551,23 +1551,21 @@ export default function InvoiceDetailsPage() {
                                       <CheckCircle className="h-3 w-3" />
                                       Approved
                                     </span>
-                                    <TooltipProvider>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <button className="flex items-center gap-1 text-gray-600 hover:text-gray-800 transition-colors">
-                                            <Clock className="h-3 w-3" />
-                                            <span className="font-medium">92%</span>
-                                          </button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                          <div className="text-sm">
-                                            <p className="font-medium">Payment History</p>
-                                            <p className="text-gray-300">92% on-time payments</p>
-                                            <p className="text-gray-300 text-xs mt-1">46 of 50 invoices paid on schedule</p>
-                                          </div>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </TooltipProvider>
+                                    <Popover>
+                                      <PopoverTrigger asChild>
+                                        <button className="flex items-center gap-1 text-gray-600 hover:text-gray-800 transition-colors">
+                                          <Clock className="h-3 w-3" />
+                                          <span className="font-medium">92%</span>
+                                        </button>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-64">
+                                        <div className="text-sm">
+                                          <p className="font-medium">Payment History</p>
+                                          <p className="text-gray-600">92% on-time payments</p>
+                                          <p className="text-gray-600 text-xs mt-1">46 of 50 invoices paid on schedule</p>
+                                        </div>
+                                      </PopoverContent>
+                                    </Popover>
                                   </div>
                                 )}
                               </div>
