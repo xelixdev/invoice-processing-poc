@@ -7,7 +7,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogOverlay, DialogPortal } from "@/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetHeader, SheetTitle, SheetTrigger, SheetPortal, SheetClose } from "@/components/ui/sheet"
+import * as SheetPrimitive from "@radix-ui/react-dialog"
 import Sidebar from "@/components/sidebar"
 import Link from "next/link"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -1567,7 +1568,11 @@ export default function InvoiceDetailsPage() {
                                 Exceptions ({getIssueCounts().total})
                               </button>
                             </SheetTrigger>
-                            <SheetContent className="w-[90vw] max-w-[700px] sm:max-w-[900px] flex flex-col">
+                            <SheetPortal>
+                              <SheetPrimitive.Content
+                                className="fixed inset-y-0 right-0 z-50 h-full w-[60vw] max-w-[500px] sm:max-w-[600px] flex flex-col gap-4 bg-background p-6 transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right border-l"
+                                style={{boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'}}
+                              >
                               <SheetHeader className="flex-shrink-0 pb-4 border-b">
                                 <SheetTitle className="text-lg font-semibold text-gray-900">Processing Exceptions</SheetTitle>
                                 <p className="text-sm text-gray-600 mt-1">Review and resolve validation exceptions before approval</p>
@@ -1575,8 +1580,8 @@ export default function InvoiceDetailsPage() {
 
                           <div className="flex-1 overflow-y-auto mt-4">
                             {/* Summary */}
-                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-5 mb-6">
-                              <div className="flex items-center justify-between mb-4">
+                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-3 mb-4">
+                              <div className="flex items-center justify-between mb-2">
                                 <h3 className="font-semibold text-gray-900 text-base">Exception Summary</h3>
                                 <div className="flex items-center gap-4 text-sm">
                                   {getIssueCounts().errors > 0 && (
@@ -1593,13 +1598,13 @@ export default function InvoiceDetailsPage() {
                                   )}
                                 </div>
                               </div>
-                              <p className="text-sm text-gray-700 leading-relaxed">
+                              <p className="text-xs text-gray-700 leading-relaxed">
                                 The following exceptions require review before this invoice can be processed for payment. Critical exceptions must be resolved, while others may be approved with authorization.
                               </p>
                             </div>
 
                             {/* Issues by Field */}
-                            <div className="space-y-6">
+                            <div className="space-y-4">
                               {Object.entries(validationIssues).map(([fieldKey, fieldIssues]) => {
                                 // Filter out resolved issues
                                 const activeIssues = fieldIssues.filter((_, index) => {
@@ -1611,11 +1616,13 @@ export default function InvoiceDetailsPage() {
                                 if (activeIssues.length === 0) return null
                                 
                                 return (
-                                  <div key={fieldKey} className="mb-8">
-                                    <div className="mb-4 border-l-4 border-indigo-500 pl-4">
-                                      <h4 className="font-semibold text-gray-900 text-lg">{getFieldDisplayName(fieldKey)}</h4>
-                                      <p className="text-sm text-gray-600 mt-1">{activeIssues.length} exception{activeIssues.length > 1 ? 's' : ''} found</p>
+                                  <div key={fieldKey} className="mb-4">
+                                    <div className="mb-3 border-l-4 border-indigo-500 pl-3">
+                                      <h4 className="font-semibold text-gray-900 text-sm">{getFieldDisplayName(fieldKey)}</h4>
+                                      <p className="text-xs text-gray-600 mt-0.5">{activeIssues.length} exception{activeIssues.length > 1 ? 's' : ''} found</p>
                                     </div>
+                                  
+                                    <div className="space-y-2">
 
                                     <div className="space-y-4">
                                       {fieldIssues.map((issue, index) => {
@@ -1624,9 +1631,9 @@ export default function InvoiceDetailsPage() {
                                         const isResolved = resolvedIssues.has(issueId)
 
                                         return (
-                                          <div
-                                            key={index}
-                                            className={`relative bg-white border rounded-lg p-5 shadow-sm transition-all duration-500 ${
+                                          <div 
+                                            key={index} 
+                                            className={`relative bg-white border rounded-lg p-3 hover:shadow-md transition-all duration-300 ${
                                               isResolved ? 'transform translate-x-full opacity-0 pointer-events-none' :
                                               isResolving ? 'border-green-300 bg-green-50' : 
                                               issue.type === 'error' ? 'border-red-200 hover:shadow-lg hover:border-red-300' :
@@ -1638,39 +1645,39 @@ export default function InvoiceDetailsPage() {
                                               overflow: isResolved ? 'hidden' : 'visible'
                                             }}
                                           >
-                                            <div className="flex items-start gap-4">
-                                              <div className="flex-shrink-0 mt-0.5">
-                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
+                                            <div className="flex items-start gap-3">
+                                              <div className="flex-shrink-0">
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center border ${
                                                   isResolving ? 'bg-green-100 border-green-300' : 
                                                   issue.type === 'error' ? 'bg-red-50 border-red-200' : 
                                                   issue.type === 'warning' ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'
                                                 }`}>
                                                   {isResolving ? (
-                                                    <CheckCircle className="h-5 w-5 text-green-600" />
+                                                    <CheckCircle className="h-4 w-4 text-green-600" />
                                                   ) : issue.type === 'error' ? (
-                                                    <AlertCircle className="h-5 w-5 text-red-600" />
+                                                    <AlertCircle className="h-4 w-4 text-red-600" />
                                                   ) : issue.type === 'warning' ? (
-                                                    <AlertTriangle className="h-5 w-5 text-amber-600" />
+                                                    <AlertTriangle className="h-4 w-4 text-amber-600" />
                                                   ) : (
-                                                    <AlertCircle className="h-5 w-5 text-blue-600" />
+                                                    <AlertCircle className="h-4 w-4 text-blue-600" />
                                                   )}
                                                 </div>
                                               </div>
                                               <div className="flex-1 min-w-0">
-                                                <div className="flex items-start justify-between mb-3">
-                                                  <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wide ${
+                                                <div className="flex items-start justify-between mb-2">
+                                                  <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium uppercase tracking-wide ${
                                                     issue.type === 'error' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
                                                   }`}>
                                                     {issue.type === 'error' ? 'Critical' : 'Review Required'}
                                                   </span>
                                                 </div>
-                                                <p className="text-sm font-medium text-gray-900 mb-3 leading-relaxed">{issue.message}</p>
+                                                <p className="text-xs font-medium text-gray-900 mb-2 leading-snug">{issue.message}</p>
                                                 {issue.action && (
-                                                  <div className="flex items-center gap-3 mt-2">
+                                                  <div className="flex items-center gap-2 mt-1.5">
                                                     <Button
                                                       variant="outline"
                                                       size="sm"
-                                                      className={`h-9 text-xs font-semibold px-5 transition-all duration-300 ${
+                                                      className={`h-7 text-xs font-medium px-3 transition-all duration-300 ${
                                                         isResolving 
                                                           ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-100' 
                                                           : issue.type === 'error'
@@ -1698,7 +1705,7 @@ export default function InvoiceDetailsPage() {
                                                       <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        className="h-9 text-xs font-medium px-3 text-gray-600 hover:text-gray-800 hover:bg-gray-100"
+                                                        className="h-7 text-xs font-medium px-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100"
                                                         onClick={() => handleResolveIssue(fieldKey, index)}
                                                       >
                                                         Mark as Reviewed
@@ -1718,18 +1725,23 @@ export default function InvoiceDetailsPage() {
                             </div>
                           </div>
 
-                              {/* Actions - Fixed at bottom */}
-                              {getIssueCounts().errors === 0 && (
-                                <div className="flex-shrink-0 mt-8 pt-6 border-t">
-                                  <Button className="w-full bg-violet-600 hover:bg-violet-700">
-                                    Save with Warnings
-                                  </Button>
-                                </div>
-                              )}
-                            </SheetContent>
-                          </Sheet>
-                        )}
-                      </div>
+                          {/* Actions - Fixed at bottom */}
+                          {getIssueCounts().errors === 0 && (
+                            <div className="flex-shrink-0 mt-8 pt-6 border-t">
+                              <Button className="w-full bg-violet-600 hover:bg-violet-700">
+                                Save with Warnings
+                              </Button>
+                            </div>
+                          )}
+                                <SheetClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
+                                  <X className="h-4 w-4" />
+                                  <span className="sr-only">Close</span>
+                                </SheetClose>
+                              </SheetPrimitive.Content>
+                            </SheetPortal>
+                      </Sheet>
+                    )}
+                  </div>
 
                       <div className="space-y-8">
                         {/* GENERAL INFO Section */}
