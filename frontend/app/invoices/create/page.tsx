@@ -1225,7 +1225,7 @@ export default function InvoiceDetailsPage() {
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
               </Link>
-              <h1 className="text-lg font-semibold">Invoice {invoice?.number || 'new'}</h1>
+              <h1 className="text-lg font-semibold">Invoice {invoice?.invoice_number || 'new'}</h1>
 
               {/* Compact Workflow Indicator */}
               <div className="ml-8 flex items-center">
@@ -1259,7 +1259,7 @@ export default function InvoiceDetailsPage() {
                               ) : isActive ? (
                                 <span className="text-xs font-medium whitespace-nowrap">{stage.label}</span>
                               ) : (
-                                <span className="text-[11px] font-bold">{index + 1}</span>
+                                <div className="w-1.5 h-1.5 bg-current rounded-full"></div>
                               )}
                             </div>
                           </div>
@@ -1622,8 +1622,6 @@ export default function InvoiceDetailsPage() {
                                       <p className="text-xs text-gray-600 mt-0.5">{activeIssues.length} exception{activeIssues.length > 1 ? 's' : ''} found</p>
                                     </div>
                                   
-                                    <div className="space-y-2">
-
                                     <div className="space-y-4">
                                       {fieldIssues.map((issue, index) => {
                                         const issueId = `${fieldKey}-${index}`
