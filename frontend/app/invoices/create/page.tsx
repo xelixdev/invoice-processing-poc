@@ -1246,8 +1246,8 @@ export default function InvoiceDetailsPage() {
                                 : isPast 
                                   ? 'bg-green-600 text-white h-6 w-6 rounded-full' 
                                   : index >= 2
-                                    ? 'bg-gray-200 text-gray-400 h-6 w-6 rounded-full hover:bg-gray-300'
-                                    : 'bg-gray-300 text-gray-500 h-6 w-6 rounded-full hover:bg-gray-400'
+                                    ? 'bg-gray-100 text-gray-400 h-6 w-6 rounded-full hover:bg-gray-200'
+                                    : 'bg-gray-200 text-gray-500 h-6 w-6 rounded-full hover:bg-gray-300'
                               }
                             `}
                           >
@@ -1276,11 +1276,11 @@ export default function InvoiceDetailsPage() {
 
                         {/* Connecting Line */}
                         {!isLast && (
-                          <div className="relative w-4 lg:w-6">
-                            <div
+                          <div className="relative w-6 lg:w-8">
+                            <div 
                               className={`
                                 absolute top-1/2 -translate-y-1/2 h-0.5 w-full transition-all duration-300
-                                ${isPast ? 'bg-green-600' : 'bg-gray-300'}
+                                ${isPast ? 'bg-green-600' : 'bg-gray-200'}
                               `}
                             />
                           </div>
