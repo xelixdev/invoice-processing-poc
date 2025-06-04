@@ -26,7 +26,7 @@ interface InvoiceData {
 }
 
 interface Invoice {
-  number: string;
+  invoice_number: string;
   po_number: string;
   amount: number;
   subtotal?: number;
@@ -453,7 +453,7 @@ export default function InvoiceDetailsPage() {
 
     // Invoice Number validation
     const invoiceIssues: ValidationIssue[] = []
-    if (invoice.number !== mockPOData.invoiceNumber) {
+    if (invoice.invoice_number !== mockPOData.invoiceNumber) {
       invoiceIssues.push({
         type: 'warning',
         message: `Invoice number doesn't match PO expectation (${mockPOData.invoiceNumber})`
@@ -468,7 +468,7 @@ export default function InvoiceDetailsPage() {
         onClick: () => console.log('View similar invoice')
       }
     })
-    if (invoiceIssues.length > 0) issues.invoiceNumber = invoiceIssues
+    if (invoiceIssues.length > 0) issues.invoice_number = invoiceIssues
 
     // Vendor validation
     if (invoice.vendor && invoice.vendor !== mockPOData.vendor) {
@@ -568,7 +568,7 @@ export default function InvoiceDetailsPage() {
   // Helper function to get field display name
   const getFieldDisplayName = (fieldKey: string): string => {
     const fieldNames: {[key: string]: string} = {
-      invoiceNumber: 'Invoice Number',
+      invoice_number: 'Invoice Number',
       vendor: 'Vendor',
       date: 'Invoice Date',
       dueDate: 'Due Date',
@@ -702,7 +702,7 @@ export default function InvoiceDetailsPage() {
     setEditingField(null)
     // Here you would typically save the value
     if (fieldName === 'invoiceNumber' && fieldValues.invoiceNumber) {
-      setInvoice(prev => prev ? { ...prev, number: fieldValues.invoiceNumber } : prev)
+      setInvoice(prev => prev ? { ...prev, invoice_number: fieldValues.invoiceNumber } : prev)
     }
     // Add other field mappings as needed
   }
@@ -1183,7 +1183,7 @@ export default function InvoiceDetailsPage() {
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
               </Link>
-              <h1 className="text-lg font-semibold">Invoice {invoice?.number || 'new'}</h1>
+              <h1 className="text-lg font-semibold">Invoice {invoice?.invoice_number || 'new'}</h1>
               <Badge className="ml-2 bg-yellow-100 text-yellow-700 hover:bg-yellow-100 hover:text-yellow-700">
                 Pending Approval
               </Badge>
@@ -1387,141 +1387,141 @@ export default function InvoiceDetailsPage() {
                             <SheetContent className="w-[700px] sm:w-[900px] flex flex-col">
                               <SheetHeader className="flex-shrink-0 pb-3">
                                 <SheetTitle>Matching Exceptions</SheetTitle>
-                          </SheetHeader>
-                          
-                          <div className="flex-1 overflow-y-auto mt-3">
-                            {/* Summary */}
-                            <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                              <div className="flex items-center justify-between mb-3">
-                                <h3 className="font-medium text-gray-900">Summary</h3>
-                                <div className="flex items-center gap-4 text-sm">
-                                  {getIssueCounts().errors > 0 && (
-                                    <div className="flex items-center gap-1 text-red-600">
-                                      <AlertCircle className="h-4 w-4" />
-                                      {getIssueCounts().errors} error{getIssueCounts().errors > 1 ? 's' : ''}
-                                    </div>
-                                  )}
-                                  {getIssueCounts().warnings > 0 && (
-                                    <div className="flex items-center gap-1 text-amber-600">
-                                      <AlertTriangle className="h-4 w-4" />
-                                      {getIssueCounts().warnings} warning{getIssueCounts().warnings > 1 ? 's' : ''}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              <p className="text-sm text-gray-600">
-                                Review and resolve matching exceptions for approval.
-                              </p>
-                            </div>
-
-                            {/* Issues by Field */}
-                            <div className="space-y-6">
-                              {Object.entries(validationIssues).map(([fieldKey, fieldIssues]) => {
-                                // Filter out resolved issues
-                                const activeIssues = fieldIssues.filter((_, index) => {
-                                  const issueId = `${fieldKey}-${index}`
-                                  return !resolvedIssues.has(issueId)
-                                })
-                                
-                                // Don't render section if no active issues
-                                if (activeIssues.length === 0) return null
-                                
-                                return (
-                                  <div key={fieldKey} className="mb-6">
-                                    <div className="mb-3">
-                                      <h4 className="font-semibold text-gray-900 text-base">{getFieldDisplayName(fieldKey)}</h4>
-                                    </div>
-                                  
-                                    <div className="space-y-4">
-                                      {fieldIssues.map((issue, index) => {
-                                        const issueId = `${fieldKey}-${index}`
-                                        const isResolving = resolvingIssues.has(issueId)
-                                        const isResolved = resolvedIssues.has(issueId)
-                                        
-                                        return (
-                                          <div 
-                                            key={index} 
-                                            className={`relative bg-white border border-gray-200 rounded-lg p-4 shadow-sm transition-all duration-500 ${
-                                              isResolved ? 'transform translate-x-full opacity-0 pointer-events-none' :
-                                              isResolving ? 'border-green-200' : 'hover:shadow-md'
-                                            }`}
-                                            style={{
-                                              height: isResolved ? '0' : 'auto',
-                                              marginBottom: isResolved ? '0' : undefined,
-                                              overflow: isResolved ? 'hidden' : 'visible'
-                                            }}
-                                          >
-                                            <div className="flex items-start gap-4">
-                                              <div className="flex-shrink-0 mt-1">
-                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                                                  isResolving ? 'bg-green-100' : 
-                                                  issue.type === 'error' ? 'bg-red-100' : 
-                                                  issue.type === 'warning' ? 'bg-amber-100' : 'bg-blue-100'
-                                                }`}>
-                                                  {isResolving ? (
-                                                    <CheckCircle className="h-4 w-4 text-green-600" />
-                                                  ) : issue.type === 'error' ? (
-                                                    <AlertCircle className="h-4 w-4 text-red-600" />
-                                                  ) : issue.type === 'warning' ? (
-                                                    <AlertTriangle className="h-4 w-4 text-amber-600" />
-                                                  ) : (
-                                                    <AlertCircle className="h-4 w-4 text-blue-600" />
-                                                  )}
-                                                </div>
-                                              </div>
-                                              <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-medium text-gray-900 mb-2 leading-relaxed">{issue.message}</p>
-                                                {issue.action && (
-                                                  <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className={`h-8 text-xs font-medium px-4 transition-all duration-300 ${
-                                                      isResolving 
-                                                        ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-100' 
-                                                        : 'hover:bg-violet-50 hover:border-violet-300 hover:text-violet-700'
-                                                    }`}
-                                                    disabled={isResolving}
-                                                    onClick={() => {
-                                                      if (!isResolving) {
-                                                        issue.action?.onClick()
-                                                        handleResolveIssue(fieldKey, index)
-                                                      }
-                                                    }}
-                                                  >
-                                                    {isResolving ? (
-                                                      <>
-                                                        <CheckCircle className="h-3 w-3 mr-1" />
-                                                        Resolved
-                                                      </>
-                                                    ) : (
-                                                      issue.action.label
-                                                    )}
-                                                  </Button>
-                                                )}
-                                              </div>
-                                            </div>
-                                          </div>
-                                        )
-                                      })}
+                              </SheetHeader>
+                              
+                              <div className="flex-1 overflow-y-auto mt-3">
+                                {/* Summary */}
+                                <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                                  <div className="flex items-center justify-between mb-3">
+                                    <h3 className="font-medium text-gray-900">Summary</h3>
+                                    <div className="flex items-center gap-4 text-sm">
+                                      {getIssueCounts().errors > 0 && (
+                                        <div className="flex items-center gap-1 text-red-600">
+                                          <AlertCircle className="h-4 w-4" />
+                                          {getIssueCounts().errors} error{getIssueCounts().errors > 1 ? 's' : ''}
+                                        </div>
+                                      )}
+                                      {getIssueCounts().warnings > 0 && (
+                                        <div className="flex items-center gap-1 text-amber-600">
+                                          <AlertTriangle className="h-4 w-4" />
+                                          {getIssueCounts().warnings} warning{getIssueCounts().warnings > 1 ? 's' : ''}
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
-                                )
-                              })}
-                            </div>
-                          </div>
+                                  <p className="text-sm text-gray-600">
+                                    Review and resolve matching exceptions for approval.
+                                  </p>
+                                </div>
 
-                          {/* Actions - Fixed at bottom */}
-                          {getIssueCounts().errors === 0 && (
-                            <div className="flex-shrink-0 mt-8 pt-6 border-t">
-                              <Button className="w-full bg-violet-600 hover:bg-violet-700">
-                                Save with Warnings
-                              </Button>
-                            </div>
-                          )}
-                        </SheetContent>
-                      </Sheet>
-                    )}
-                  </div>
+                                {/* Issues by Field */}
+                                <div className="space-y-6">
+                                  {Object.entries(validationIssues).map(([fieldKey, fieldIssues]) => {
+                                    // Filter out resolved issues
+                                    const activeIssues = fieldIssues.filter((_, index) => {
+                                      const issueId = `${fieldKey}-${index}`
+                                      return !resolvedIssues.has(issueId)
+                                    })
+                                    
+                                    // Don't render section if no active issues
+                                    if (activeIssues.length === 0) return null
+                                    
+                                    return (
+                                      <div key={fieldKey} className="mb-6">
+                                        <div className="mb-3">
+                                          <h4 className="font-semibold text-gray-900 text-base">{getFieldDisplayName(fieldKey)}</h4>
+                                        </div>
+                                      
+                                        <div className="space-y-4">
+                                          {fieldIssues.map((issue, index) => {
+                                            const issueId = `${fieldKey}-${index}`
+                                            const isResolving = resolvingIssues.has(issueId)
+                                            const isResolved = resolvedIssues.has(issueId)
+                                            
+                                            return (
+                                              <div 
+                                                key={index} 
+                                                className={`relative bg-white border border-gray-200 rounded-lg p-4 shadow-sm transition-all duration-500 ${
+                                                  isResolved ? 'transform translate-x-full opacity-0 pointer-events-none' :
+                                                  isResolving ? 'border-green-200' : 'hover:shadow-md'
+                                                }`}
+                                                style={{
+                                                  height: isResolved ? '0' : 'auto',
+                                                  marginBottom: isResolved ? '0' : undefined,
+                                                  overflow: isResolved ? 'hidden' : 'visible'
+                                                }}
+                                              >
+                                                <div className="flex items-start gap-4">
+                                                  <div className="flex-shrink-0 mt-1">
+                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                                                      isResolving ? 'bg-green-100' : 
+                                                      issue.type === 'error' ? 'bg-red-100' : 
+                                                      issue.type === 'warning' ? 'bg-amber-100' : 'bg-blue-100'
+                                                    }`}>
+                                                      {isResolving ? (
+                                                        <CheckCircle className="h-4 w-4 text-green-600" />
+                                                      ) : issue.type === 'error' ? (
+                                                        <AlertCircle className="h-4 w-4 text-red-600" />
+                                                      ) : issue.type === 'warning' ? (
+                                                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                                                      ) : (
+                                                        <AlertCircle className="h-4 w-4 text-blue-600" />
+                                                      )}
+                                                    </div>
+                                                  </div>
+                                                  <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium text-gray-900 mb-2 leading-relaxed">{issue.message}</p>
+                                                    {issue.action && (
+                                                      <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className={`h-8 text-xs font-medium px-4 transition-all duration-300 ${
+                                                          isResolving 
+                                                            ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-100' 
+                                                            : 'hover:bg-violet-50 hover:border-violet-300 hover:text-violet-700'
+                                                        }`}
+                                                        disabled={isResolving}
+                                                        onClick={() => {
+                                                          if (!isResolving) {
+                                                            issue.action?.onClick()
+                                                            handleResolveIssue(fieldKey, index)
+                                                          }
+                                                        }}
+                                                      >
+                                                        {isResolving ? (
+                                                          <>
+                                                            <CheckCircle className="h-3 w-3 mr-1" />
+                                                            Resolved
+                                                          </>
+                                                        ) : (
+                                                          issue.action.label
+                                                        )}
+                                                      </Button>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            )
+                                          })}
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+
+                              {/* Actions - Fixed at bottom */}
+                              {getIssueCounts().errors === 0 && (
+                                <div className="flex-shrink-0 mt-8 pt-6 border-t">
+                                  <Button className="w-full bg-violet-600 hover:bg-violet-700">
+                                    Save with Warnings
+                                  </Button>
+                                </div>
+                              )}
+                            </SheetContent>
+                          </Sheet>
+                        )}
+                      </div>
 
                       <div className="space-y-8">
                         {/* GENERAL INFO Section */}
@@ -1537,7 +1537,7 @@ export default function InvoiceDetailsPage() {
                               <EditableField
                                 fieldName="invoiceNumber"
                                 label="Invoice Number"
-                                value={invoice?.number}
+                                value={invoice?.invoice_number}
                               />
                               <div className="space-y-1">
                                 <EditableField
