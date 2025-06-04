@@ -14,11 +14,12 @@ class ExtractedLineItemSerializer(serializers.ModelSerializer):
 
 class ExtractedInvoiceSerializer(serializers.ModelSerializer):
     line_items = ExtractedLineItemSerializer(many=True, read_only=True)
+    number = serializers.CharField(source='invoice_number', read_only=True)
     
     class Meta:
         model = ExtractedInvoice
         fields = [
-            'id', 'document_type', 'invoice_number', 'po_number',
+            'id', 'document_type', 'invoice_number', 'number', 'po_number',
             'amount', 'tax_amount', 'currency_code', 'date', 'due_date',
             'payment_term_days', 'vendor', 'processed_to_invoice',
             'processed_invoice_id', 'line_items',
