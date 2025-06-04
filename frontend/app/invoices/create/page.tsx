@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { ArrowLeft, FileText, Edit, Plus, Download, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Maximize, X, Receipt, FileCheck, TrendingUp, AlertCircle, AlertTriangle, CheckCircle, Calendar as CalendarIcon, Copy, List, MoreVertical, MessageCircle, Save, XIcon, Clock, Info } from "lucide-react"
+import React, { useState, useEffect, useRef } from "react"
+import { ArrowLeft, FileText, Edit, Plus, Download, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Maximize, X, Receipt, FileCheck, TrendingUp, AlertCircle, AlertTriangle, CheckCircle, Calendar as CalendarIcon, Copy, List, MoreVertical, MessageCircle, Save, XIcon, Clock, Info, Check, Send, UserCheck, CreditCard, Link as LinkIcon, Eye, Shield, FileImage, Package, Truck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
@@ -65,6 +65,23 @@ interface ValidationIssue {
   }
 }
 
+const workflowStages = {
+  draft: { label: 'Draft', color: 'bg-gray-100 text-gray-700', icon: FileText },
+  validation: { label: 'Under Review', color: 'bg-blue-100 text-blue-700', icon: AlertCircle },
+  pending_approval: { label: 'Pending Approval', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
+  approved: { label: 'Approved', color: 'bg-green-100 text-green-700', icon: CheckCircle },
+  processing: { label: 'Processing Payment', color: 'bg-purple-100 text-purple-700', icon: TrendingUp },
+  paid: { label: 'Paid', color: 'bg-gray-100 text-gray-700', icon: Check }
+}
+
+const assigneeOptions = [
+  { initials: 'SC', name: 'Sarah Chen', role: 'AP Manager', color: 'bg-violet-500' },
+  { initials: 'MJ', name: 'Michael Johnson', role: 'AP Specialist', color: 'bg-blue-500' },
+  { initials: 'AR', name: 'Anna Rodriguez', role: 'Finance Director', color: 'bg-green-500' },
+  { initials: 'DK', name: 'David Kim', role: 'AP Clerk', color: 'bg-amber-500' },
+  { initials: 'LP', name: 'Lisa Park', role: 'Senior Accountant', color: 'bg-purple-500' }
+]
+
 export default function InvoiceDetailsPage() {
   const [extractedData, setExtractedData] = useState<InvoiceData | null>(null)
   const [invoice, setInvoice] = useState<Invoice | null>(null)
@@ -84,7 +101,10 @@ export default function InvoiceDetailsPage() {
   const [editingLineItem, setEditingLineItem] = useState<number | null>(null)
   const [lineItemValues, setLineItemValues] = useState<{[key: number]: Partial<LineItem>}>({})
   const [forcedMatchedItems, setForcedMatchedItems] = useState<Set<number>>(new Set())
-  const [budgetSectionExpanded, setBudgetSectionExpanded] = useState(false)
+  const [budgetSectionExpanded, setBudgetSectionExpanded] = useState(true)
+  const [workflowStage, setWorkflowStage] = useState<'draft' | 'validation' | 'pending_approval' | 'approved' | 'processing' | 'paid'>('validation')
+  const [showWorkflowDetails, setShowWorkflowDetails] = useState(false)
+  const [currentAssignee, setCurrentAssignee] = useState('SC')
   const pdfContainerRef = useRef<HTMLDivElement>(null)
   const descriptionInputRefs = useRef<{[key: number]: HTMLInputElement | null}>({})
 
@@ -456,15 +476,15 @@ export default function InvoiceDetailsPage() {
     if (invoice.invoice_number !== mockPOData.invoiceNumber) {
       invoiceIssues.push({
         type: 'warning',
-        message: `Invoice number doesn't match PO expectation (${mockPOData.invoiceNumber})`
+        message: `Invoice number mismatch: Expected "${mockPOData.invoiceNumber}" per PO requirements`
       })
     }
     // Add a duplicate check example
     invoiceIssues.push({
       type: 'error',
-      message: 'Potential duplicate: Similar invoice found in system',
+      message: 'Duplicate invoice detected: Similar invoice #INV-2024-0892 exists in payment queue',
       action: {
-        label: 'View Similar',
+        label: 'Review Duplicate',
         onClick: () => console.log('View similar invoice')
       }
     })
@@ -477,9 +497,9 @@ export default function InvoiceDetailsPage() {
       // PO mismatch warning
       vendorIssues.push({
         type: 'warning',
-        message: `Vendor exception: PO expects "${mockPOData.vendor}"`,
+        message: `Vendor mismatch: PO issued to "${mockPOData.vendor}", payment authorization required`,
         action: {
-          label: 'Use PO Vendor',
+          label: 'Apply PO Vendor',
           onClick: () => console.log('Copy PO vendor')
         }
       })
@@ -487,9 +507,9 @@ export default function InvoiceDetailsPage() {
       // Vendor not validated warning
       vendorIssues.push({
         type: 'warning',
-        message: 'Vendor is not validated in the system',
+        message: 'Vendor not in approved supplier list - requires finance approval before payment',
         action: {
-          label: 'Validate Vendor',
+          label: 'Request Approval',
           onClick: () => console.log('Validate vendor')
         }
       })
@@ -507,9 +527,9 @@ export default function InvoiceDetailsPage() {
       if (daysDiff > 30) {
         dateIssues.push({
           type: 'warning',
-          message: `Invoice date is ${Math.round(daysDiff)} days from expected PO date`,
+          message: `Invoice date variance: ${Math.round(daysDiff)} days outside PO terms, may impact payment schedule`,
           action: {
-            label: 'Copy PO Date',
+            label: 'Apply PO Date',
             onClick: () => console.log('Copy PO date')
           }
         })
@@ -517,7 +537,7 @@ export default function InvoiceDetailsPage() {
       if (invoiceDate > new Date()) {
         dateIssues.push({
           type: 'error',
-          message: 'Invoice date is in the future'
+          message: 'Future-dated invoice: Cannot process payment for services not yet rendered'
         })
       }
       if (dateIssues.length > 0) issues.date = dateIssues
@@ -527,7 +547,7 @@ export default function InvoiceDetailsPage() {
     if (invoice.amount && invoice.amount > mockPOData.maxAmount) {
       issues.amount = [{
         type: 'error',
-        message: `Amount exceeds PO limit by ${formatCurrency(invoice.amount - mockPOData.maxAmount, invoice.currency_code)}`
+        message: `Amount exceeds authorized PO limit by ${formatCurrency(invoice.amount - mockPOData.maxAmount, invoice.currency_code)} - requires manager approval`
       }]
     }
 
@@ -535,9 +555,9 @@ export default function InvoiceDetailsPage() {
     if (invoice.currency_code && invoice.currency_code !== mockPOData.currency) {
       issues.currency = [{
         type: 'warning',
-        message: `Currency variance: PO expects ${mockPOData.currency}`,
+        message: `Currency mismatch: PO authorized in ${mockPOData.currency}, FX rate approval required`,
         action: {
-          label: 'Use PO Currency',
+          label: 'Apply PO Currency',
           onClick: () => console.log('Copy PO currency')
         }
       }]
@@ -623,7 +643,7 @@ export default function InvoiceDetailsPage() {
         <PopoverContent className="w-80 p-0" align="start">
           <div className="p-4">
             <h4 className="font-medium text-sm mb-3">
-              {fieldIssues.length === 1 ? 'Validation Issue' : `${fieldIssues.length} Validation Issues`}
+              {fieldIssues.length === 1 ? 'Exception' : `${fieldIssues.length} Exceptions`}
             </h4>
             <div className="space-y-3">
               {fieldIssues.map((issue, index) => (
@@ -793,6 +813,8 @@ export default function InvoiceDetailsPage() {
         e.stopPropagation()
         return
       }
+
+      // Always set the editing field immediately, even if another field is being edited
       setEditingField(fieldName)
       setFieldValues(prev => ({ ...prev, [fieldName]: value || '' }))
     }
@@ -864,7 +886,12 @@ export default function InvoiceDetailsPage() {
                           handleFieldChange(fieldName, val)
                           setEditingField(null)
                         }}
-                        open={true}
+                        onOpenChange={(open) => {
+                          if (!open) {
+                            setEditingField(null)
+                          }
+                        }}
+                        defaultOpen={true}
                       >
                         <SelectTrigger className="opacity-0 pointer-events-none h-0 overflow-hidden">
                           <SelectValue />
@@ -907,7 +934,12 @@ export default function InvoiceDetailsPage() {
                     handleFieldChange(fieldName, val)
                     setEditingField(null)
                   }}
-                  open={true}
+                  onOpenChange={(open) => {
+                    if (!open) {
+                      setEditingField(null)
+                    }
+                  }}
+                  defaultOpen={true}
                 >
                   <SelectTrigger 
                     className={cn(
@@ -916,7 +948,6 @@ export default function InvoiceDetailsPage() {
                       hasWarning ? "border-amber-300 bg-amber-50 focus:ring-0" : 
                       "border-violet-500 bg-white focus:ring-0"
                     )}
-                    onBlur={(e) => handleFieldBlur(fieldName, e)}
                   >
                     <SelectValue placeholder={placeholder} />
                   </SelectTrigger>
@@ -935,7 +966,12 @@ export default function InvoiceDetailsPage() {
                     handleFieldChange(fieldName, val)
                     setEditingField(null)
                   }}
-                  open={true}
+                  onOpenChange={(open) => {
+                    if (!open) {
+                      setEditingField(null)
+                    }
+                  }}
+                  defaultOpen={true}
                 >
                   <SelectTrigger 
                     className={cn(
@@ -944,7 +980,6 @@ export default function InvoiceDetailsPage() {
                       hasWarning ? "border-amber-300 bg-amber-50 focus:ring-0" : 
                       "border-violet-500 bg-white focus:ring-0"
                     )}
-                    onBlur={(e) => handleFieldBlur(fieldName, e)}
                   >
                     <SelectValue placeholder="Select vendor..." />
                   </SelectTrigger>
@@ -957,7 +992,14 @@ export default function InvoiceDetailsPage() {
                   </SelectContent>
                 </Select>
               ) : type === "date" ? (
-                <Popover open={true}>
+                <Popover
+                  defaultOpen={true}
+                  onOpenChange={(open) => {
+                    if (!open) {
+                      setEditingField(null)
+                    }
+                  }}
+                >
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
@@ -968,7 +1010,6 @@ export default function InvoiceDetailsPage() {
                         hasWarning ? "border-amber-300 bg-amber-50 hover:bg-amber-50" : 
                         "border-violet-500 bg-white hover:bg-white"
                       )}
-                      onBlur={(e) => handleFieldBlur(fieldName, e)}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {value ? format(new Date(value), "PPP") : placeholder}
@@ -1174,7 +1215,7 @@ export default function InvoiceDetailsPage() {
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar />
-      <div className="flex-1 flex flex-col overflow-auto">
+      <div className="flex-1 flex flex-col">
         <header className="border-b sticky top-0 bg-background z-10">
           <div className="flex h-16 items-center px-6 justify-between">
             <div className="flex items-center">
@@ -1183,25 +1224,130 @@ export default function InvoiceDetailsPage() {
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
               </Link>
-              <h1 className="text-lg font-semibold">Invoice {invoice?.invoice_number || 'new'}</h1>
-              <Badge className="ml-2 bg-yellow-100 text-yellow-700 hover:bg-yellow-100 hover:text-yellow-700">
-                Pending Approval
-              </Badge>
+              <h1 className="text-lg font-semibold">Invoice {invoice?.number || 'new'}</h1>
+
+              {/* Compact Workflow Indicator */}
+              <div className="ml-8 flex items-center">
+                <div className="flex items-center gap-0">
+                  {Object.entries(workflowStages).map(([key, stage], index, array) => {
+                    const isActive = key === workflowStage
+                    const isPast = Object.keys(workflowStages).indexOf(key) < Object.keys(workflowStages).indexOf(workflowStage)
+                    const isLast = index === array.length - 1
+
+                    return (
+                      <div key={key} className="flex items-center">
+                        {/* Step Dot/Pill */}
+                        <div className="relative group">
+                          <div
+                            className={`
+                              flex items-center justify-center transition-all duration-300 relative
+                              ${isActive 
+                                ? 'bg-violet-600 text-white h-6 px-3 rounded-full shadow-sm ring-2 ring-violet-200' 
+                                : isPast 
+                                  ? 'bg-green-600 text-white h-6 w-6 rounded-full' 
+                                  : index >= 2
+                                    ? 'bg-gray-200 text-gray-400 h-6 w-6 rounded-full hover:bg-gray-300'
+                                    : 'bg-gray-300 text-gray-500 h-6 w-6 rounded-full hover:bg-gray-400'
+                              }
+                            `}
+                          >
+                            {/* Content */}
+                            <div className="flex items-center gap-1 relative z-10">
+                              {isPast ? (
+                                <Check className="h-3.5 w-3.5" />
+                              ) : isActive ? (
+                                <span className="text-xs font-medium whitespace-nowrap">{stage.label}</span>
+                              ) : (
+                                <span className="text-[11px] font-bold">{index + 1}</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Hover tooltip for non-active steps */}
+                          {!isActive && (
+                            <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-30">
+                              <div className="bg-gray-900 text-white text-xs px-2 py-1 rounded-md whitespace-nowrap relative">
+                                {stage.label}
+                                <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45" />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Connecting Line */}
+                        {!isLast && (
+                          <div className="relative w-4 lg:w-6">
+                            <div
+                              className={`
+                                absolute top-1/2 -translate-y-1/2 h-0.5 w-full transition-all duration-300
+                                ${isPast ? 'bg-green-600' : 'bg-gray-300'}
+                              `}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
             <div className="flex items-center gap-2">
-              <Link href="/">
-                <Button variant="outline" size="sm" className="text-gray-700">
-                  Cancel
-                </Button>
-              </Link>
-              <Button size="sm" className="bg-violet-600 hover:bg-violet-700">Save</Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1">
+                    <MoreVertical className="h-4 w-4" />
+                    <span className="hidden sm:inline">More Actions</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem className="gap-2">
+                    <CheckCircle className="h-4 w-4 text-amber-600" />
+                    <span>Approve with Exceptions</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="gap-2">
+                    <UserCheck className="h-4 w-4 text-blue-600" />
+                    <span>Request Approval</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="gap-2">
+                    <CreditCard className="h-4 w-4 text-green-600" />
+                    <span>Schedule Payment</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+              >
+                <X className="h-4 w-4" />
+                <span className="hidden sm:inline">Reject</span>
+              </Button>
+              <Button
+                size="sm"
+                className="gap-1 bg-green-600 hover:bg-green-700"
+              >
+                <Check className="h-4 w-4" />
+                <span className="hidden sm:inline">Approve</span>
+              </Button>
             </div>
           </div>
         </header>
 
+        {/* Contextual Message Banner */}
+        {invoice && invoice.amount > 2500 && (
+          <div className="bg-blue-50 border-b border-blue-200 px-6 py-3">
+            <div className="flex items-center gap-2 text-sm">
+              <Info className="h-4 w-4 text-blue-600 flex-shrink-0" />
+              <span className="text-blue-800">
+                Amount exceeds your approval limit ($2,500). Requires manager approval.
+              </span>
+            </div>
+          </div>
+        )}
+
         <div className="bg-gray-50/50 border-b">
           <div className="px-6 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3 sm:gap-6 flex-wrap">
               {/* PO Reference */}
               <div className="flex items-center gap-3">
                 <div className="p-1.5 bg-violet-100 rounded-lg">
@@ -1216,7 +1362,7 @@ export default function InvoiceDetailsPage() {
               </div>
 
               {/* Separator */}
-              <div className="h-8 w-px bg-gray-200" />
+              <div className="h-8 w-px bg-gray-200 hidden sm:block" />
 
               {/* PO Available Balance */}
               <div className="flex items-center gap-3">
@@ -1232,7 +1378,7 @@ export default function InvoiceDetailsPage() {
               </div>
 
               {/* Separator */}
-              <div className="h-8 w-px bg-gray-200" />
+              <div className="h-8 w-px bg-gray-200 hidden sm:block" />
 
               {/* Invoice Total */}
               <div className="flex items-center gap-3">
@@ -1250,7 +1396,7 @@ export default function InvoiceDetailsPage() {
               {/* Variance - only show if there's a PO */}
               {invoice?.po_number && (
                 <>
-                  <div className="h-8 w-px bg-gray-200" />
+                  <div className="h-8 w-px bg-gray-200 hidden sm:block" />
 
                   {/* Variance */}
                   <div className="flex items-center gap-3">
@@ -1272,7 +1418,7 @@ export default function InvoiceDetailsPage() {
               {/* No PO Status - only show if no PO */}
               {!invoice?.po_number && (
                 <>
-                  <div className="h-8 w-px bg-gray-200" />
+                  <div className="h-8 w-px bg-gray-200 hidden sm:block" />
                   
                   <div className="flex items-center gap-3">
                     <div className="p-1.5 bg-violet-100 rounded-lg">
@@ -1295,14 +1441,51 @@ export default function InvoiceDetailsPage() {
             </div>
 
             {/* Assignee - Right Side */}
-            <div className="flex items-center justify-center w-7 h-7 bg-violet-500 text-white rounded-full text-xs font-medium">
-              SC
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={`
+                    flex items-center justify-center w-7 h-7 text-white rounded-full text-xs font-medium 
+                    hover:ring-2 hover:ring-gray-300 transition-all cursor-pointer
+                    ${assigneeOptions.find(a => a.initials === currentAssignee)?.color || 'bg-violet-500'}
+                  `}
+                  title="Click to reassign"
+                >
+                  {currentAssignee}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <div className="px-2 py-1.5 text-xs font-medium text-gray-500 border-b">
+                  Assign to:
+                </div>
+                {assigneeOptions.map((assignee) => (
+                  <DropdownMenuItem
+                    key={assignee.initials}
+                    className="gap-3 py-2"
+                    onClick={() => setCurrentAssignee(assignee.initials)}
+                  >
+                    <div className={`
+                      flex items-center justify-center w-8 h-8 text-white rounded-full text-xs font-medium
+                      ${assignee.color}
+                    `}>
+                      {assignee.initials}
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">{assignee.name}</p>
+                      <p className="text-xs text-gray-500">{assignee.role}</p>
+                    </div>
+                    {currentAssignee === assignee.initials && (
+                      <Check className="h-4 w-4 text-green-600 ml-auto" />
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
-        <div className="flex-1 p-6 flex flex-col">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
+        <div className="flex-1 p-3 sm:p-6 flex flex-col overflow-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6 flex-1">
             {/* PDF Preview - Independent */}
             <div className="border rounded-lg overflow-hidden flex flex-col">
               <div className="flex items-center justify-between border-b p-3 h-12">
@@ -1384,131 +1567,156 @@ export default function InvoiceDetailsPage() {
                                 Exceptions ({getIssueCounts().total})
                               </button>
                             </SheetTrigger>
-                            <SheetContent className="w-[700px] sm:w-[900px] flex flex-col">
-                              <SheetHeader className="flex-shrink-0 pb-3">
-                                <SheetTitle>Matching Exceptions</SheetTitle>
-                              </SheetHeader>
-                              
-                              <div className="flex-1 overflow-y-auto mt-3">
-                                {/* Summary */}
-                                <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                                  <div className="flex items-center justify-between mb-3">
-                                    <h3 className="font-medium text-gray-900">Summary</h3>
-                                    <div className="flex items-center gap-4 text-sm">
-                                      {getIssueCounts().errors > 0 && (
-                                        <div className="flex items-center gap-1 text-red-600">
-                                          <AlertCircle className="h-4 w-4" />
-                                          {getIssueCounts().errors} error{getIssueCounts().errors > 1 ? 's' : ''}
-                                        </div>
-                                      )}
-                                      {getIssueCounts().warnings > 0 && (
-                                        <div className="flex items-center gap-1 text-amber-600">
-                                          <AlertTriangle className="h-4 w-4" />
-                                          {getIssueCounts().warnings} warning{getIssueCounts().warnings > 1 ? 's' : ''}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <p className="text-sm text-gray-600">
-                                    Review and resolve matching exceptions for approval.
-                                  </p>
-                                </div>
+                            <SheetContent className="w-[90vw] max-w-[700px] sm:max-w-[900px] flex flex-col">
+                              <SheetHeader className="flex-shrink-0 pb-4 border-b">
+                                <SheetTitle className="text-lg font-semibold text-gray-900">Processing Exceptions</SheetTitle>
+                                <p className="text-sm text-gray-600 mt-1">Review and resolve validation exceptions before approval</p>
+                          </SheetHeader>
 
-                                {/* Issues by Field */}
-                                <div className="space-y-6">
-                                  {Object.entries(validationIssues).map(([fieldKey, fieldIssues]) => {
-                                    // Filter out resolved issues
-                                    const activeIssues = fieldIssues.filter((_, index) => {
-                                      const issueId = `${fieldKey}-${index}`
-                                      return !resolvedIssues.has(issueId)
-                                    })
-                                    
-                                    // Don't render section if no active issues
-                                    if (activeIssues.length === 0) return null
-                                    
-                                    return (
-                                      <div key={fieldKey} className="mb-6">
-                                        <div className="mb-3">
-                                          <h4 className="font-semibold text-gray-900 text-base">{getFieldDisplayName(fieldKey)}</h4>
-                                        </div>
-                                      
-                                        <div className="space-y-4">
-                                          {fieldIssues.map((issue, index) => {
-                                            const issueId = `${fieldKey}-${index}`
-                                            const isResolving = resolvingIssues.has(issueId)
-                                            const isResolved = resolvedIssues.has(issueId)
-                                            
-                                            return (
-                                              <div 
-                                                key={index} 
-                                                className={`relative bg-white border border-gray-200 rounded-lg p-4 shadow-sm transition-all duration-500 ${
-                                                  isResolved ? 'transform translate-x-full opacity-0 pointer-events-none' :
-                                                  isResolving ? 'border-green-200' : 'hover:shadow-md'
-                                                }`}
-                                                style={{
-                                                  height: isResolved ? '0' : 'auto',
-                                                  marginBottom: isResolved ? '0' : undefined,
-                                                  overflow: isResolved ? 'hidden' : 'visible'
-                                                }}
-                                              >
-                                                <div className="flex items-start gap-4">
-                                                  <div className="flex-shrink-0 mt-1">
-                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                                                      isResolving ? 'bg-green-100' : 
-                                                      issue.type === 'error' ? 'bg-red-100' : 
-                                                      issue.type === 'warning' ? 'bg-amber-100' : 'bg-blue-100'
-                                                    }`}>
+                          <div className="flex-1 overflow-y-auto mt-4">
+                            {/* Summary */}
+                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-5 mb-6">
+                              <div className="flex items-center justify-between mb-4">
+                                <h3 className="font-semibold text-gray-900 text-base">Exception Summary</h3>
+                                <div className="flex items-center gap-4 text-sm">
+                                  {getIssueCounts().errors > 0 && (
+                                    <div className="flex items-center gap-1.5 text-red-700 bg-red-100 px-2.5 py-1 rounded-full">
+                                      <AlertCircle className="h-4 w-4" />
+                                      <span className="font-medium">{getIssueCounts().errors} critical</span>
+                                    </div>
+                                  )}
+                                  {getIssueCounts().warnings > 0 && (
+                                    <div className="flex items-center gap-1.5 text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full">
+                                      <AlertTriangle className="h-4 w-4" />
+                                      <span className="font-medium">{getIssueCounts().warnings} review required</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <p className="text-sm text-gray-700 leading-relaxed">
+                                The following exceptions require review before this invoice can be processed for payment. Critical exceptions must be resolved, while others may be approved with authorization.
+                              </p>
+                            </div>
+
+                            {/* Issues by Field */}
+                            <div className="space-y-6">
+                              {Object.entries(validationIssues).map(([fieldKey, fieldIssues]) => {
+                                // Filter out resolved issues
+                                const activeIssues = fieldIssues.filter((_, index) => {
+                                  const issueId = `${fieldKey}-${index}`
+                                  return !resolvedIssues.has(issueId)
+                                })
+                                
+                                // Don't render section if no active issues
+                                if (activeIssues.length === 0) return null
+                                
+                                return (
+                                  <div key={fieldKey} className="mb-8">
+                                    <div className="mb-4 border-l-4 border-indigo-500 pl-4">
+                                      <h4 className="font-semibold text-gray-900 text-lg">{getFieldDisplayName(fieldKey)}</h4>
+                                      <p className="text-sm text-gray-600 mt-1">{activeIssues.length} exception{activeIssues.length > 1 ? 's' : ''} found</p>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                      {fieldIssues.map((issue, index) => {
+                                        const issueId = `${fieldKey}-${index}`
+                                        const isResolving = resolvingIssues.has(issueId)
+                                        const isResolved = resolvedIssues.has(issueId)
+
+                                        return (
+                                          <div
+                                            key={index}
+                                            className={`relative bg-white border rounded-lg p-5 shadow-sm transition-all duration-500 ${
+                                              isResolved ? 'transform translate-x-full opacity-0 pointer-events-none' :
+                                              isResolving ? 'border-green-300 bg-green-50' : 
+                                              issue.type === 'error' ? 'border-red-200 hover:shadow-lg hover:border-red-300' :
+                                              'border-amber-200 hover:shadow-lg hover:border-amber-300'
+                                            }`}
+                                            style={{
+                                              height: isResolved ? '0' : 'auto',
+                                              marginBottom: isResolved ? '0' : undefined,
+                                              overflow: isResolved ? 'hidden' : 'visible'
+                                            }}
+                                          >
+                                            <div className="flex items-start gap-4">
+                                              <div className="flex-shrink-0 mt-0.5">
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
+                                                  isResolving ? 'bg-green-100 border-green-300' : 
+                                                  issue.type === 'error' ? 'bg-red-50 border-red-200' : 
+                                                  issue.type === 'warning' ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'
+                                                }`}>
+                                                  {isResolving ? (
+                                                    <CheckCircle className="h-5 w-5 text-green-600" />
+                                                  ) : issue.type === 'error' ? (
+                                                    <AlertCircle className="h-5 w-5 text-red-600" />
+                                                  ) : issue.type === 'warning' ? (
+                                                    <AlertTriangle className="h-5 w-5 text-amber-600" />
+                                                  ) : (
+                                                    <AlertCircle className="h-5 w-5 text-blue-600" />
+                                                  )}
+                                                </div>
+                                              </div>
+                                              <div className="flex-1 min-w-0">
+                                                <div className="flex items-start justify-between mb-3">
+                                                  <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wide ${
+                                                    issue.type === 'error' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
+                                                  }`}>
+                                                    {issue.type === 'error' ? 'Critical' : 'Review Required'}
+                                                  </span>
+                                                </div>
+                                                <p className="text-sm font-medium text-gray-900 mb-3 leading-relaxed">{issue.message}</p>
+                                                {issue.action && (
+                                                  <div className="flex items-center gap-3 mt-2">
+                                                    <Button
+                                                      variant="outline"
+                                                      size="sm"
+                                                      className={`h-9 text-xs font-semibold px-5 transition-all duration-300 ${
+                                                        isResolving 
+                                                          ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-100' 
+                                                          : issue.type === 'error'
+                                                            ? 'border-red-300 text-red-700 hover:bg-red-50 hover:border-red-400'
+                                                            : 'border-amber-300 text-amber-700 hover:bg-amber-50 hover:border-amber-400'
+                                                      }`}
+                                                      disabled={isResolving}
+                                                      onClick={() => {
+                                                        if (!isResolving) {
+                                                          issue.action?.onClick()
+                                                          handleResolveIssue(fieldKey, index)
+                                                        }
+                                                      }}
+                                                    >
                                                       {isResolving ? (
-                                                        <CheckCircle className="h-4 w-4 text-green-600" />
-                                                      ) : issue.type === 'error' ? (
-                                                        <AlertCircle className="h-4 w-4 text-red-600" />
-                                                      ) : issue.type === 'warning' ? (
-                                                        <AlertTriangle className="h-4 w-4 text-amber-600" />
+                                                        <>
+                                                          <CheckCircle className="h-3 w-3 mr-1.5" />
+                                                          Resolved
+                                                        </>
                                                       ) : (
-                                                        <AlertCircle className="h-4 w-4 text-blue-600" />
+                                                        issue.action.label
                                                       )}
-                                                    </div>
-                                                  </div>
-                                                  <div className="flex-1 min-w-0">
-                                                    <p className="text-sm font-medium text-gray-900 mb-2 leading-relaxed">{issue.message}</p>
-                                                    {issue.action && (
+                                                    </Button>
+                                                    {!isResolving && (
                                                       <Button
-                                                        variant="outline"
+                                                        variant="ghost"
                                                         size="sm"
-                                                        className={`h-8 text-xs font-medium px-4 transition-all duration-300 ${
-                                                          isResolving 
-                                                            ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-100' 
-                                                            : 'hover:bg-violet-50 hover:border-violet-300 hover:text-violet-700'
-                                                        }`}
-                                                        disabled={isResolving}
-                                                        onClick={() => {
-                                                          if (!isResolving) {
-                                                            issue.action?.onClick()
-                                                            handleResolveIssue(fieldKey, index)
-                                                          }
-                                                        }}
+                                                        className="h-9 text-xs font-medium px-3 text-gray-600 hover:text-gray-800 hover:bg-gray-100"
+                                                        onClick={() => handleResolveIssue(fieldKey, index)}
                                                       >
-                                                        {isResolving ? (
-                                                          <>
-                                                            <CheckCircle className="h-3 w-3 mr-1" />
-                                                            Resolved
-                                                          </>
-                                                        ) : (
-                                                          issue.action.label
-                                                        )}
+                                                        Mark as Reviewed
                                                       </Button>
                                                     )}
                                                   </div>
-                                                </div>
+                                                )}
                                               </div>
-                                            )
-                                          })}
-                                        </div>
-                                      </div>
-                                    )
-                                  })}
-                                </div>
-                              </div>
+                                            </div>
+                                          </div>
+                                        )
+                                      })}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
 
                               {/* Actions - Fixed at bottom */}
                               {getIssueCounts().errors === 0 && (
@@ -1904,9 +2112,9 @@ export default function InvoiceDetailsPage() {
                           
                           {budgetSectionExpanded && (
                             <div className="grid grid-cols-2 gap-6 animate-in slide-in-from-top-2 duration-300">
-                              <div>
+                              <div className="flex flex-col">
                                 <label className="text-xs text-gray-500 font-medium">Budget Status</label>
-                                <div className="mt-2 border border-gray-200 rounded-lg p-4">
+                                <div className="mt-2 border border-gray-200 rounded-lg p-4 h-full flex flex-col">
                                   <div className="flex items-center justify-between text-sm mb-2">
                                     <span className="font-medium text-gray-700">Q1 Professional Services</span>
                                     <span className="text-gray-600 font-medium">85%</span>
@@ -1938,9 +2146,9 @@ export default function InvoiceDetailsPage() {
                                 </div>
                               </div>
                               
-                              <div>
+                              <div className="flex flex-col">
                                 <label className="text-xs text-gray-500 font-medium">Budget Impact</label>
-                                <div className="mt-2 border border-gray-200 rounded-lg p-4">
+                                <div className="mt-2 border border-gray-200 rounded-lg p-4 h-full flex flex-col">
                                   <div className="flex items-center justify-between text-sm mb-2">
                                     <span className="font-medium text-gray-700">This Invoice Impact</span>
                                     <span className="text-amber-600 font-medium">53%</span>
@@ -1961,7 +2169,7 @@ export default function InvoiceDetailsPage() {
                                       <p className="font-medium text-gray-900">53%</p>
                                     </div>
                                   </div>
-                                  <div className="pt-2 mt-4 border-t">
+                                  <div className="pt-2 mt-4 border-t flex-1 flex items-end">
                                     <p className="text-xs text-amber-600">
                                       <Info className="h-3 w-3 inline mr-1" />
                                       Approval will leave $3,074 for the remaining quarter
@@ -1978,21 +2186,84 @@ export default function InvoiceDetailsPage() {
                 </TabsContent>
 
                 <TabsContent value="activity" className="flex-1 p-0 mt-4">
-                  <div className="border rounded-lg overflow-hidden h-full">
+                  <div className="border rounded-lg overflow-hidden h-full min-h-[70vh]">
                     <div className="p-6">
                       <div className="flex items-center justify-between mb-4">
                         <h2 className="text-lg font-semibold">Activity Log</h2>
                         <div></div>
                       </div>
-                      <div className="space-y-4">
-                        <div className="flex items-start gap-4">
-                          <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
-                            <FileText className="h-5 w-5" />
+                      <div className="space-y-6">
+                        {/* Current Status */}
+                        <div className="relative">
+                          <div className="flex items-start gap-4">
+                            <div className="relative">
+                              <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 ring-4 ring-blue-50">
+                                <Eye className="h-5 w-5" />
+                              </div>
+                              <div className="absolute top-10 left-1/2 w-0.5 h-6 bg-gray-200 -translate-x-1/2"></div>
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-medium text-blue-600">Under Review</p>
+                              <p className="text-sm text-muted-foreground">Invoice assigned to Sarah Chen (AP Manager) for final approval</p>
+                              <p className="text-xs text-muted-foreground mt-1">Current status</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-medium">Invoice created</p>
-                            <p className="text-sm text-muted-foreground">Created from uploaded file with extracted data</p>
-                            <p className="text-xs text-muted-foreground mt-1">Just now</p>
+                        </div>
+
+                        {/* Timeline Header */}
+                        <div className="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <Clock className="h-3 w-3" />
+                          Activity Timeline
+                        </div>
+
+                        {/* Timeline Items */}
+                        <div className="relative">
+                          <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+
+                          <div className="space-y-6">
+                            <div className="relative flex items-start gap-4">
+                              <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center text-green-600 ring-2 ring-white shadow-sm">
+                                <CheckCircle className="h-5 w-5" />
+                              </div>
+                              <div className="flex-1">
+                                <p className="font-medium">Budget approval obtained</p>
+                                <p className="text-sm text-muted-foreground">Budget impact approved by Finance Director (Anna Rodriguez)</p>
+                                <p className="text-xs text-muted-foreground mt-1">2 minutes ago</p>
+                              </div>
+                            </div>
+
+                            <div className="relative flex items-start gap-4">
+                              <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 ring-2 ring-white shadow-sm">
+                                <Shield className="h-5 w-5" />
+                              </div>
+                              <div className="flex-1">
+                                <p className="font-medium">Compliance check completed</p>
+                                <p className="text-sm text-muted-foreground">VAT rate validated, vendor details verified against internal database</p>
+                                <p className="text-xs text-muted-foreground mt-1">5 minutes ago</p>
+                              </div>
+                            </div>
+
+                            <div className="relative flex items-start gap-4">
+                              <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 ring-2 ring-white shadow-sm">
+                                <LinkIcon className="h-5 w-5" />
+                              </div>
+                              <div className="flex-1">
+                                <p className="font-medium">Purchase Order matched</p>
+                                <p className="text-sm text-muted-foreground">Automatically linked to PO #PO-2024-0847 based on vendor and amount</p>
+                                <p className="text-xs text-muted-foreground mt-1">8 minutes ago</p>
+                              </div>
+                            </div>
+
+                            <div className="relative flex items-start gap-4">
+                              <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 ring-2 ring-white shadow-sm">
+                                <FileText className="h-5 w-5" />
+                              </div>
+                              <div className="flex-1">
+                                <p className="font-medium">Invoice created</p>
+                                <p className="text-sm text-muted-foreground">Created from uploaded file with extracted data</p>
+                                <p className="text-xs text-muted-foreground mt-1">12 minutes ago</p>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -2001,7 +2272,7 @@ export default function InvoiceDetailsPage() {
                 </TabsContent>
 
                 <TabsContent value="attachments" className="flex-1 p-0 mt-4">
-                  <div className="border rounded-lg overflow-hidden h-full">
+                  <div className="border rounded-lg overflow-hidden h-full min-h-[70vh]">
                     <div className="p-6">
                       <div className="flex items-center justify-between mb-4">
                         <h2 className="text-lg font-semibold">Attachments</h2>
@@ -2011,26 +2282,172 @@ export default function InvoiceDetailsPage() {
                         </Button>
                       </div>
 
-                      {fileName ? (
-                        <div className="border rounded-lg overflow-hidden">
-                          <div className="flex items-center justify-between p-4">
-                            <div className="flex items-center gap-3">
-                              <FileText className="h-5 w-5 text-violet-600" />
-                              <div>
-                                <p className="font-medium">{fileName}</p>
-                                <p className="text-xs text-muted-foreground">Uploaded just now</p>
+                      <div className="space-y-6">
+                        {/* Primary Documents */}
+                        <div>
+                          <div className="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase tracking-wider mb-4">
+                            <Receipt className="h-3 w-3" />
+                            Primary Documents
+                          </div>
+
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between p-4 border border-violet-200 bg-violet-50/30 rounded-lg">
+                              <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-full bg-violet-100 flex items-center justify-center text-violet-600">
+                                  <Receipt className="h-5 w-5" />
+                                </div>
+                                <div>
+                                  <p className="font-medium">Original Invoice</p>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span>invoice_globex_2024_0847.pdf</span>
+                                    <Badge variant="outline" className="text-xs px-1.5 py-0.5">PDF</Badge>
+                                    <span>•</span>
+                                    <span>2.4 MB</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button variant="ghost" size="sm" className="h-8 gap-1">
+                                  <Eye className="h-3 w-3" />
+                                  View
+                                </Button>
+                                <Button variant="outline" size="sm" className="h-8 gap-1" onClick={handleDownload}>
+                                  <Download className="h-3 w-3" />
+                                  Download
+                                </Button>
                               </div>
                             </div>
-                            <Button variant="outline" size="sm" onClick={handleDownload}>
-                              Download
-                            </Button>
                           </div>
                         </div>
-                      ) : (
-                        <div className="border rounded-lg p-8 text-center">
-                          <p className="text-muted-foreground">No attachments yet.</p>
+
+                        {/* Supporting Documents */}
+                        <div>
+                          <div className="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase tracking-wider mb-4">
+                            <FileCheck className="h-3 w-3" />
+                            Supporting Documents
+                          </div>
+
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50/50 transition-colors">
+                              <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                                  <FileText className="h-5 w-5" />
+                                </div>
+                                <div>
+                                  <p className="font-medium">Purchase Order</p>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span>PO-2024-0847.pdf</span>
+                                    <Badge variant="outline" className="text-xs px-1.5 py-0.5">PDF</Badge>
+                                    <span>•</span>
+                                    <span>1.2 MB</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button variant="ghost" size="sm" className="h-8 gap-1">
+                                  <Eye className="h-3 w-3" />
+                                  View
+                                </Button>
+                                <Button variant="outline" size="sm" className="h-8 gap-1">
+                                  <Download className="h-3 w-3" />
+                                  Download
+                                </Button>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50/50 transition-colors">
+                              <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+                                  <Truck className="h-5 w-5" />
+                                </div>
+                                <div>
+                                  <p className="font-medium">Goods Receipt Note</p>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span>GRN-2024-1205.pdf</span>
+                                    <Badge variant="outline" className="text-xs px-1.5 py-0.5">PDF</Badge>
+                                    <span>•</span>
+                                    <span>856 KB</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button variant="ghost" size="sm" className="h-8 gap-1">
+                                  <Eye className="h-3 w-3" />
+                                  View
+                                </Button>
+                                <Button variant="outline" size="sm" className="h-8 gap-1">
+                                  <Download className="h-3 w-3" />
+                                  Download
+                                </Button>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50/50 transition-colors">
+                              <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
+                                  <FileImage className="h-5 w-5" />
+                                </div>
+                                <div>
+                                  <p className="font-medium">Proof of Delivery</p>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span>delivery_confirmation.jpg</span>
+                                    <Badge variant="outline" className="text-xs px-1.5 py-0.5">JPG</Badge>
+                                    <span>•</span>
+                                    <span>3.1 MB</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button variant="ghost" size="sm" className="h-8 gap-1">
+                                  <Eye className="h-3 w-3" />
+                                  View
+                                </Button>
+                                <Button variant="outline" size="sm" className="h-8 gap-1">
+                                  <Download className="h-3 w-3" />
+                                  Download
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      )}
+
+                        {/* Additional Files */}
+                        <div>
+                          <div className="flex items-center gap-2 text-xs font-medium text-gray-500 uppercase tracking-wider mb-4">
+                            <Package className="h-3 w-3" />
+                            Additional Files
+                          </div>
+
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50/50 transition-colors">
+                              <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
+                                  <FileText className="h-5 w-5" />
+                                </div>
+                                <div>
+                                  <p className="font-medium">Service Agreement</p>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <span>service_contract_2024.pdf</span>
+                                    <Badge variant="outline" className="text-xs px-1.5 py-0.5">PDF</Badge>
+                                    <span>•</span>
+                                    <span>745 KB</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button variant="ghost" size="sm" className="h-8 gap-1">
+                                  <Eye className="h-3 w-3" />
+                                  View
+                                </Button>
+                                <Button variant="outline" size="sm" className="h-8 gap-1">
+                                  <Download className="h-3 w-3" />
+                                  Download
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </TabsContent>
@@ -2174,22 +2591,21 @@ export default function InvoiceDetailsPage() {
                   {/* Scrollable PO/GR Columns */}
                   <div className="flex-1 overflow-x-auto bg-white shadow-sm">
                     <Table className={cn(
-                      "min-w-[200px]",
-                      linkedPO && linkedGR && "min-w-[840px]",
-                      linkedPO && !linkedGR && "min-w-[516px]",
-                      !linkedPO && linkedGR && "min-w-[404px]",
-                      !linkedPO && !linkedGR && "w-full"
+                      "w-full",
+                      linkedPO && linkedGR && "min-w-[600px]",
+                      linkedPO && !linkedGR && "min-w-[400px]",
+                      !linkedPO && linkedGR && "min-w-[300px]"
                     )}>
                       <TableHeader>
                         <TableRow className="bg-gray-50 h-auto">
                           {linkedPO && (
                             <>
-                              <TableHead className="min-w-[80px] text-sm font-medium py-2 px-2">PO Line<br/>Source</TableHead>
-                              <TableHead className="min-w-[224px] text-sm font-medium py-2 px-2">PO Description</TableHead>
-                              <TableHead className="min-w-[48px] text-right text-sm font-medium py-2 px-2">PO<br/>Qty</TableHead>
-                              <TableHead className="min-w-[80px] text-right text-sm font-medium py-2 px-2">PO Unit<br/>Price</TableHead>
+                              <TableHead className="min-w-[60px] text-sm font-medium py-2 px-2">PO Line<br/>Source</TableHead>
+                              <TableHead className="min-w-[120px] text-sm font-medium py-2 px-2">PO Description</TableHead>
+                              <TableHead className="min-w-[40px] text-right text-sm font-medium py-2 px-2">PO<br/>Qty</TableHead>
+                              <TableHead className="min-w-[60px] text-right text-sm font-medium py-2 px-2">PO Unit<br/>Price</TableHead>
                               <TableHead className={cn(
-                                "min-w-[80px] text-right text-sm font-medium py-2 px-2",
+                                "min-w-[60px] text-right text-sm font-medium py-2 px-2",
                                 !linkedGR && "border-r-2 border-violet-300"
                               )}>PO<br/>Total</TableHead>
                             </>
@@ -2197,20 +2613,20 @@ export default function InvoiceDetailsPage() {
                           {linkedGR && (
                             <>
                               <TableHead className={cn(
-                                "min-w-[80px] text-sm font-medium py-2 px-2",
+                                "min-w-[60px] text-sm font-medium py-2 px-2",
                                 linkedPO && "border-l-2 border-violet-300"
                               )}>GR Line<br/>Source</TableHead>
-                              <TableHead className="min-w-[224px] text-sm font-medium py-2 px-2">GR Description</TableHead>
-                              <TableHead className="min-w-[48px] text-right text-sm font-medium py-2 px-2 border-r-2 border-violet-300">GR<br/>Qty</TableHead>
+                              <TableHead className="min-w-[120px] text-sm font-medium py-2 px-2">GR Description</TableHead>
+                              <TableHead className="min-w-[40px] text-right text-sm font-medium py-2 px-2 border-r-2 border-violet-300">GR<br/>Qty</TableHead>
                             </>
                           )}
                           <TableHead className={cn(
                             "text-center text-sm font-medium py-2 px-2",
-                            !linkedPO && !linkedGR ? "w-1/2" : "min-w-[48px]"
+                            !linkedPO && !linkedGR ? "w-1/2" : "min-w-[40px]"
                           )}>Comments</TableHead>
                           <TableHead className={cn(
                             "text-center text-sm font-medium py-2 px-2",
-                            !linkedPO && !linkedGR ? "w-1/2" : "min-w-[48px]"
+                            !linkedPO && !linkedGR ? "w-1/2" : "min-w-[40px]"
                           )}>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
