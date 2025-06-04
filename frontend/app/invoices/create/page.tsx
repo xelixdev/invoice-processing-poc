@@ -1259,7 +1259,7 @@ export default function InvoiceDetailsPage() {
                               ) : isActive ? (
                                 <span className="text-xs font-medium whitespace-nowrap">{stage.label}</span>
                               ) : (
-                                <span className="text-[11px] font-bold">{index + 1}</span>
+                                <div className="w-1.5 h-1.5 bg-current rounded-full"></div>
                               )}
                             </div>
                           </div>
