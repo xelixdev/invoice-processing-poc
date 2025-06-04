@@ -21,13 +21,13 @@ def extract_invoice_from_file(file_path):
         
         # Process based on file type
         if ext == '.pdf':
-            # Convert PDF to image
-            image_base64 = get_image_from_pdf(file_bytes)
-            if not image_base64:
+            # Convert PDF to list of images
+            image_base64_list = get_image_from_pdf(file_bytes)
+            if not image_base64_list:
                 return {"error": "Failed to process PDF file"}
         elif ext in ['.jpg', '.jpeg', '.png']:
             # For image files, encode directly to base64
-            image_base64 = base64.b64encode(file_bytes).decode('utf-8')
+            image_base64_list = [base64.b64encode(file_bytes).decode('utf-8')]
         else:
             return {"error": f"Unsupported file type: {ext}"}
         
@@ -61,9 +61,15 @@ def extract_invoice_from_file(file_path):
                 }]
             }
         
-        # Extract invoice data
-        result = client.extract_invoice_data(image_base64)
-        if result:
+        # For PDFs, send all pages at once. For single images, send just that image
+        if ext == '.pdf':
+            print(f"Processing PDF with {len(image_base64_list)} pages...", file=sys.stderr)
+            result = client.extract_invoice_data(image_base64_list)
+        else:
+            print("Processing single image...", file=sys.stderr)
+            result = client.extract_invoice_data(image_base64_list[0])
+        
+        if result and 'invoices' in result:
             return result
         else:
             return {"error": "Failed to extract invoice data"}

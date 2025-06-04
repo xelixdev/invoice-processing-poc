@@ -54,20 +54,23 @@ def preprocess_pdf_page_image(
         elapsed_time=time() - start_time,
     )
 
-def get_image_from_pdf(pdf_bytes: bytes) -> Optional[str]:
-    """Convert PDF to base64 encoded image."""
+def get_image_from_pdf(pdf_bytes: bytes) -> Optional[list[str]]:
+    """Convert PDF to list of base64 encoded images, one per page."""
     try:
+        images = []
         with fitz.Document(stream=pdf_bytes, filetype="pdf") as doc:
-            # Get the first page
-            page = doc[0]
-            # Extract image
-            image_bytes = extract_image_page_bytes(page)
-            # Convert to OpenCV format
-            cv_image = bytes_to_cv2(image_bytes)
-            # Preprocess
-            processed_image = preprocess_pdf_page_image(cv_image)
-            # Convert to base64
-            return base64.b64encode(processed_image.data).decode("utf-8")
+            # Process each page
+            for page_num in range(len(doc)):
+                page = doc[page_num]
+                # Extract image
+                image_bytes = extract_image_page_bytes(page)
+                # Convert to OpenCV format
+                cv_image = bytes_to_cv2(image_bytes)
+                # Preprocess
+                processed_image = preprocess_pdf_page_image(cv_image)
+                # Convert to base64 and add to list
+                images.append(base64.b64encode(processed_image.data).decode("utf-8"))
+        return images if images else None
     except Exception as e:
         print(f"Error processing PDF: {str(e)}", file=sys.stderr)
         return None 

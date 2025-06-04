@@ -3,7 +3,7 @@ import json
 import os
 import sys
 import re
-from typing import Dict, Any
+from typing import Dict, Any, Union, List, Optional
 from decimal import Decimal
 from prompts import INVOICE_EXTRACTION_PROMPT
 from dotenv import load_dotenv
@@ -19,15 +19,15 @@ class AnthropicClient:
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model = "claude-3-5-sonnet-20240620"
 
-    def _parse_numeric(self, value: str) -> float:
+    def _parse_numeric(self, value: str) -> Optional[float]:
         """Parse numeric values from strings, handling various formats."""
-        if not value or not isinstance(value, str):
-            return 0.0
+        if not value or not isinstance(value, str) or value.strip() == "":
+            return None
         try:
             cleaned = "".join(c for c in value if c.isdigit() or c in ".-")
-            return float(cleaned)
+            return float(cleaned) if cleaned else None
         except (ValueError, TypeError):
-            return 0.0
+            return None
 
     def _parse_line_items(self, items: list) -> list:
         """Parse numeric values in line items."""
@@ -39,7 +39,7 @@ class AnthropicClient:
                     parsed_item[field] = self._parse_numeric(str(parsed_item[field]))
                 else:
                     # Handle cases where a numeric field might be missing or None
-                    parsed_item[field] = 0.0 # Default to 0.0 or handle as appropriate
+                    parsed_item[field] = None
             parsed_items.append(parsed_item)
         return parsed_items
         
@@ -62,26 +62,33 @@ class AnthropicClient:
         # If all else fails, return the original text
         return text
 
-    def extract_invoice_data(self, image_base64: str) -> Dict[str, Any]:
-        """Extract invoice data from an image using Anthropic's Claude."""
+    def extract_invoice_data(self, image_base64: Union[str, List[str]]) -> Dict[str, Any]:
+        """Extract invoice data from an image or list of images using Anthropic's Claude."""
         try:
+            # Always convert to list for consistent handling
+            images = [image_base64] if isinstance(image_base64, str) else image_base64
+            print(f"Processing {len(images)} image(s) with Anthropic Claude...", file=sys.stderr)
+
+            # Prepare the message content with all images
+            content = []
+            for img in images:
+                content.append({
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/jpeg",
+                        "data": img,
+                    },
+                })
+            content.append({"type": "text", "text": INVOICE_EXTRACTION_PROMPT})
+
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=2048,
                 messages=[
                     {
                         "role": "user",
-                        "content": [
-                            {
-                                "type": "image",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": "image/jpeg",
-                                    "data": image_base64,
-                                },
-                            },
-                            {"type": "text", "text": INVOICE_EXTRACTION_PROMPT}
-                        ],
+                        "content": content,
                     }
                 ],
             )
@@ -100,15 +107,17 @@ class AnthropicClient:
 
             if "invoices" in extracted_data:
                 for invoice in extracted_data["invoices"]:
-                    invoice["amount"] = self._parse_numeric(str(invoice.get("amount", "0")))
-                    invoice["tax_amount"] = self._parse_numeric(str(invoice.get("tax_amount", "0")))
-                    invoice["payment_term_days"] = self._parse_numeric(str(invoice.get("payment_term_days", "0")))
+                    invoice["amount"] = self._parse_numeric(str(invoice.get("amount", "")))
+                    invoice["tax_amount"] = self._parse_numeric(str(invoice.get("tax_amount", "")))
+                    invoice["payment_term_days"] = self._parse_numeric(str(invoice.get("payment_term_days", "")))
                     if "line_items" in invoice and isinstance(invoice["line_items"], list):
                         invoice["line_items"] = self._parse_line_items(invoice["line_items"])
                     else:
                         invoice["line_items"] = []
+                print(f"Found {len(extracted_data['invoices'])} invoices", file=sys.stderr)
             else:
                  extracted_data["invoices"] = []
+                 print("No invoices found", file=sys.stderr)
 
             return extracted_data
 
