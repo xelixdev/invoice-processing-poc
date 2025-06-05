@@ -1590,7 +1590,7 @@ export default function InvoiceDetailsPage() {
                                 type="number"
                               />
                               <EditableField
-                                fieldName="subtotal"
+                                fieldName="subtotalAmount"
                                 label="Subtotal"
                                 value={invoice?.subtotal?.toString() || (invoice?.amount && invoice?.tax_amount ? (invoice.amount - invoice.tax_amount).toString() : '')}
                                 type="number"
