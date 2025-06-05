@@ -22,7 +22,7 @@ interface Invoice {
   currency_code: string;
   date: string;
   due_date: string;
-  payment_term_days: number;
+  payment_term_days: string;
   vendor: string;
   line_items: LineItem[];
 }
@@ -201,7 +201,7 @@ export default function InvoiceUploader() {
                   </div>
                   <div>
                     <h3 className="text-sm font-medium">Payment Terms</h3>
-                    <p>{invoice.payment_term_days} days</p>
+                    <p>{invoice.payment_term_days || ''}</p>
                   </div>
                 </div>
 

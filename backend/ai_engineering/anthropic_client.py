@@ -92,7 +92,8 @@ class AnthropicClient:
                 for invoice in extracted_data["invoices"]:
                     invoice["amount"] = self._parse_numeric(str(invoice.get("amount", "")))
                     invoice["tax_amount"] = self._parse_numeric(str(invoice.get("tax_amount", "")))
-                    invoice["payment_term_days"] = self._parse_numeric(str(invoice.get("payment_term_days", "")))
+                    # Don't parse payment terms as numeric - keep as string
+                    invoice["payment_term_days"] = str(invoice.get("payment_term_days", ""))
                     if "line_items" in invoice and isinstance(invoice["line_items"], list):
                         invoice["line_items"] = self._parse_line_items(invoice["line_items"])
                     else:

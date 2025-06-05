@@ -35,7 +35,7 @@ interface Invoice {
   currency_code: string;
   date: string;
   due_date: string;
-  payment_term_days: number;
+  payment_term_days: string;
   vendor: string;
   vendor_status?: string;
   payment_history?: string;
@@ -1679,7 +1679,7 @@ export default function InvoiceDetailsPage() {
                             <EditableField
                               fieldName="paymentTerms"
                               label="Payment Terms"
-                              value={invoice?.payment_term_days ? `Net ${invoice.payment_term_days}` : 'Net 7'}
+                              value={invoice?.payment_term_days || ''}
                               type="select"
                               options={[
                                 { value: "Net 7", label: "Net 7 (No early payment discount)" },

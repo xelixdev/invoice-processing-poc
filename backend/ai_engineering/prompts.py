@@ -36,7 +36,9 @@ and convert it to ISO format appropriately.
 - `due_date`: Return the invoice due date for this invoice, if it is present, in ISO format (yyyy-mm-dd). 
 Pay close attention to the country indicated by the vendor's address - if it is from the USA or Canada then 
 assume that the date has been written in month-first date format and convert it to ISO format appropriately.
-- `payment_term_days`: Return the number for payment term days if it is present
+- `payment_term_days`: Return the EXACT payment term text as it appears on the invoice (e.g. "Net 30", "60 Days Net Monthly", "Due on Receipt"). 
+DO NOT convert this to a number. If the exact text is not present but can be inferred from the invoice date and due date, 
+then return the number of days as a string (e.g. "30 days" or "55 days"). If no payment terms are found, return an empty string.
 - `vendor`: Return the name of the business which has sent this invoice
 - `line_items`: Return a list of line items, where each line item contains:
   - description: The item description

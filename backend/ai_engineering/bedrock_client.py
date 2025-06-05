@@ -96,10 +96,12 @@ class BedrockClient:
             # Parse numeric values in the response
             if extracted_data.get("invoices"):
                 for invoice in extracted_data["invoices"]:
+                    print(f"Raw payment terms from LLM: {invoice.get('payment_term_days', '')}", file=sys.stderr)
                     # Parse main invoice amounts
                     invoice["amount"] = self._parse_numeric(str(invoice.get("amount", "")))
                     invoice["tax_amount"] = self._parse_numeric(str(invoice.get("tax_amount", "")))
-                    invoice["payment_term_days"] = self._parse_numeric(str(invoice.get("payment_term_days", "")))
+                    # Don't parse payment terms as numeric - keep as string
+                    invoice["payment_term_days"] = str(invoice.get("payment_term_days", ""))
 
                     # Parse line items
                     if "line_items" in invoice:
