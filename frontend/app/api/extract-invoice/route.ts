@@ -16,8 +16,8 @@ export async function POST(request: NextRequest) {
     const response = await fetch(`${PYTHON_API_URL}/api/extract-invoice/`, {
       method: 'POST',
       body: formData,
-      // Add a timeout to avoid hanging indefinitely
-      signal: AbortSignal.timeout(10000) // 10 second timeout
+      // Increase timeout to 60 seconds for multi-page documents
+      signal: AbortSignal.timeout(60000)
     });
     
     // Check if response is ok and log more details

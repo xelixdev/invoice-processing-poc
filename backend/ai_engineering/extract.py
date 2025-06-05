@@ -5,12 +5,12 @@ import base64
 import os
 import tempfile
 import csv
+from typing import Dict, Any, List
 from .image_processor import get_image_from_pdf
 from .anthropic_client import AnthropicClient
 from .bedrock_client import BedrockClient
-from typing import Dict, Any
 
-def extract_invoice_from_file(file_path):
+def extract_invoice_from_file(file_path: str) -> Dict[str, Any]:
     """Process a file (PDF or image) and extract invoice data."""
     try:
         # Determine file type based on extension
@@ -23,21 +23,23 @@ def extract_invoice_from_file(file_path):
         
         # Process based on file type
         if ext == '.pdf':
-            # Convert PDF to image
-            image_base64 = get_image_from_pdf(file_bytes)
-            if not image_base64:
+            # Convert PDF to list of images (one per page)
+            image_base64_list = get_image_from_pdf(file_bytes)
+            if not image_base64_list:
                 return {"error": "Failed to process PDF file"}
         elif ext in ['.jpg', '.jpeg', '.png']:
             # For image files, encode directly to base64
-            image_base64 = base64.b64encode(file_bytes).decode('utf-8')
+            image_base64_list = [base64.b64encode(file_bytes).decode('utf-8')]
         else:
             return {"error": f"Unsupported file type: {ext}"}
         
         # Choose which client to use based on environment variables
         if os.getenv('ANTHROPIC_API_KEY'):
             client = AnthropicClient()
+            print("Using Anthropic client for extraction", file=sys.stderr)
         elif os.environ.get('AWS_DEFAULT_REGION'):  # Check if AWS credentials are available
             client = BedrockClient()
+            print("Using AWS Bedrock client for extraction", file=sys.stderr)
         else:
             # If no API keys are available, return a mock response for testing
             return {
@@ -63,17 +65,18 @@ def extract_invoice_from_file(file_path):
                 }]
             }
         
-        # Extract invoice data
-        result = client.extract_invoice_data(image_base64)
+        # Extract invoice data using all pages
+        result = client.extract_invoice_data(image_base64_list)
         if result:
             return result
         else:
             return {"error": "Failed to extract invoice data"}
             
     except Exception as e:
+        print(f"Error in extract_invoice_from_file: {str(e)}", file=sys.stderr)
         return {"error": f"Error processing file: {str(e)}"}
 
-def extract_invoice_from_csv(file_path):
+def extract_invoice_from_csv(file_path: str) -> Dict[str, Any]:
     """Parse a CSV file and extract invoice data in the expected format."""
     try:
         invoices = []
@@ -95,8 +98,6 @@ def extract_invoice_from_csv(file_path):
                 }
                 
                 # Add line items if they exist in the CSV
-                # This assumes your CSV has line items in some format
-                # You may need to adjust this based on your CSV structure
                 if "line_item_desc" in row and row["line_item_desc"]:
                     invoice["line_items"].append({
                         "description": row.get("line_item_desc", ""),
@@ -113,11 +114,11 @@ def extract_invoice_from_csv(file_path):
         }
             
     except Exception as e:
+        print(f"Error in extract_invoice_from_csv: {str(e)}", file=sys.stderr)
         return {"error": f"Error processing CSV file: {str(e)}"}
 
 if __name__ == "__main__":
     # Get the file path from command line arguments
-    
     if len(sys.argv) < 2:
         print(json.dumps({"error": "No file path provided"}))
         sys.exit(1)

@@ -54,20 +54,50 @@ def preprocess_pdf_page_image(
         elapsed_time=time() - start_time,
     )
 
-def get_image_from_pdf(pdf_bytes: bytes) -> Optional[str]:
-    """Convert PDF to base64 encoded image."""
+def get_image_from_pdf(pdf_bytes: bytes) -> Optional[list[str]]:
+    """Convert PDF to list of base64 encoded images, one per page."""
     try:
+        images = []
         with fitz.Document(stream=pdf_bytes, filetype="pdf") as doc:
-            # Get the first page
-            page = doc[0]
-            # Extract image
-            image_bytes = extract_image_page_bytes(page)
-            # Convert to OpenCV format
-            cv_image = bytes_to_cv2(image_bytes)
-            # Preprocess
-            processed_image = preprocess_pdf_page_image(cv_image)
-            # Convert to base64
-            return base64.b64encode(processed_image.data).decode("utf-8")
+            # Process each page
+            for page_num in range(len(doc)):
+                try:
+                    page = doc[page_num]
+                    # Extract image with higher zoom for better quality
+                    image_bytes = extract_image_page_bytes(page, zoom=3.0)
+                    
+                    # Convert to OpenCV format
+                    cv_image = bytes_to_cv2(image_bytes)
+                    if cv_image is None:
+                        print(f"Failed to decode image for page {page_num + 1}", file=sys.stderr)
+                        continue
+                        
+                    # Preprocess
+                    processed_image = preprocess_pdf_page_image(cv_image)
+                    
+                    # Verify the processed image data
+                    if not processed_image.data:
+                        print(f"Empty image data for page {page_num + 1}", file=sys.stderr)
+                        continue
+                        
+                    # Convert to base64 and add to list
+                    base64_str = base64.b64encode(processed_image.data).decode("utf-8")
+                    if base64_str:
+                        images.append(base64_str)
+                    else:
+                        print(f"Failed to encode page {page_num + 1} to base64", file=sys.stderr)
+                        
+                except Exception as page_error:
+                    print(f"Error processing page {page_num + 1}: {str(page_error)}", file=sys.stderr)
+                    continue  # Skip this page and continue with others
+                    
+        if not images:
+            print("No valid images were extracted from the PDF", file=sys.stderr)
+            return None
+            
+        print(f"Successfully processed {len(images)} pages from PDF", file=sys.stderr)
+        return images
+        
     except Exception as e:
         print(f"Error processing PDF: {str(e)}", file=sys.stderr)
         return None 
