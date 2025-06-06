@@ -22,8 +22,8 @@ class ExtractedInvoiceSerializer(serializers.ModelSerializer):
             'id', 'document_type', 'invoice_number', 'number', 'po_number',
             'amount', 'tax_amount', 'currency_code', 'date', 'due_date',
             'payment_term_days', 'vendor', 'processed_to_invoice',
-            'processed_invoice_id', 'line_items',
-            'created_at', 'updated_at'
+            'processed_invoice_id', 'line_items', 'billing_address',
+            'payment_method', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 

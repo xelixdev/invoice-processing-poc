@@ -45,6 +45,17 @@ then return the number of days as a string (e.g. "30 days" or "55 days"). If no 
   - quantity: The quantity as a number
   - unit_price: The unit price as a number
   - total: The total amount for this line item as a number
+- `billing_address`: Return the billing address as a single line of text. This is the address where the invoice should be sent for payment.
+  Look for sections labeled as "Bill To", "To", or "Sold To" (in that order of preference). Format the address as:
+  "Company Name, Department (if present), Street Address, City, State/Province, Postal Code, Country"
+  Example: "Acme Corporation, Accounts Payable, 123 Business Street, Richmond, VA 23219, USA"
+  If multiple addresses are present, use the "Bill To" address. If no "Bill To" exists, use "To". If neither exists, use "Sold To".
+  If no billing address is found, return an empty string.
+- `shipping_address`: Return the complete "Ship To" address if present on the invoice. Include all address components exactly as they appear.
+  If no shipping address is found, return an empty string.
+- `payment_method`: Return the payment method specified on the invoice (e.g. "Bank Transfer", "ACH", "Wire Transfer", "Check"). 
+If no explicit payment method is specified but bank details are present (e.g. account number + sort code, IBAN, routing number), 
+assume it's a "Bank Transfer" and return that. If no payment method or bank details are found, return an empty string.
 
 Your response should be formatted in JSON format, with two keys in a dictionary: 
 "document_type" and "invoices". 
@@ -63,8 +74,9 @@ Here is an example output format for a document classified as 'invoice' containi
         "currency_code": "GBP",
         "date": "2024-11-09",
         "due_date": "2024-12-09",
-        "payment_term_days": 30,
+        "payment_term_days": "Net 30",
         "vendor": "ABC LTD",
+        "payment_method": "Bank Transfer",
         "line_items": [
             {
                 "description": "Product A",

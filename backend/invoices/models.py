@@ -58,6 +58,7 @@ class Invoice(models.Model):
     
     currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, default='USD')
     payment_terms = models.CharField(max_length=50)
+    billing_address = models.CharField(max_length=500, blank=True, null=True)
     
     sub_total = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))

@@ -64,6 +64,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'vendor', 'vendor_id', 'vendor_name',
             'company', 'company_id', 'company_name',
             'currency', 'payment_terms',
+            'billing_address',
             'sub_total', 'discount_amount', 'tax_amount',
             'shipping', 'total_due',
             'line_items',

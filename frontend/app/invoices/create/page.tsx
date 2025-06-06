@@ -1651,14 +1651,14 @@ export default function InvoiceDetailsPage() {
                             <EditableField
                               fieldName="billingAddress"
                               label="Billing Address"
-                              value={invoice?.billing_address || "Richmond, VA, USA"}
+                              value={invoice?.billing_address || ''}
                               multiline={true}
                             />
                             <div className="space-y-1">
                               <EditableField
                                 fieldName="paymentMethod"
                                 label="Payment Method"
-                                value={invoice?.payment_method || "ACH Transfer"}
+                                value={invoice?.payment_method || ''}
                                 type="select"
                                 options={[
                                   { value: "ACH Transfer", label: "ACH Transfer" },
@@ -1667,11 +1667,11 @@ export default function InvoiceDetailsPage() {
                                   { value: "Credit Card", label: "Credit Card" }
                                 ]}
                               />
-                              {invoice?.payment_method === "ACH Transfer" && (
+                              {invoice?.payment_method === "ACH Transfer" ? (
                                 <div className="text-xs text-gray-600">
                                   Bank: Wells Fargo ***1234
                                 </div>
-                              )}
+                              ) : null}
                             </div>
                           </div>
                           
