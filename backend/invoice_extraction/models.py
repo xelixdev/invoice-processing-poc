@@ -49,8 +49,10 @@ class ExtractedInvoice(models.Model):
     currency_code = models.CharField(max_length=3, default='USD', null=True, blank=True)
     date = models.CharField(max_length=50, null=True, blank=True)  # Store as string initially for parsing
     due_date = models.CharField(max_length=50, null=True, blank=True)
-    payment_term_days = models.IntegerField(null=True, blank=True)
+    payment_term_days = models.CharField(max_length=50, null=True, blank=True)
     vendor = models.CharField(max_length=255, null=True, blank=True)
+    billing_address = models.CharField(max_length=500, null=True, blank=True)
+    payment_method = models.CharField(max_length=100, null=True, blank=True)
     
     # Processing status
     processed_to_invoice = models.BooleanField(default=False)

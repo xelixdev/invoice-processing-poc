@@ -35,7 +35,7 @@ interface Invoice {
   currency_code: string;
   date: string;
   due_date: string;
-  payment_term_days: number;
+  payment_term_days: string;
   vendor: string;
   vendor_status?: string;
   payment_history?: string;
@@ -1590,7 +1590,7 @@ export default function InvoiceDetailsPage() {
                                 type="number"
                               />
                               <EditableField
-                                fieldName="subtotal"
+                                fieldName="subtotalAmount"
                                 label="Subtotal"
                                 value={invoice?.subtotal?.toString() || (invoice?.amount && invoice?.tax_amount ? (invoice.amount - invoice.tax_amount).toString() : '')}
                                 type="number"
@@ -1651,14 +1651,14 @@ export default function InvoiceDetailsPage() {
                             <EditableField
                               fieldName="billingAddress"
                               label="Billing Address"
-                              value={invoice?.billing_address || "Richmond, VA, USA"}
+                              value={invoice?.billing_address || ''}
                               multiline={true}
                             />
                             <div className="space-y-1">
                               <EditableField
                                 fieldName="paymentMethod"
                                 label="Payment Method"
-                                value={invoice?.payment_method || "ACH Transfer"}
+                                value={invoice?.payment_method || ''}
                                 type="select"
                                 options={[
                                   { value: "ACH Transfer", label: "ACH Transfer" },
@@ -1667,11 +1667,11 @@ export default function InvoiceDetailsPage() {
                                   { value: "Credit Card", label: "Credit Card" }
                                 ]}
                               />
-                              {invoice?.payment_method === "ACH Transfer" && (
+                              {invoice?.payment_method === "ACH Transfer" ? (
                                 <div className="text-xs text-gray-600">
                                   Bank: Wells Fargo ***1234
                                 </div>
-                              )}
+                              ) : null}
                             </div>
                           </div>
                           
@@ -1679,7 +1679,7 @@ export default function InvoiceDetailsPage() {
                             <EditableField
                               fieldName="paymentTerms"
                               label="Payment Terms"
-                              value={invoice?.payment_term_days ? `Net ${invoice.payment_term_days}` : 'Net 7'}
+                              value={invoice?.payment_term_days || ''}
                               type="select"
                               options={[
                                 { value: "Net 7", label: "Net 7 (No early payment discount)" },

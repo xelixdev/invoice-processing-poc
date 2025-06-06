@@ -61,7 +61,9 @@ class InvoiceExtractionJobViewSet(viewsets.ModelViewSet):
                             date=invoice_data.get('date', ''),
                             due_date=invoice_data.get('due_date', ''),
                             payment_term_days=invoice_data.get('payment_term_days'),
-                            vendor=invoice_data.get('vendor', '')
+                            vendor=invoice_data.get('vendor', ''),
+                            billing_address=invoice_data.get('billing_address', ''),
+                            payment_method=invoice_data.get('payment_method', '')
                         )
                         
                         # Save line items

@@ -4,7 +4,7 @@ import anthropic
 import os
 import sys
 import re
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union, List
 from decimal import Decimal
 from datetime import datetime
 from .prompts import INVOICE_EXTRACTION_PROMPT
@@ -21,15 +21,15 @@ class AnthropicClient:
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model = "claude-3-5-sonnet-20240620"
 
-    def _parse_numeric(self, value: str) -> float:
+    def _parse_numeric(self, value: str) -> Optional[float]:
         """Parse numeric values from strings, handling various formats."""
-        if not value or not isinstance(value, str):
-            return 0.0
+        if not value or not isinstance(value, str) or value.strip() == "":
+            return None
         try:
             cleaned = "".join(c for c in value if c.isdigit() or c in ".-")
-            return float(cleaned)
+            return float(cleaned) if cleaned else None
         except (ValueError, TypeError):
-            return 0.0
+            return None
 
     def _parse_line_items(self, items: list) -> list:
         """Parse numeric values in line items."""
@@ -41,76 +41,67 @@ class AnthropicClient:
                     parsed_item[field] = self._parse_numeric(str(parsed_item[field]))
                 else:
                     # Handle cases where a numeric field might be missing or None
-                    parsed_item[field] = 0.0 # Default to 0.0 or handle as appropriate
+                    parsed_item[field] = None
             parsed_items.append(parsed_item)
         return parsed_items
-        
-    def _extract_json_from_text(self, text: str) -> str:
-        """Extract JSON from a text response that might have additional text before/after the JSON."""
-        # Try to find JSON between triple backticks
-        json_pattern = r"```(?:json)?\s*(\{[\s\S]*?\})\s*```"
-        matches = re.search(json_pattern, text)
-        
-        if matches:
-            return matches.group(1)
-        
-        # If no match with backticks, try to find anything that looks like a JSON object
-        json_pattern = r"(\{[\s\S]*\})"
-        matches = re.search(json_pattern, text)
-        
-        if matches:
-            return matches.group(1)
-        
-        # If all else fails, return the original text
-        return text
 
-    def extract_invoice_data(self, image_base64: str) -> Dict[str, Any]:
-        """Extract invoice data from an image using Anthropic's Claude."""
+    def extract_invoice_data(self, image_base64: Union[str, List[str]]) -> Dict[str, Any]:
+        """
+        Extract invoice data using Anthropic's Claude model from an image or list of images.
+
+        Args:
+            image_base64 (Union[str, List[str]]): Base64 encoded image(s) of the invoice(s)
+
+        Returns:
+            Dict[str, Any]: Extracted invoice data
+        """
         try:
+            # Always convert to list for consistent handling
+            images = [image_base64] if isinstance(image_base64, str) else image_base64
+            print(f"Processing {len(images)} image(s) with Anthropic...", file=sys.stderr)
+
+            # Prepare the message content with all images
+            content = [{"type": "text", "text": INVOICE_EXTRACTION_PROMPT}]
+            for img in images:
+                content.append({
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/jpeg",
+                        "data": img,
+                    },
+                })
+
             response = self.client.messages.create(
                 model=self.model,
-                max_tokens=2048,
+                max_tokens=1000,
                 messages=[
                     {
                         "role": "user",
-                        "content": [
-                            {
-                                "type": "image",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": "image/jpeg",
-                                    "data": image_base64,
-                                },
-                            },
-                            {"type": "text", "text": INVOICE_EXTRACTION_PROMPT}
-                        ],
+                        "content": content,
                     }
                 ],
             )
 
-            if response.content and isinstance(response.content, list) and len(response.content) > 0:
-                extracted_text = response.content[0].text
-            else:
-                print("Error: Unexpected response structure from Anthropic API.", file=sys.stderr)
-                return None
-            
-            # Extract the JSON portion from the response text
-            json_str = self._extract_json_from_text(extracted_text)
-            print(f"Extracted JSON string: {json_str[:100]}...", file=sys.stderr)
-                
-            extracted_data = json.loads(json_str)
+            # Parse the response
+            extracted_text = response.content[0].text
+            extracted_data = json.loads(extracted_text)
 
+            # Parse numeric values in the response
             if "invoices" in extracted_data:
                 for invoice in extracted_data["invoices"]:
-                    invoice["amount"] = self._parse_numeric(str(invoice.get("amount", "0")))
-                    invoice["tax_amount"] = self._parse_numeric(str(invoice.get("tax_amount", "0")))
-                    invoice["payment_term_days"] = self._parse_numeric(str(invoice.get("payment_term_days", "0")))
+                    invoice["amount"] = self._parse_numeric(str(invoice.get("amount", "")))
+                    invoice["tax_amount"] = self._parse_numeric(str(invoice.get("tax_amount", "")))
+                    # Don't parse payment terms as numeric - keep as string
+                    invoice["payment_term_days"] = str(invoice.get("payment_term_days", ""))
                     if "line_items" in invoice and isinstance(invoice["line_items"], list):
                         invoice["line_items"] = self._parse_line_items(invoice["line_items"])
                     else:
                         invoice["line_items"] = []
+                print(f"Found {len(extracted_data['invoices'])} invoices", file=sys.stderr)
             else:
-                 extracted_data["invoices"] = []
+                extracted_data["invoices"] = []
+                print("No invoices found", file=sys.stderr)
 
             return extracted_data
 
