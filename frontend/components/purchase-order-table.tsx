@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { useEffect, useState } from "react"
 import type { PurchaseOrder } from "@/lib/data-utils"
+import PurchaseOrderDetail from "@/components/purchase-order-detail"
 
 const BACKEND_URL = process.env.NODE_ENV === 'development' 
   ? (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
@@ -13,6 +14,8 @@ export default function PurchaseOrderTable() {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedPoNumber, setSelectedPoNumber] = useState<string | null>(null)
+  const [isDetailOpen, setIsDetailOpen] = useState(false)
 
   useEffect(() => {
     async function fetchPurchaseOrders() {
@@ -56,6 +59,16 @@ export default function PurchaseOrderTable() {
     fetchPurchaseOrders()
   }, [])
 
+  const handleRowClick = (poNumber: string) => {
+    setSelectedPoNumber(poNumber)
+    setIsDetailOpen(true)
+  }
+
+  const handleDetailClose = () => {
+    setIsDetailOpen(false)
+    setSelectedPoNumber(null)
+  }
+
   if (loading) {
     return <div className="flex justify-center items-center h-64">Loading purchase orders...</div>
   }
@@ -94,7 +107,11 @@ export default function PurchaseOrderTable() {
         </TableHeader>
         <TableBody>
           {purchaseOrders.map((po) => (
-            <TableRow key={po.poNumber} className="hover:bg-gray-50">
+            <TableRow 
+              key={po.poNumber} 
+              className="hover:bg-gray-50 cursor-pointer transition-colors"
+              onClick={() => handleRowClick(po.poNumber)}
+            >
               <TableCell className="font-medium text-violet-600">{po.poNumber}</TableCell>
               <TableCell>{po.date}</TableCell>
               <TableCell>{po.vendorName}</TableCell>
@@ -113,6 +130,12 @@ export default function PurchaseOrderTable() {
           ))}
         </TableBody>
       </Table>
+      
+      <PurchaseOrderDetail
+        isOpen={isDetailOpen}
+        onClose={handleDetailClose}
+        poNumber={selectedPoNumber}
+      />
     </div>
   )
 }
