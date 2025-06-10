@@ -19,9 +19,15 @@ class Command(BaseCommand):
             default='fixtures',
             help='Directory containing CSV files (default: fixtures)'
         )
+        parser.add_argument(
+            '--clear-data',
+            action='store_true',
+            help='Clear existing data before loading new data'
+        )
 
     def handle(self, *args, **options):
         fixtures_dir = options['fixtures_dir']
+        clear_data = options['clear_data']
         base_dir = settings.BASE_DIR
         fixtures_path = os.path.join(base_dir, fixtures_dir)
 
@@ -37,6 +43,9 @@ class Command(BaseCommand):
 
         # Load data in order (dependencies first)
         try:
+            if clear_data:
+                self.clear_all_data()
+            
             self.load_companies_and_vendors(fixtures_path)
             self.load_items(fixtures_path)
             self.load_purchase_orders(fixtures_path)
@@ -51,6 +60,33 @@ class Command(BaseCommand):
                 self.style.ERROR(f'Error loading CSV data: {e}')
             )
             raise
+
+    def clear_all_data(self):
+        """Clear all existing data from tables in the correct order (respecting foreign keys)."""
+        self.stdout.write(self.style.WARNING('Clearing existing data...'))
+        
+        # Delete in reverse dependency order to avoid foreign key constraint errors
+        deleted_counts = {}
+        
+        # Delete line items first
+        deleted_counts['InvoiceLineItem'] = InvoiceLineItem.objects.all().delete()[0]
+        deleted_counts['GoodsReceivedLineItem'] = GoodsReceivedLineItem.objects.all().delete()[0]
+        deleted_counts['PurchaseOrderLineItem'] = PurchaseOrderLineItem.objects.all().delete()[0]
+        
+        # Delete main records
+        deleted_counts['Invoice'] = Invoice.objects.all().delete()[0]
+        deleted_counts['GoodsReceived'] = GoodsReceived.objects.all().delete()[0]
+        deleted_counts['PurchaseOrder'] = PurchaseOrder.objects.all().delete()[0]
+        
+        # Delete reference data
+        deleted_counts['Item'] = Item.objects.all().delete()[0]
+        deleted_counts['Vendor'] = Vendor.objects.all().delete()[0]
+        deleted_counts['Company'] = Company.objects.all().delete()[0]
+        
+        self.stdout.write('Cleared existing data:')
+        for model, count in deleted_counts.items():
+            if count > 0:
+                self.stdout.write(f'  - {model}: {count} records deleted')
 
     def load_companies_and_vendors(self, fixtures_path):
         """Load companies and vendors from CSV files."""
