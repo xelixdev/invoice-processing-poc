@@ -44,6 +44,15 @@ ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[
     '*.up.railway.app'  # Allow any Railway production subdomain
 ])
 
+# CSRF Trusted Origins - Required for Django 4.0+ with HTTPS
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'https://invoice-processing-poc-production.up.railway.app',
+    'https://*.railway.app',
+    'https://*.up.railway.app',
+])
+
 # Application definition
 
 INSTALLED_APPS = [
