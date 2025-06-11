@@ -102,6 +102,7 @@ export default function PurchaseOrderTable() {
             <TableHead>Company</TableHead>
             <TableHead>Amount</TableHead>
             <TableHead>Currency</TableHead>
+            <TableHead>Payment Terms</TableHead>
             <TableHead>Status</TableHead>
           </TableRow>
         </TableHeader>
@@ -118,6 +119,7 @@ export default function PurchaseOrderTable() {
               <TableCell>{po.companyName}</TableCell>
               <TableCell>${Number(po.totalAmount || po.total_amount || 0).toFixed(2)}</TableCell>
               <TableCell>{po.currency}</TableCell>
+              <TableCell>{po.payment_terms || 'N/A'}</TableCell>
               <TableCell>
                 <Badge
                   variant="outline"

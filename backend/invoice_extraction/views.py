@@ -1,17 +1,19 @@
-from django.shortcuts import render
-import os
-import time
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
-from django.utils import timezone
-from .models import InvoiceExtractionJob, ExtractedInvoice, ExtractedLineItem
+
+from .models import InvoiceExtractionJob, ExtractedInvoice
 from .serializers import (
-    InvoiceExtractionJobSerializer, InvoiceExtractionUploadSerializer,
-    ExtractedInvoiceSerializer
+    InvoiceExtractionJobSerializer,
+    ExtractedInvoiceSerializer,
+    ExtractAndMatchRequestSerializer,
+    ExtractAndMatchResponseSerializer
 )
-from .services import InvoiceExtractionService
+from .services import (
+    InvoiceExtractionService,
+    ExtractAndMatchOrchestrator
+)
 
 
 class InvoiceExtractionJobViewSet(viewsets.ModelViewSet):
@@ -19,81 +21,50 @@ class InvoiceExtractionJobViewSet(viewsets.ModelViewSet):
     queryset = InvoiceExtractionJob.objects.all()
     serializer_class = InvoiceExtractionJobSerializer
     
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.extraction_service = InvoiceExtractionService()
+
+
+    
+
+
     @action(detail=False, methods=['post'], parser_classes=[MultiPartParser, FormParser])
-    def upload(self, request):
-        """Upload and process an invoice file."""
-        serializer = InvoiceExtractionUploadSerializer(data=request.data)
-        if serializer.is_valid():
-            uploaded_file = serializer.validated_data['file']
-            
-            # Create extraction job
-            job = InvoiceExtractionJob.objects.create(
-                original_filename=uploaded_file.name,
-                file_type=os.path.splitext(uploaded_file.name)[1].lower().replace('.', ''),
-                uploaded_file=uploaded_file,
-                status='PROCESSING'
-            )
-            
-            try:
-                # Process the file
-                start_time = time.time()
-                extraction_service = InvoiceExtractionService()
-                result = extraction_service.process_file(job)
-                processing_time = time.time() - start_time
-                
-                if result.get('error'):
-                    job.status = 'FAILED'
-                    job.error_message = result['error']
-                else:
-                    job.status = 'COMPLETED'
-                    job.ai_service_used = result.get('ai_service_used', 'unknown')
-                    
-                    # Save extracted data
-                    for invoice_data in result.get('invoices', []):
-                        extracted_invoice = ExtractedInvoice.objects.create(
-                            extraction_job=job,
-                            document_type=result.get('document_type', 'invoice'),
-                            invoice_number=invoice_data.get('number', ''),
-                            po_number=invoice_data.get('po_number', ''),
-                            amount=invoice_data.get('amount'),
-                            tax_amount=invoice_data.get('tax_amount'),
-                            currency_code=invoice_data.get('currency_code', 'USD'),
-                            date=invoice_data.get('date', ''),
-                            due_date=invoice_data.get('due_date', ''),
-                            payment_term_days=invoice_data.get('payment_term_days'),
-                            vendor=invoice_data.get('vendor', ''),
-                            billing_address=invoice_data.get('billing_address', ''),
-                            payment_method=invoice_data.get('payment_method', '')
-                        )
-                        
-                        # Save line items
-                        for line_item_data in invoice_data.get('line_items', []):
-                            ExtractedLineItem.objects.create(
-                                extracted_invoice=extracted_invoice,
-                                description=line_item_data.get('description', ''),
-                                quantity=line_item_data.get('quantity'),
-                                unit_price=line_item_data.get('unit_price'),
-                                total=line_item_data.get('total')
-                            )
-                
-                job.processing_time_seconds = processing_time
-                job.processed_at = timezone.now()
-                job.save()
-                
-                # Return the job with extracted data
-                response_serializer = InvoiceExtractionJobSerializer(job)
-                return Response(response_serializer.data, status=status.HTTP_201_CREATED)
-                
-            except Exception as e:
-                job.status = 'FAILED'
-                job.error_message = str(e)
-                job.save()
-                return Response(
-                    {'error': f'Processing failed: {str(e)}'}, 
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
+    def extract_and_match(self, request):
+        """
+        Complete extract-and-match workflow: extraction → PO matching → data comparison.
         
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        This endpoint provides the full AP processing pipeline:
+        1. Extracts invoice data from uploaded file
+        2. Matches extracted PO numbers against database using fuzzy matching
+        3. Performs comprehensive data comparison between invoice and matched PO
+        
+        Returns detailed results for each step with AP processor-friendly formatting.
+        """
+        # Validate request data
+        serializer = ExtractAndMatchRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        uploaded_file = serializer.validated_data['file']
+        match_threshold = serializer.validated_data['match_threshold']
+        
+        try:
+            # Use orchestrator service to handle the complete workflow
+            orchestrator = ExtractAndMatchOrchestrator()
+            workflow_result = orchestrator.process_uploaded_file(uploaded_file, match_threshold)
+            
+            # Serialize and return response
+            response_serializer = ExtractAndMatchResponseSerializer(workflow_result)
+            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Extract and match workflow failed: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+
 
 
 class ExtractedInvoiceViewSet(viewsets.ReadOnlyModelViewSet):

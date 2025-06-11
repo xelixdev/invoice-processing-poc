@@ -65,7 +65,7 @@ export default function UploadInvoicePage() {
       console.log("Starting upload process...")
 
       // Call our invoice extraction API
-      const response = await fetch("/api/extract-invoice", {
+      const response = await fetch("/api/extract-and-match", {
         method: "POST",
         body: formData,
       })
@@ -77,8 +77,39 @@ export default function UploadInvoicePage() {
         throw new Error(extractedData.error || "Failed to extract invoice data")
       }
 
+      // The new simplified response structure from extract-and-match:
+      // {
+      //   invoices: [{ invoice data + matching: { matched_po, match_confidence, etc. } }]
+      // }
+
+      // Extract invoices from the simplified response
+      let invoices = []
+      if (extractedData.invoices && Array.isArray(extractedData.invoices)) {
+        invoices = extractedData.invoices.map((invoice: any) => ({
+          invoice_number: invoice.invoice_number,
+          po_number: invoice.po_number,
+          amount: invoice.amount,
+          subtotal: invoice.subtotal,
+          tax_amount: invoice.tax_amount,
+          currency_code: invoice.currency_code,
+          date: invoice.date,
+          due_date: invoice.due_date,
+          payment_term_days: invoice.payment_term_days,
+          vendor: invoice.vendor,
+          billing_address: invoice.billing_address,
+          payment_method: invoice.payment_method,
+          line_items: invoice.line_items || []
+        }))
+      }
+
+      // Create compatible format for the create page
+      const compatibleData = {
+        document_type: "invoice",
+        invoices: invoices
+      }
+
       // Check if we have invoice data
-      if (!extractedData.invoices || extractedData.invoices.length === 0) {
+      if (!compatibleData.invoices || compatibleData.invoices.length === 0) {
         console.log("No invoice data found in response")
         toast({
           title: "No invoice data found",
@@ -90,10 +121,13 @@ export default function UploadInvoicePage() {
       }
 
       console.log("Invoice data found, storing in sessionStorage...")
-      // Store the extracted data in sessionStorage to pass to the create page
-      sessionStorage.setItem("extractedInvoiceData", JSON.stringify(extractedData))
-      console.log("Data stored in sessionStorage")
+      // Store the compatible data for the create page
+      sessionStorage.setItem("extractedInvoiceData", JSON.stringify(compatibleData))
       
+      // Also store the full simplified extract-and-match results for future use
+      sessionStorage.setItem("fullExtractAndMatchData", JSON.stringify(extractedData))
+      console.log("Data stored in sessionStorage")
+
       // Also store the file data for preview
       if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
         console.log("Processing file for preview...")

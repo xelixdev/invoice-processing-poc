@@ -36,7 +36,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
             'id', 'po_number', 'date', 'required_delivery_date',
             'vendor', 'vendor_id', 'vendor_name',
             'company', 'company_id', 'company_name',
-            'currency', 'status', 'total_amount',
+            'currency', 'status', 'payment_terms', 'total_amount',
             'line_items',
             # Frontend-expected fields
             'poNumber', 'vendorName', 'companyName', 'totalAmount',
@@ -53,7 +53,7 @@ class PurchaseOrderCreateSerializer(serializers.ModelSerializer):
         model = PurchaseOrder
         fields = [
             'po_number', 'date', 'required_delivery_date',
-            'vendor', 'company', 'currency', 'status',
+            'vendor', 'company', 'currency', 'status', 'payment_terms',
             'line_items'
         ]
     

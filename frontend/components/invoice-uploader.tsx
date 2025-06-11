@@ -85,7 +85,7 @@ export default function InvoiceUploader() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch("/api/extract-invoice", {
+      const response = await fetch("/api/extract-and-match", {
         method: "POST",
         body: formData,
       });
@@ -93,7 +93,37 @@ export default function InvoiceUploader() {
       const data = await response.json();
       
       if (response.ok) {
-        setInvoiceData(data);
+        // The new simplified response structure from extract-and-match:
+        // {
+        //   invoices: [{ invoice data + matching: { matched_po, match_confidence, etc. } }]
+        // }
+
+        // Transform to the format this component expects
+        let transformedData = { document_type: "invoice", invoices: [] };
+        
+        if (data.invoices && Array.isArray(data.invoices)) {
+          const invoices = data.invoices.map((invoice: any) => ({
+            number: invoice.invoice_number,
+            po_number: invoice.po_number,
+            amount: invoice.amount,
+            tax_amount: invoice.tax_amount,
+            currency_code: invoice.currency_code,
+            date: invoice.date,
+            due_date: invoice.due_date,
+            payment_term_days: invoice.payment_term_days,
+            vendor: invoice.vendor,
+            billing_address: invoice.billing_address,
+            payment_method: invoice.payment_method,
+            line_items: invoice.line_items || []
+          }));
+          
+          transformedData = {
+            document_type: "invoice",
+            invoices: invoices
+          };
+        }
+
+        setInvoiceData(transformedData);
         toast({
           title: "Success",
           description: "Invoice data extracted successfully",

@@ -47,7 +47,7 @@ def health_check(request):
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),
-    path('api/extract-invoice/', InvoiceExtractionJobViewSet.as_view({'post': 'upload'}), name='extract-invoice'),
+    path('api/extract-and-match/', InvoiceExtractionJobViewSet.as_view({'post': 'extract_and_match'}), name='extract-and-match'),
     path('api/health/', health_check, name='health_check'),
 ]
 
