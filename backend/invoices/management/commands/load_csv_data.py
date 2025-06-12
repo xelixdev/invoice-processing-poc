@@ -10,7 +10,7 @@ from goods_received.models import GoodsReceived, GoodsReceivedLineItem
 
 
 class Command(BaseCommand):
-    help = 'Load data from CSV files into the database'
+    help = 'Load data from CSV files into the database (always clears existing data first)'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -19,15 +19,9 @@ class Command(BaseCommand):
             default='fixtures',
             help='Directory containing CSV files (default: fixtures)'
         )
-        parser.add_argument(
-            '--clear-data',
-            action='store_true',
-            help='Clear existing data before loading new data'
-        )
 
     def handle(self, *args, **options):
         fixtures_dir = options['fixtures_dir']
-        clear_data = options['clear_data']
         base_dir = settings.BASE_DIR
         fixtures_path = os.path.join(base_dir, fixtures_dir)
 
@@ -43,8 +37,8 @@ class Command(BaseCommand):
 
         # Load data in order (dependencies first)
         try:
-            if clear_data:
-                self.clear_all_data()
+            # Always clear existing data first
+            self.clear_all_data()
             
             self.load_companies_and_vendors(fixtures_path)
             self.load_items(fixtures_path)
