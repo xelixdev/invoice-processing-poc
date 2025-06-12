@@ -29,6 +29,7 @@ class PurchaseOrder(models.Model):
     
     currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, default='USD')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    payment_terms = models.CharField(max_length=50, blank=True, null=True, help_text="Payment terms (e.g., 'Net 30', '2/10 Net 30', 'Due on Receipt')")
     
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     

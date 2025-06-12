@@ -34,6 +34,7 @@ interface PurchaseOrderDetail {
   company_name: string
   currency: string
   status: string
+  payment_terms?: string
   total_amount: string
   line_items: LineItem[]
 }
@@ -176,6 +177,19 @@ export default function PurchaseOrderDetail({ isOpen, onClose, poNumber }: Purch
                       </div>
                     </div>
                   </div>
+
+                  {purchaseOrder.payment_terms && (
+                    <>
+                      <Separator />
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="h-4 w-4 text-gray-500" />
+                        <div>
+                          <div className="text-sm text-gray-500">Payment Terms</div>
+                          <div className="font-medium">{purchaseOrder.payment_terms}</div>
+                        </div>
+                      </div>
+                    </>
+                  )}
                   
                   <Separator />
                   

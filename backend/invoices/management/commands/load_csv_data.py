@@ -187,7 +187,8 @@ class Command(BaseCommand):
                             'vendor': vendor,
                             'company': company,
                             'currency': row['Currency'],
-                            'status': row['PO_Status'].upper()
+                            'status': row['PO_Status'].upper(),
+                            'payment_terms': row.get('Payment_Terms', '')
                         }
                     )
                     
