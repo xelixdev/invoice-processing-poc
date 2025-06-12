@@ -1065,14 +1065,14 @@ export default function InvoiceDetailsPage() {
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <span className="inline-flex items-center px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-medium rounded-full max-w-full">
-                                  <span className="truncate max-w-[160px]">
-                                    {value}
+                                <span className="inline-flex items-center px-3 py-0.5 bg-gray-100 text-gray-700 text-xs font-medium rounded-full max-w-full">
+                                  <span className="truncate max-w-[200px]">
+                                    V078 - {value}
                                   </span>
                                 </span>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p>{value}</p>
+                                <p>V078 - {value}</p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
@@ -1297,14 +1297,14 @@ export default function InvoiceDetailsPage() {
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-medium rounded-full max-w-full">
-                            <span className="truncate max-w-[160px]">
-                              {value}
+                          <span className="inline-flex items-center gap-1 px-3 py-0.5 bg-gray-100 text-gray-700 text-xs font-medium rounded-full max-w-full">
+                            <span className="truncate max-w-[200px]">
+                              V078 - {value}
                             </span>
                           </span>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>{value}</p>
+                          <p>V078 - {value}</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
