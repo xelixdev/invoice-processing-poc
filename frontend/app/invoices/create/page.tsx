@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input"
 import { format } from "date-fns"
 import { LineItemSelector } from "@/components/line-item-selector"
 import { useInvoiceValidation, validationRules } from "@/hooks/use-invoice-validation"
-import { parseMatchingValidation, getFieldMatchStatus, getMatchingSummary } from "@/lib/validation/matching-parser"
+import { parseMatchingValidation, getFieldMatchStatus, getFieldMatchResult, getMatchingSummary } from "@/lib/validation/matching-parser"
 import { runCrossFieldValidations, calculateExpectedValues, crossFieldValidationRules } from "@/lib/validation/cross-field-validation"
 
 interface InvoiceData {
@@ -661,6 +661,11 @@ export default function InvoiceDetailsPage() {
         text: 'Perfect Match',
         className: 'bg-green-50 text-green-700 border-green-200'
       }
+    } else if (summary.status === 'tolerance') {
+      return {
+        text: 'Within Tolerance',
+        className: 'bg-green-25 text-green-600 border-green-100'
+      }
     } else if (summary.status === 'partial') {
       return {
         text: 'Partial Match',
@@ -694,6 +699,7 @@ export default function InvoiceDetailsPage() {
     const fieldValidation = validation.getFieldValidation(fieldKey)
     const fieldIssues = fieldValidation.issues
     const matchStatus = getFieldMatchStatus(matchingData, fieldKey)
+    const matchResult = getFieldMatchResult(matchingData, fieldKey)
     
     // Show loading indicator if validating
     if (fieldValidation.isValidating) {
@@ -704,14 +710,39 @@ export default function InvoiceDetailsPage() {
       )
     }
     
-    // Show green checkmark with PO badge for matched fields
+    // Show badges for matched fields (both perfect match and within tolerance)
     if ((!fieldIssues || fieldIssues.length === 0) && matchStatus === 'matched') {
-      return (
-        <div className="ml-2 flex items-center gap-1">
-          <CheckCircle className="h-4 w-4 text-green-500" />
-          <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium">PO</span>
-        </div>
-      )
+      if (matchResult === 'perfect_match') {
+        return (
+          <div className="ml-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <CheckCircle className="h-4 w-4 text-green-500 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Perfect Match with PO</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        )
+      } else if (matchResult === 'within_tolerance') {
+        return (
+          <div className="ml-2 flex items-center gap-1">
+            <CheckCircle className="h-4 w-4 text-green-400" />
+            <span className="text-[10px] px-1.5 py-0.5 bg-green-50 text-green-600 rounded-full font-medium">Within Tolerance</span>
+          </div>
+        )
+      } else {
+        // Fallback for other matched cases
+        return (
+          <div className="ml-2 flex items-center gap-1">
+            <CheckCircle className="h-4 w-4 text-green-500" />
+            <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium">PO</span>
+          </div>
+        )
+      }
     }
     
     // Show green checkmark for fields with no issues
@@ -1568,6 +1599,28 @@ export default function InvoiceDetailsPage() {
                             return (
                               <div className="inline-flex items-center px-2 py-0.5 bg-green-100 text-green-700 rounded-full mt-0.5">
                                 <span className="text-[10px] font-medium">Perfect Match</span>
+                              </div>
+                            )
+                          }
+                          
+                          if (amountComparison.result === 'within_tolerance') {
+                            const variance = amountComparison.details?.variance || 0
+                            const variancePercent = amountComparison.details?.variance_percent || 0
+                            const sign = variance > 0 ? '+' : ''
+                            
+                            return (
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1">
+                                  <p className="text-sm font-semibold text-green-600">
+                                    {sign}{formatCurrency(variance, invoice.currency_code)}
+                                  </p>
+                                  <span className="text-xs text-green-600">
+                                    ({sign}{variancePercent.toFixed(1)}%)
+                                  </span>
+                                </div>
+                                <div className="inline-flex items-center px-2 py-0.5 bg-green-50 text-green-600 rounded-full mt-0.5">
+                                  <span className="text-[10px] font-medium">Within 5% Tolerance</span>
+                                </div>
                               </div>
                             )
                           }
