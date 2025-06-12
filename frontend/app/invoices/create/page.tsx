@@ -20,6 +20,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Input } from "@/components/ui/input"
 import { format } from "date-fns"
 import { LineItemSelector } from "@/components/line-item-selector"
+import { useInvoiceValidation, validationRules } from "@/hooks/use-invoice-validation"
+import { parseMatchingValidation, getFieldMatchStatus, getMatchingSummary } from "@/lib/validation/matching-parser"
+import { runCrossFieldValidations, calculateExpectedValues, crossFieldValidationRules } from "@/lib/validation/cross-field-validation"
 
 interface InvoiceData {
   document_type: string;
@@ -57,13 +60,11 @@ interface LineItem {
   total: number;
 }
 
-interface ValidationIssue {
-  type: 'error' | 'warning' | 'info'
-  message: string
-  action?: {
-    label: string
-    onClick: () => void
-  }
+import type { ValidationIssue as ValidationIssueType } from "@/hooks/use-invoice-validation"
+
+// Extend the validation issue type if needed for UI-specific properties
+interface ValidationIssue extends ValidationIssueType {
+  // Additional UI-specific properties can go here
 }
 
 const workflowStages = {
@@ -83,6 +84,78 @@ const assigneeOptions = [
   { initials: 'LP', name: 'Lisa Park', role: 'Senior Accountant', color: 'bg-purple-500' }
 ]
 
+// Define validation rules for invoice fields
+// Note: Field names must match the fieldName prop in EditableField components
+const invoiceFieldValidation = {
+  // Basic invoice fields
+  invoiceNumber: [
+    validationRules.required('Invoice number is required'),
+    validationRules.pattern(/^[A-Z0-9-]+$/i, 'Invoice number must contain only letters, numbers, and hyphens')
+  ],
+  vendor: [
+    validationRules.required('Vendor is required'),
+    validationRules.minLength(2, 'Vendor name must be at least 2 characters')
+  ],
+  
+  // Amount fields
+  amount: [
+    validationRules.required('Total amount is required'),
+    validationRules.minAmount(0.01, 'Amount must be greater than 0')
+  ],
+  subtotalAmount: [
+    validationRules.minAmount(0, 'Subtotal must be non-negative')
+  ],
+  taxAmount: [
+    validationRules.required('Tax amount is required'),
+    validationRules.minAmount(0, 'Tax amount must be non-negative')
+  ],
+  
+  // Date fields
+  date: [
+    validationRules.required('Invoice date is required')
+  ],
+  dueDate: [
+    validationRules.required('Due date is required'),
+    validationRules.futureDate('Due date should be in the future')
+  ],
+  
+  // Payment fields
+  paymentTerms: [
+    validationRules.required('Payment terms are required')
+  ],
+  currency: [
+    validationRules.required('Currency is required')
+  ],
+  
+  // Additional fields that could be validated
+  billingAddress: [
+    validationRules.minLength(10, 'Please provide a complete billing address')
+  ],
+  paymentMethod: [
+    validationRules.required('Payment method is required')
+  ],
+  
+  // Cross-field validations
+  amount: [
+    validationRules.required('Total amount is required'),
+    validationRules.minAmount(0.01, 'Amount must be greater than 0'),
+    crossFieldValidationRules.totalCalculation()
+  ],
+  dueDate: [
+    validationRules.required('Due date is required'),
+    validationRules.futureDate('Due date should be in the future'),
+    crossFieldValidationRules.dueDateAfterInvoiceDate()
+  ],
+  paymentTerms: [
+    validationRules.required('Payment terms are required'),
+    crossFieldValidationRules.paymentTermsMatchDueDate()
+  ],
+  subtotalAmount: [
+    validationRules.minAmount(0, 'Subtotal must be non-negative'),
+    crossFieldValidationRules.lineItemsTotal()
+  ]
+}
+
 export default function InvoiceDetailsPage() {
   const [extractedData, setExtractedData] = useState<InvoiceData | null>(null)
   const [invoice, setInvoice] = useState<Invoice | null>(null)
@@ -92,7 +165,7 @@ export default function InvoiceDetailsPage() {
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false)
   const [linkedPO, setLinkedPO] = useState<string | null>(null)
   const [linkedGR, setLinkedGR] = useState<string | null>(null)
-  const [validationIssues, setValidationIssues] = useState<{[key: string]: ValidationIssue[]}>({})
+  const [validationIssues, setValidationIssues] = useState<{[key: string]: ValidationIssue[]}>({}) // Keep for backward compatibility
   const [isIssuesDrawerOpen, setIsIssuesDrawerOpen] = useState(false)
   const [editingField, setEditingField] = useState<string | null>(null)
   const [fieldValues, setFieldValues] = useState<{[key: string]: string}>({})
@@ -108,6 +181,12 @@ export default function InvoiceDetailsPage() {
   const [currentAssignee, setCurrentAssignee] = useState('SC')
   const pdfContainerRef = useRef<HTMLDivElement>(null)
   const descriptionInputRefs = useRef<{[key: number]: HTMLInputElement | null}>({})
+  
+  // Initialize the validation hook
+  const validation = useInvoiceValidation({
+    validationRules: invoiceFieldValidation,
+    initialData: invoice
+  })
 
   // Mock PO data for validation
   const mockPOData = {
@@ -427,6 +506,9 @@ export default function InvoiceDetailsPage() {
     return stats
   }
 
+  // State for matching validation
+  const [matchingData, setMatchingData] = useState<any>(null)
+  
   useEffect(() => {
     // Retrieve the extracted data from sessionStorage
     const storedData = sessionStorage.getItem("extractedInvoiceData")
@@ -444,6 +526,12 @@ export default function InvoiceDetailsPage() {
         }
         
         setInvoice(firstInvoice)
+        
+        // Store matching data if available
+        if ((firstInvoice as any).matching) {
+          setMatchingData((firstInvoice as any).matching)
+        }
+        
         // Initialize linked PO state
         setLinkedPO(firstInvoice.po_number)
         // Initialize with a sample GR for demonstration
@@ -463,90 +551,79 @@ export default function InvoiceDetailsPage() {
     }
   }, [])
 
-  // Validation logic
+  // Sync validation hook state with existing validation UI
+  useEffect(() => {
+    // Convert validation hook state to the existing format
+    const newValidationIssues: {[key: string]: ValidationIssue[]} = {}
+    
+    Object.entries(validation.validationState).forEach(([field, issues]) => {
+      if (issues.length > 0) {
+        newValidationIssues[field] = issues
+      }
+    })
+    
+    // Add matching validation if available
+    if (matchingData && linkedPO) {
+      const matchingIssues = parseMatchingValidation(matchingData, (field, value) => {
+        // Quick fix callback
+        setFieldValues(prev => ({ ...prev, [field]: value }))
+        setEditingField(field)
+      })
+      
+      // Merge matching issues with existing validation
+      Object.entries(matchingIssues).forEach(([field, issues]) => {
+        if (issues.length > 0) {
+          newValidationIssues[field] = [
+            ...(newValidationIssues[field] || []),
+            ...issues
+          ]
+        }
+      })
+    }
+    
+    // Add cross-field validation
+    if (invoice) {
+      const crossFieldIssues = runCrossFieldValidations(invoice)
+      Object.entries(crossFieldIssues).forEach(([field, issues]) => {
+        if (issues.length > 0) {
+          newValidationIssues[field] = [
+            ...(newValidationIssues[field] || []),
+            ...issues
+          ]
+        }
+      })
+    }
+    
+    setValidationIssues(newValidationIssues)
+  }, [validation.validationState, matchingData, linkedPO, invoice])
+  
+  // Mock validation logic for PO matching (this will be replaced by backend validation)
   useEffect(() => {
     if (!invoice || !linkedPO) {
-      setValidationIssues({})
       return
     }
 
-    const issues: {[key: string]: ValidationIssue[]} = {}
+    // Add mock PO-specific validations that aren't covered by field validation
+    const additionalIssues: {[key: string]: ValidationIssue[]} = {}
 
-    // Invoice Number validation
-    const invoiceIssues: ValidationIssue[] = []
-    if (invoice.invoice_number !== mockPOData.invoiceNumber) {
-      invoiceIssues.push({
-        type: 'warning',
-        message: `Invoice number mismatch: Expected "${mockPOData.invoiceNumber}" per PO requirements`
-      })
-    }
-    // Add a duplicate check example
-    invoiceIssues.push({
-      type: 'error',
-      message: 'Duplicate invoice detected: Similar invoice #INV-2024-0892 exists in payment queue',
-      action: {
-        label: 'Review Duplicate',
-        onClick: () => console.log('View similar invoice')
-      }
-    })
-    if (invoiceIssues.length > 0) issues.invoice_number = invoiceIssues
-
-    // Vendor validation
+    // PO-specific vendor validation
     if (invoice.vendor && invoice.vendor !== mockPOData.vendor) {
-      const vendorIssues: ValidationIssue[] = []
-      
-      // PO mismatch warning
-      vendorIssues.push({
+      additionalIssues.vendor_po = [{
         type: 'warning',
         message: `Vendor mismatch: PO issued to "${mockPOData.vendor}", payment authorization required`,
         action: {
           label: 'Apply PO Vendor',
-          onClick: () => console.log('Copy PO vendor')
-        }
-      })
-      
-      // Vendor not validated warning
-      vendorIssues.push({
-        type: 'warning',
-        message: 'Vendor not in approved supplier list - requires finance approval before payment',
-        action: {
-          label: 'Request Approval',
-          onClick: () => console.log('Validate vendor')
-        }
-      })
-      
-      issues.vendor = vendorIssues
-    }
-
-    // Date validation
-    if (invoice.date) {
-      const invoiceDate = new Date(invoice.date)
-      const expectedDate = new Date(mockPOData.expectedDate)
-      const daysDiff = Math.abs((invoiceDate.getTime() - expectedDate.getTime()) / (1000 * 60 * 60 * 24))
-      
-      const dateIssues: ValidationIssue[] = []
-      if (daysDiff > 30) {
-        dateIssues.push({
-          type: 'warning',
-          message: `Invoice date variance: ${Math.round(daysDiff)} days outside PO terms, may impact payment schedule`,
-          action: {
-            label: 'Apply PO Date',
-            onClick: () => console.log('Copy PO date')
+          onClick: () => {
+            setFieldValues(prev => ({ ...prev, vendor: mockPOData.vendor }))
+            setEditingField('vendor')
           }
-        })
-      }
-      if (invoiceDate > new Date()) {
-        dateIssues.push({
-          type: 'error',
-          message: 'Future-dated invoice: Cannot process payment for services not yet rendered'
-        })
-      }
-      if (dateIssues.length > 0) issues.date = dateIssues
+        }
+      }]
     }
 
-    // Amount validation
+    // Amount vs PO validation
     if (invoice.amount && invoice.amount > mockPOData.maxAmount) {
-      issues.amount = [{
+      additionalIssues.amount_po = [{
         type: 'error',
         message: `Amount exceeds authorized PO limit by ${formatCurrency(invoice.amount - mockPOData.maxAmount, invoice.currency_code)} - requires manager approval`
       }]
@@ -554,7 +631,7 @@ export default function InvoiceDetailsPage() {
 
     // Currency validation
     if (invoice.currency_code && invoice.currency_code !== mockPOData.currency) {
-      issues.currency = [{
+      additionalIssues.currency = [{
         type: 'warning',
         message: `Currency mismatch: PO authorized in ${mockPOData.currency}, FX rate approval required`,
         action: {
@@ -564,19 +641,20 @@ export default function InvoiceDetailsPage() {
       }]
     }
 
-    // Due date validation
+    // Due date validation  
     if (invoice.due_date) {
       const dueDate = new Date(invoice.due_date)
       const today = new Date()
       if (dueDate < today) {
-        issues.dueDate = [{
+        additionalIssues.dueDate = [{
           type: 'error',
           message: 'Due date has already passed'
         }]
       }
     }
 
-    setValidationIssues(issues)
+    // Merge additional issues with existing validation
+    setValidationIssues(prev => ({ ...prev, ...additionalIssues }))
   }, [invoice, linkedPO])
 
   // Helper function to get the most severe issue type for a field
@@ -611,7 +689,28 @@ export default function InvoiceDetailsPage() {
 
   // Helper function to render validation indicator
   const renderValidationIndicator = (fieldKey: string) => {
-    const fieldIssues = validationIssues[fieldKey]
+    const fieldValidation = validation.getFieldValidation(fieldKey)
+    const fieldIssues = fieldValidation.issues
+    const matchStatus = getFieldMatchStatus(matchingData, fieldKey)
+    
+    // Show loading indicator if validating
+    if (fieldValidation.isValidating) {
+      return (
+        <div className="ml-2">
+          <div className="h-4 w-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      )
+    }
+    
+    // Show green checkmark with PO badge for matched fields
+    if ((!fieldIssues || fieldIssues.length === 0) && matchStatus === 'matched') {
+      return (
+        <div className="ml-2 flex items-center gap-1">
+          <CheckCircle className="h-4 w-4 text-green-500" />
+          <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium">PO</span>
+        </div>
+      )
+    }
     
     // Show green checkmark for fields with no issues
     if (!fieldIssues || fieldIssues.length === 0) {
@@ -706,13 +805,41 @@ export default function InvoiceDetailsPage() {
     }).format(amount)
   }
 
-  // Handle field value changes
-  const handleFieldChange = (fieldName: string, value: string) => {
+  // Handle field value changes with validation
+  const handleFieldChange = async (fieldName: string, value: string) => {
     setFieldValues(prev => ({ ...prev, [fieldName]: value }))
+    
+    // Validate the field in real-time
+    if (invoice) {
+      const updatedInvoice = { ...invoice, [fieldName]: value }
+      await validation.validateField(fieldName, value, updatedInvoice)
+    }
   }
 
+  // Map UI field names to invoice data structure field names
+  const fieldNameMapping: { [key: string]: string } = {
+    invoiceNumber: 'invoice_number',
+    subtotalAmount: 'subtotal',
+    taxAmount: 'tax_amount',
+    dueDate: 'due_date',
+    paymentTerms: 'payment_term_days',
+    currency: 'currency_code',
+    billingAddress: 'billing_address',
+    paymentMethod: 'payment_method',
+    spendCategory: 'spend_category',
+    // Fields that map directly (same name)
+    vendor: 'vendor',
+    amount: 'amount',
+    date: 'date'
+  }
+  
+  // Get the actual invoice field name from UI field name
+  const getInvoiceFieldName = (uiFieldName: string): string => {
+    return fieldNameMapping[uiFieldName] || uiFieldName
+  }
+  
   // Handle field blur
-  const handleFieldBlur = (fieldName: string, e?: React.FocusEvent) => {
+  const handleFieldBlur = async (fieldName: string, e?: React.FocusEvent) => {
     // Check if we're clicking on another editable field
     const relatedTarget = e?.relatedTarget as HTMLElement
     if (relatedTarget?.closest('[data-editable-field]')) {
@@ -721,11 +848,23 @@ export default function InvoiceDetailsPage() {
     }
     
     setEditingField(null)
-    // Here you would typically save the value
-    if (fieldName === 'invoiceNumber' && fieldValues.invoiceNumber) {
-      setInvoice(prev => prev ? { ...prev, invoice_number: fieldValues.invoiceNumber } : prev)
+    
+    // Save the value to invoice state
+    const newValue = fieldValues[fieldName]
+    if (newValue !== undefined && invoice) {
+      const invoiceFieldName = getInvoiceFieldName(fieldName)
+      const updatedInvoice = { ...invoice, [invoiceFieldName]: newValue }
+      setInvoice(updatedInvoice)
+      
+      // Run final validation on blur (use UI field name for validation)
+      await validation.validateField(fieldName, newValue, updatedInvoice)
     }
-    // Add other field mappings as needed
+    
+    // Clear the temporary field value
+    setFieldValues(prev => {
+      const { [fieldName]: _, ...rest } = prev
+      return rest
+    })
   }
 
   // Get field value
@@ -803,9 +942,10 @@ export default function InvoiceDetailsPage() {
     options?: { value: string; label: string }[]
   }) => {
     const isEditing = editingField === fieldName
-    const hasValidationIssues = validationIssues[fieldName]
-    const hasError = hasValidationIssues?.some(i => i.type === 'error')
-    const hasWarning = hasValidationIssues?.some(i => i.type === 'warning')
+    const fieldValidation = validation.getFieldValidation(fieldName)
+    const hasValidationIssues = fieldValidation.issues.length > 0
+    const hasError = fieldValidation.hasError
+    const hasWarning = fieldValidation.hasWarning
     
     const handleFieldClick = (e: React.MouseEvent) => {
       // Prevent editing when clicking on validation indicator
@@ -1977,6 +2117,28 @@ export default function InvoiceDetailsPage() {
                           </div>
                           
                           <div className="space-y-3">
+                            {/* Matching Summary - only show when PO is linked */}
+                            {linkedPO && matchingData && (
+                              <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <div className={cn(
+                                      "h-2 w-2 rounded-full",
+                                      getMatchingSummary(matchingData).status === 'perfect' ? "bg-green-500" :
+                                      getMatchingSummary(matchingData).status === 'partial' ? "bg-amber-500" :
+                                      "bg-red-500"
+                                    )} />
+                                    <span className="text-sm font-medium text-gray-700">
+                                      {getMatchingSummary(matchingData).message}
+                                    </span>
+                                  </div>
+                                  <span className="text-xs text-gray-500">
+                                    {getMatchingSummary(matchingData).confidence}% match
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                            
                             {/* Purchase Order Link */}
                             {linkedPO ? (
                               <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors animate-in fade-in-0 slide-in-from-top-2 duration-300">
