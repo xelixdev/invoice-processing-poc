@@ -98,7 +98,9 @@ export default function UploadInvoicePage() {
           vendor: invoice.vendor,
           billing_address: invoice.billing_address,
           payment_method: invoice.payment_method,
-          line_items: invoice.line_items || []
+          line_items: invoice.line_items || [],
+          // ✅ CRITICAL: Include the matching data!
+          matching: invoice.matching
         }))
       }
 
@@ -121,12 +123,19 @@ export default function UploadInvoicePage() {
       }
 
       console.log("Invoice data found, storing in sessionStorage...")
+      
+      // Create invoice-specific keys for scalability
+      const invoiceId = invoices[0]?.invoice_number || `invoice_${Date.now()}`
+      
       // Store the compatible data for the create page
       sessionStorage.setItem("extractedInvoiceData", JSON.stringify(compatibleData))
+      sessionStorage.setItem("currentInvoiceId", invoiceId)
       
-      // Also store the full simplified extract-and-match results for future use
-      sessionStorage.setItem("fullExtractAndMatchData", JSON.stringify(extractedData))
-      console.log("Data stored in sessionStorage")
+      // Store invoice-specific data for future scalability
+      sessionStorage.setItem(`invoice_${invoiceId}_data`, JSON.stringify(compatibleData))
+      sessionStorage.setItem(`invoice_${invoiceId}_full`, JSON.stringify(extractedData))
+      
+      console.log("Data stored in sessionStorage with invoice ID:", invoiceId)
 
       // Also store the file data for preview
       if (file.type === 'application/pdf' || file.type.startsWith('image/')) {

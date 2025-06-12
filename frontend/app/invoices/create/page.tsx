@@ -97,31 +97,35 @@ const invoiceFieldValidation = {
     validationRules.minLength(2, 'Vendor name must be at least 2 characters')
   ],
   
-  // Amount fields
+  // Amount fields (with cross-field validation)
   amount: [
     validationRules.required('Total amount is required'),
-    validationRules.minAmount(0.01, 'Amount must be greater than 0')
+    validationRules.minAmount(0.01, 'Amount must be greater than 0'),
+    crossFieldValidationRules.totalCalculation()
   ],
   subtotalAmount: [
-    validationRules.minAmount(0, 'Subtotal must be non-negative')
+    validationRules.minAmount(0, 'Subtotal must be non-negative'),
+    crossFieldValidationRules.lineItemsTotal()
   ],
   taxAmount: [
     validationRules.required('Tax amount is required'),
     validationRules.minAmount(0, 'Tax amount must be non-negative')
   ],
   
-  // Date fields
+  // Date fields (with cross-field validation)
   date: [
     validationRules.required('Invoice date is required')
   ],
   dueDate: [
     validationRules.required('Due date is required'),
-    validationRules.futureDate('Due date should be in the future')
+    validationRules.futureDate('Due date should be in the future'),
+    crossFieldValidationRules.dueDateAfterInvoiceDate()
   ],
   
-  // Payment fields
+  // Payment fields (with cross-field validation)
   paymentTerms: [
-    validationRules.required('Payment terms are required')
+    validationRules.required('Payment terms are required'),
+    crossFieldValidationRules.paymentTermsMatchDueDate()
   ],
   currency: [
     validationRules.required('Currency is required')
@@ -133,26 +137,6 @@ const invoiceFieldValidation = {
   ],
   paymentMethod: [
     validationRules.required('Payment method is required')
-  ],
-  
-  // Cross-field validations
-  amount: [
-    validationRules.required('Total amount is required'),
-    validationRules.minAmount(0.01, 'Amount must be greater than 0'),
-    crossFieldValidationRules.totalCalculation()
-  ],
-  dueDate: [
-    validationRules.required('Due date is required'),
-    validationRules.futureDate('Due date should be in the future'),
-    crossFieldValidationRules.dueDateAfterInvoiceDate()
-  ],
-  paymentTerms: [
-    validationRules.required('Payment terms are required'),
-    crossFieldValidationRules.paymentTermsMatchDueDate()
-  ],
-  subtotalAmount: [
-    validationRules.minAmount(0, 'Subtotal must be non-negative'),
-    crossFieldValidationRules.lineItemsTotal()
   ]
 }
 
@@ -188,24 +172,7 @@ export default function InvoiceDetailsPage() {
     initialData: invoice
   })
 
-  // Mock PO data for validation
-  const mockPOData = {
-    vendor: "Globex Corporation",
-    expectedDate: "2024-01-15",
-    maxAmount: 2500.00,
-    currency: "USD",
-    invoiceNumber: "INV-002"
-  }
-
-  // Mock PO line items for matching
-  const mockPOLines = [
-    { id: "PO-001-1", description: "Professional consulting services", quantity: 10, unit_price: 150.00, total: 1500.00 },
-    { id: "PO-001-2", description: "Software development services", quantity: 8, unit_price: 200.00, total: 1600.00 },
-    { id: "PO-001-3", description: "Project management services", quantity: 5, unit_price: 175.00, total: 875.00 },
-    { id: "PO-001-4", description: "Technical documentation", quantity: 2, unit_price: 100.00, total: 200.00 },
-  ]
-
-  // Mock GR line items for matching
+  // Mock GR line items for matching (keeping only GR for now)
   const mockGRLines = [
     { id: "GR-001-1", description: "Professional consulting services", quantity: 10 },
     { id: "GR-001-2", description: "Software development services", quantity: 8 },
@@ -232,7 +199,8 @@ export default function InvoiceDetailsPage() {
     if (!match?.poLineId) return 'missing'
     
     const invoiceItem = invoice?.line_items[itemIndex]
-    const poLine = mockPOLines.find(po => po.id === match.poLineId)
+    // TODO: Get PO line items from backend matching data
+    const poLine = null // mockPOLines.find(po => po.id === match.poLineId)
     
     if (!poLine || !invoiceItem) return 'missing'
     
@@ -530,6 +498,9 @@ export default function InvoiceDetailsPage() {
         // Store matching data if available
         if ((firstInvoice as any).matching) {
           setMatchingData((firstInvoice as any).matching)
+          console.log('✅ Matching data loaded successfully!')
+        } else {
+          console.log('⚠️ No matching data found in invoice')
         }
         
         // Initialize linked PO state
@@ -597,65 +568,7 @@ export default function InvoiceDetailsPage() {
     setValidationIssues(newValidationIssues)
   }, [validation.validationState, matchingData, linkedPO, invoice])
   
-  // Mock validation logic for PO matching (this will be replaced by backend validation)
-  useEffect(() => {
-    if (!invoice || !linkedPO) {
-      return
-    }
-
-    // Add mock PO-specific validations that aren't covered by field validation
-    const additionalIssues: {[key: string]: ValidationIssue[]} = {}
-
-    // PO-specific vendor validation
-    if (invoice.vendor && invoice.vendor !== mockPOData.vendor) {
-      additionalIssues.vendor_po = [{
-        type: 'warning',
-        message: `Vendor mismatch: PO issued to "${mockPOData.vendor}", payment authorization required`,
-        action: {
-          label: 'Apply PO Vendor',
-          onClick: () => {
-            setFieldValues(prev => ({ ...prev, vendor: mockPOData.vendor }))
-            setEditingField('vendor')
-          }
-        }
-      }]
-    }
-
-    // Amount vs PO validation
-    if (invoice.amount && invoice.amount > mockPOData.maxAmount) {
-      additionalIssues.amount_po = [{
-        type: 'error',
-        message: `Amount exceeds authorized PO limit by ${formatCurrency(invoice.amount - mockPOData.maxAmount, invoice.currency_code)} - requires manager approval`
-      }]
-    }
-
-    // Currency validation
-    if (invoice.currency_code && invoice.currency_code !== mockPOData.currency) {
-      additionalIssues.currency = [{
-        type: 'warning',
-        message: `Currency mismatch: PO authorized in ${mockPOData.currency}, FX rate approval required`,
-        action: {
-          label: 'Apply PO Currency',
-          onClick: () => console.log('Copy PO currency')
-        }
-      }]
-    }
-
-    // Due date validation  
-    if (invoice.due_date) {
-      const dueDate = new Date(invoice.due_date)
-      const today = new Date()
-      if (dueDate < today) {
-        additionalIssues.dueDate = [{
-          type: 'error',
-          message: 'Due date has already passed'
-        }]
-      }
-    }
-
-    // Merge additional issues with existing validation
-    setValidationIssues(prev => ({ ...prev, ...additionalIssues }))
-  }, [invoice, linkedPO])
+  // Remove this entire useEffect - validation is now handled dynamically in the main validation sync useEffect above
 
   // Helper function to get the most severe issue type for a field
   const getMostSevereIssueType = (fieldIssues: ValidationIssue[]): 'error' | 'warning' | 'info' => {
@@ -667,14 +580,103 @@ export default function InvoiceDetailsPage() {
   // Helper function to get field display name
   const getFieldDisplayName = (fieldKey: string): string => {
     const fieldNames: {[key: string]: string} = {
-      invoice_number: 'Invoice Number',
+      // Main invoice fields
+      invoiceNumber: 'Invoice Number',
       vendor: 'Vendor',
+      amount: 'Total Amount',
+      subtotalAmount: 'Subtotal',
+      taxAmount: 'Tax Amount',
+      currency: 'Currency',
+      
+      // Date fields
       date: 'Invoice Date',
       dueDate: 'Due Date',
-      amount: 'Total Amount',
-      currency: 'Currency'
+      
+      // Payment fields
+      paymentTerms: 'Payment Terms',
+      paymentMethod: 'Payment Method',
+      billingAddress: 'Billing Address',
+      
+      // Additional fields
+      spendCategory: 'Spend Category',
+      glAccount: 'GL Account',
+      
+      // Summary fields
+      _summary: 'Overall Validation',
+      
+      // Legacy field names (for backward compatibility)
+      invoice_number: 'Invoice Number',
+      tax_amount: 'Tax Amount',
+      due_date: 'Due Date',
+      payment_term_days: 'Payment Terms',
+      currency_code: 'Currency'
     }
-    return fieldNames[fieldKey] || fieldKey
+    return fieldNames[fieldKey] || fieldKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())
+  }
+  
+  // Helper function to get PO matching statistics
+  const getPOMatchingStats = () => {
+    if (!matchingData?.data_comparison?.comparisons) {
+      return { matched: 0, total: 0, status: 'unknown' }
+    }
+    
+    const comparisons = matchingData.data_comparison.comparisons
+    const fields = ['amount', 'currency', 'payment_terms', 'vendor']
+    
+    let matched = 0
+    let total = 0
+    
+    fields.forEach(field => {
+      if (comparisons[field]) {
+        total++
+        if (comparisons[field].result === 'perfect_match') {
+          matched++
+        }
+      }
+    })
+    
+    // Add line items if available
+    if (invoice?.line_items) {
+      total += invoice.line_items.length
+      // For now, assume line items are matched if overall status is good
+      if (matchingData.match_confidence && matchingData.match_confidence > 80) {
+        matched += invoice.line_items.length
+      }
+    }
+    
+    return {
+      matched,
+      total,
+      status: total === 0 ? 'unknown' : matched === total ? 'perfect' : matched > total * 0.8 ? 'good' : 'poor'
+    }
+  }
+  
+  // Helper function to get match status badge
+  const getMatchStatusBadge = () => {
+    const stats = getPOMatchingStats()
+    const summary = getMatchingSummary(matchingData)
+    
+    if (summary.status === 'perfect') {
+      return {
+        text: 'Perfect Match',
+        className: 'bg-green-50 text-green-700 border-green-200'
+      }
+    } else if (summary.status === 'partial') {
+      return {
+        text: 'Partial Match',
+        className: 'bg-amber-50 text-amber-700 border-amber-200'
+      }
+    } else if (summary.status === 'poor') {
+      return {
+        text: 'Poor Match',
+        className: 'bg-red-50 text-red-700 border-red-200'
+      }
+    } else {
+      return {
+        text: 'Not Validated',
+        className: 'bg-gray-50 text-gray-700 border-gray-200'
+      }
+    }
   }
 
   // Helper function to get total issue counts
@@ -1513,7 +1515,14 @@ export default function InvoiceDetailsPage() {
                 <div>
                   <p className="text-[10px] font-medium text-gray-500 tracking-wider">PO Total</p>
                   <p className="text-sm font-semibold text-gray-900 -mt-0.5">
-                    {invoice?.po_number ? formatCurrency(invoice.amount * 1.2, invoice.currency_code) : "N/A"}
+                    {(() => {
+                      if (!invoice?.po_number) return "N/A"
+                      if (matchingData?.matched_po?.total_amount) {
+                        const poAmount = parseFloat(matchingData.matched_po.total_amount)
+                        return formatCurrency(poAmount, invoice.currency_code)
+                      }
+                      return "Loading..."
+                    })()}
                   </p>
                 </div>
               </div>
@@ -1547,9 +1556,50 @@ export default function InvoiceDetailsPage() {
                     <div>
                       <p className="text-[10px] font-medium text-gray-500 tracking-wider">Variance</p>
                       <div className="flex items-center gap-2 -mt-0.5">
-                        <p className="text-sm font-semibold text-amber-600">
-                          +{formatCurrency(invoice.amount * 0.2, invoice.currency_code)}
-                        </p>
+                        {(() => {
+                          // Get variance from backend matching data
+                          const amountComparison = matchingData?.data_comparison?.comparisons?.amount
+                          
+                          if (!amountComparison) {
+                            return <p className="text-sm font-semibold text-gray-500">N/A</p>
+                          }
+                          
+                          if (amountComparison.result === 'perfect_match') {
+                            return (
+                              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
+                                <CheckCircle className="h-3 w-3" />
+                                <span className="text-xs font-medium">Perfect Match</span>
+                              </div>
+                            )
+                          }
+                          
+                          // Show actual variance
+                          const variance = amountComparison.details?.variance || 0
+                          const variancePercent = amountComparison.details?.variance_percent || 0
+                          
+                          if (variance === 0) {
+                            return (
+                              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
+                                <CheckCircle className="h-3 w-3" />
+                                <span className="text-xs font-medium">Perfect Match</span>
+                              </div>
+                            )
+                          }
+                          
+                          const varianceColor = Math.abs(variancePercent) > 10 ? 'text-red-600' : 'text-amber-600'
+                          const sign = variance > 0 ? '+' : ''
+                          
+                          return (
+                            <div className="flex items-center gap-1">
+                              <p className={`text-sm font-semibold ${varianceColor}`}>
+                                {sign}{formatCurrency(variance, invoice.currency_code)}
+                              </p>
+                              <span className={`text-xs ${varianceColor}`}>
+                                ({sign}{variancePercent.toFixed(1)}%)
+                              </span>
+                            </div>
+                          )
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -2149,18 +2199,30 @@ export default function InvoiceDetailsPage() {
                                   <div>
                                     <div className="flex items-center gap-2">
                                       <span className="text-sm font-medium text-gray-900">PO {linkedPO}</span>
-                                      <span className="text-xs text-gray-500">- 4 of 4 items matched</span>
+                                      {(() => {
+                                        const stats = getPOMatchingStats()
+                                        return stats.total > 0 ? (
+                                          <span className="text-xs text-gray-500">- {stats.matched} of {stats.total} items matched</span>
+                                        ) : (
+                                          <span className="text-xs text-gray-500">- Validating...</span>
+                                        )
+                                      })()}
                                     </div>
                                     <div className="text-xs text-gray-500">Purchase Order</div>
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <Badge 
-                                    variant="secondary" 
-                                    className="bg-green-50 text-green-700 border-green-200 hover:bg-green-50"
-                                  >
-                                    Matched
-                                  </Badge>
+                                  {(() => {
+                                    const badge = getMatchStatusBadge()
+                                    return (
+                                      <Badge 
+                                        variant="secondary" 
+                                        className={cn(badge.className, "hover:bg-opacity-80")}
+                                      >
+                                        {badge.text}
+                                      </Badge>
+                                    )
+                                  })()}
                                   <Button 
                                     variant="ghost" 
                                     size="icon" 
@@ -2677,7 +2739,7 @@ export default function InvoiceDetailsPage() {
                         {invoice.line_items.map((item, index) => {
                           const status = getLineItemStatus(index)
                           const match = lineItemMatches[index]
-                          const poLine = match?.poLineId ? mockPOLines.find(po => po.id === match.poLineId) : null
+                          const poLine = null // TODO: Get from backend data
                           const grLine = match?.grLineId ? mockGRLines.find(gr => gr.id === match.grLineId) : null
                           
                           return (
@@ -2805,7 +2867,7 @@ export default function InvoiceDetailsPage() {
                       <TableBody>
                         {invoice.line_items.map((item, index) => {
                           const match = lineItemMatches[index]
-                          const poLine = match?.poLineId ? mockPOLines.find(po => po.id === match.poLineId) : null
+                          const poLine = null // TODO: Get from backend data
                           const grLine = match?.grLineId ? mockGRLines.find(gr => gr.id === match.grLineId) : null
                           
                           // Get all selected PO and GR items for this dropdown
@@ -2824,7 +2886,7 @@ export default function InvoiceDetailsPage() {
                                   {/* PO Line Source */}
                                   <TableCell className="h-[50px] py-1 px-2 align-middle">
                                     <LineItemSelector
-                                      items={mockPOLines}
+                                      items={[]} // TODO: Get PO line items from backend
                                       value={match?.poLineId}
                                       onSelect={(value) => handleLineItemMatch(index, 'po', value)}
                                       placeholder="Select line"
@@ -3007,7 +3069,7 @@ export default function InvoiceDetailsPage() {
             </div>
             
             {/* PO Lines Not Found Section */}
-            {mockPOLines.length > 0 && (
+            {false && ( // TODO: Implement PO line items matching
               <div className="border-t">
                 <div className="p-3">
                   <details className="group">
@@ -3015,17 +3077,18 @@ export default function InvoiceDetailsPage() {
                       <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" />
                       <span className="text-sm font-medium text-gray-900">PO Lines Not Found on Invoice</span>
                       <Badge variant="secondary" className="ml-2 text-xs px-1.5 py-0.5">
-                        {mockPOLines.length - Object.values(lineItemMatches).filter(m => m.poLineId).length}
+                        {/* TODO: Calculate from backend data */}
+                        {0}
                       </Badge>
                     </summary>
                     <div className="mt-2 pl-4">
                       <div className="text-xs text-gray-600 mb-1">
-                        PO-2023-001: {mockPOLines.length - Object.values(lineItemMatches).filter(m => m.poLineId).length} items
+                        PO-2023-001: 0 items // TODO: Calculate from backend data
                       </div>
                       <div className="space-y-1">
-                        {mockPOLines
-                          .filter(poLine => !Object.values(lineItemMatches).some(m => m.poLineId === poLine.id))
-                          .map((poLine) => (
+                        {[]
+                          // TODO: Get PO line items from backend data
+                          .map((poLine: any) => (
                             <div key={poLine.id} className="flex items-center gap-2 p-1.5 bg-gray-50 rounded text-xs">
                               <span className="font-medium min-w-0 truncate max-w-sm">{poLine.description}</span>
                               <span className="text-gray-500 flex-shrink-0">Qty: {poLine.quantity}</span>
