@@ -1555,7 +1555,7 @@ export default function InvoiceDetailsPage() {
                     </div>
                     <div>
                       <p className="text-[10px] font-medium text-gray-500 tracking-wider">Variance</p>
-                      <div className="flex items-center gap-2 -mt-0.5">
+                      <div className="flex items-center -mt-0.5">
                         {(() => {
                           // Get variance from backend matching data
                           const amountComparison = matchingData?.data_comparison?.comparisons?.amount
@@ -1566,9 +1566,8 @@ export default function InvoiceDetailsPage() {
                           
                           if (amountComparison.result === 'perfect_match') {
                             return (
-                              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
-                                <CheckCircle className="h-3 w-3" />
-                                <span className="text-xs font-medium">Perfect Match</span>
+                              <div className="inline-flex items-center px-2 py-0.5 bg-green-100 text-green-700 rounded-full mt-1">
+                                <span className="text-[10px] font-medium">Perfect Match</span>
                               </div>
                             )
                           }
@@ -1579,9 +1578,8 @@ export default function InvoiceDetailsPage() {
                           
                           if (variance === 0) {
                             return (
-                              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
-                                <CheckCircle className="h-3 w-3" />
-                                <span className="text-xs font-medium">Perfect Match</span>
+                              <div className="inline-flex items-center px-2 py-0.5 bg-green-100 text-green-700 rounded-full mt-1">
+                                <span className="text-[10px] font-medium">Perfect Match</span>
                               </div>
                             )
                           }
