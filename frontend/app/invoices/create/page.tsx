@@ -1566,7 +1566,7 @@ export default function InvoiceDetailsPage() {
                           
                           if (amountComparison.result === 'perfect_match') {
                             return (
-                              <div className="inline-flex items-center px-2 py-0.5 bg-green-100 text-green-700 rounded-full mt-1">
+                              <div className="inline-flex items-center px-2 py-0.5 bg-green-100 text-green-700 rounded-full mt-0.5">
                                 <span className="text-[10px] font-medium">Perfect Match</span>
                               </div>
                             )
@@ -1578,7 +1578,7 @@ export default function InvoiceDetailsPage() {
                           
                           if (variance === 0) {
                             return (
-                              <div className="inline-flex items-center px-2 py-0.5 bg-green-100 text-green-700 rounded-full mt-1">
+                              <div className="inline-flex items-center px-2 py-0.5 bg-green-100 text-green-700 rounded-full mt-0.5">
                                 <span className="text-[10px] font-medium">Perfect Match</span>
                               </div>
                             )
