@@ -2090,7 +2090,7 @@ export default function InvoiceDetailsPage() {
                           </div>
                           
                           <div className="space-y-4">
-                            {/* Row 1: Total Amount, Subtotal */}
+                            {/* Row 1: Total Amount, Currency */}
                             <div className="grid grid-cols-2 gap-4">
                               <EditableField
                                 fieldName="amount"
@@ -2099,15 +2099,28 @@ export default function InvoiceDetailsPage() {
                                 type="number"
                               />
                               <EditableField
+                                fieldName="currency"
+                                label="Currency"
+                                value={invoice?.currency_code || "USD"}
+                                type="select"
+                                options={[
+                                  { value: "USD", label: "USD - US Dollar" },
+                                  { value: "EUR", label: "EUR - Euro" },
+                                  { value: "GBP", label: "GBP - British Pound" },
+                                  { value: "CAD", label: "CAD - Canadian Dollar" },
+                                  { value: "AUD", label: "AUD - Australian Dollar" }
+                                ]}
+                              />
+                            </div>
+                            
+                            {/* Row 2: Subtotal, Tax Rate */}
+                            <div className="grid grid-cols-2 gap-4">
+                              <EditableField
                                 fieldName="subtotalAmount"
                                 label="Subtotal"
                                 value={invoice?.subtotal?.toString() || (invoice?.amount && invoice?.tax_amount ? (invoice.amount - invoice.tax_amount).toString() : '')}
                                 type="number"
                               />
-                            </div>
-                            
-                            {/* Row 2: Tax Rate, Tax Amount */}
-                            <div className="grid grid-cols-2 gap-4">
                               <EditableField
                                 fieldName="taxRate"
                                 label="Tax Rate"
@@ -2122,28 +2135,15 @@ export default function InvoiceDetailsPage() {
                                   { value: "20%", label: "20%" }
                                 ]}
                               />
+                            </div>
+                            
+                            {/* Row 3: Tax Amount (first column only) */}
+                            <div className="grid grid-cols-2 gap-4">
                               <EditableField
                                 fieldName="taxAmount"
                                 label="Tax Amount"
                                 value={invoice?.tax_amount?.toString() || ''}
                                 type="number"
-                              />
-                            </div>
-                            
-                            {/* Row 3: Currency (first column only) */}
-                            <div className="grid grid-cols-2 gap-4">
-                              <EditableField
-                                fieldName="currency"
-                                label="Currency"
-                                value={invoice?.currency_code || "USD"}
-                                type="select"
-                                options={[
-                                  { value: "USD", label: "USD - US Dollar" },
-                                  { value: "EUR", label: "EUR - Euro" },
-                                  { value: "GBP", label: "GBP - British Pound" },
-                                  { value: "CAD", label: "CAD - Canadian Dollar" },
-                                  { value: "AUD", label: "AUD - Australian Dollar" }
-                                ]}
                               />
                               <div></div>
                             </div>
@@ -2188,12 +2188,6 @@ export default function InvoiceDetailsPage() {
                           </div>
                           
                           <div className="grid grid-cols-2 gap-4">
-                            <EditableField
-                              fieldName="billingAddress"
-                              label="Billing Address"
-                              value={invoice?.billing_address || ''}
-                              multiline={true}
-                            />
                             <div className="space-y-1">
                               <EditableField
                                 fieldName="paymentMethod"
@@ -2213,6 +2207,12 @@ export default function InvoiceDetailsPage() {
                                 </div>
                               ) : null}
                             </div>
+                            <EditableField
+                              fieldName="billingAddress"
+                              label="Billing Address"
+                              value={invoice?.billing_address || ''}
+                              multiline={true}
+                            />
                           </div>
                           
                           <div className="grid grid-cols-2 gap-4">
