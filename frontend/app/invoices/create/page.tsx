@@ -137,6 +137,38 @@ const invoiceFieldValidation = {
   ],
   paymentMethod: [
     validationRules.required('Payment method is required')
+  ],
+  
+  // GL Account and Spend Category - required only for non-PO invoices
+  glAccount: [
+    {
+      type: 'custom' as const,
+      severity: 'error' as const,
+      message: 'GL Account / Cost Center is required for non-PO invoices',
+      validate: (value: any, formData?: any) => {
+        // If PO-backed, field is not required
+        const isPOBacked = !!(formData?.po_number || linkedPO || matchingData?.matched_po)
+        if (isPOBacked) return true
+        
+        // For non-PO invoices, field is required
+        return value && value.trim().length > 0
+      }
+    }
+  ],
+  spendCategory: [
+    {
+      type: 'custom' as const,
+      severity: 'error' as const,
+      message: 'Spend Category is required for non-PO invoices',
+      validate: (value: any, formData?: any) => {
+        // If PO-backed, field is not required
+        const isPOBacked = !!(formData?.po_number || linkedPO || matchingData?.matched_po)
+        if (isPOBacked) return true
+        
+        // For non-PO invoices, field is required
+        return value && value.trim().length > 0
+      }
+    }
   ]
 }
 
@@ -505,8 +537,7 @@ export default function InvoiceDetailsPage() {
         
         // Initialize linked PO state
         setLinkedPO(firstInvoice.po_number)
-        // Initialize with a sample GR for demonstration
-        setLinkedGR("GR-2023-001")
+        // Do not initialize GR - let user link manually when needed
       }
     }
 
@@ -728,18 +759,32 @@ export default function InvoiceDetailsPage() {
           </div>
         )
       } else if (matchResult === 'within_tolerance') {
+        // Get variance details for tooltip
+        const fieldMap: { [key: string]: keyof typeof matchingData.data_comparison.comparisons } = {
+          amount: 'amount',
+          currency: 'currency',
+          paymentTerms: 'payment_terms',
+          vendor: 'vendor'
+        }
+        const comparisonKey = fieldMap[fieldKey]
+        const comparison = matchingData?.data_comparison?.comparisons?.[comparisonKey]
+        const variance = comparison?.details?.variance || 0
+        const variancePercent = comparison?.details?.variance_percent || 0
+        const sign = variance > 0 ? '+' : ''
+        
         return (
           <div className="ml-2 flex items-center gap-1">
             <CheckCircle className="h-4 w-4 text-green-400" />
-            <span className="text-[10px] px-1.5 py-0.5 bg-green-50 text-green-600 rounded-full font-medium">Within Tolerance</span>
-          </div>
-        )
-      } else {
-        // Fallback for other matched cases
-        return (
-          <div className="ml-2 flex items-center gap-1">
-            <CheckCircle className="h-4 w-4 text-green-500" />
-            <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium">PO</span>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-[10px] px-1.5 py-0.5 bg-green-50 text-green-600 rounded-full font-medium cursor-help">Within Tolerance</span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{sign}{formatCurrency(Math.abs(variance), invoice?.currency_code)} ({sign}{Math.abs(variancePercent).toFixed(1)}%) difference vs PO</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         )
       }
@@ -955,6 +1000,9 @@ export default function InvoiceDetailsPage() {
     { value: "Innovation Labs", label: "Innovation Labs" },
     { value: "Digital Dynamics", label: "Digital Dynamics" }
   ]
+
+  // Determine if this invoice is PO-backed
+  const isPOBacked = !!(invoice?.po_number || linkedPO || matchingData?.matched_po)
 
   // EditableField component
   const EditableField = ({ 
@@ -1224,8 +1272,10 @@ export default function InvoiceDetailsPage() {
                   autoFocus
                 />
               )}
-              <div data-validation-indicator className="absolute right-3 top-1/2 -translate-y-1/2">
-                {renderValidationIndicator(fieldName)}
+              <div className="absolute right-3 flex items-center">
+                <div data-validation-indicator className="flex items-center">
+                  {renderValidationIndicator(fieldName)}
+                </div>
               </div>
             </div>
           ) : (
@@ -2061,14 +2111,15 @@ export default function InvoiceDetailsPage() {
                               <EditableField
                                 fieldName="taxRate"
                                 label="Tax Rate"
-                                value={invoice?.tax_rate ? `${invoice.tax_rate}% VAT` : '15% VAT'}
+                                value={invoice?.tax_rate ? `${invoice.tax_rate}%` : '17.5%'}
                                 type="select"
                                 options={[
-                                  { value: "0% VAT", label: "0% VAT" },
-                                  { value: "5% VAT", label: "5% VAT" },
-                                  { value: "10% VAT", label: "10% VAT" },
-                                  { value: "15% VAT", label: "15% VAT" },
-                                  { value: "20% VAT", label: "20% VAT" }
+                                  { value: "0%", label: "0%" },
+                                  { value: "5%", label: "5%" },
+                                  { value: "10%", label: "10%" },
+                                  { value: "15%", label: "15%" },
+                                  { value: "17.5%", label: "17.5%" },
+                                  { value: "20%", label: "20%" }
                                 ]}
                               />
                               <EditableField
@@ -2095,6 +2146,36 @@ export default function InvoiceDetailsPage() {
                                 ]}
                               />
                               <div></div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* PAYMENT SCHEDULE Section */}
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2 pt-2">
+                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Payment Schedule</span>
+                            <div className="flex-1 h-[2px] bg-gray-200"></div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4">
+                            <EditableField
+                              fieldName="date"
+                              label="Invoice Date"
+                              value={invoice?.date || ''}
+                              type="date"
+                            />
+                            <div className="space-y-1">
+                              <EditableField
+                                fieldName="dueDate"
+                                label="Due Date"
+                                value={invoice?.due_date || ''}
+                                type="date"
+                              />
+                              {invoice?.due_date && new Date(invoice.due_date) < new Date() && (
+                                <div className="text-xs text-red-600 font-medium">
+                                  Overdue by {Math.floor((new Date().getTime() - new Date(invoice.due_date).getTime()) / (1000 * 60 * 60 * 24))} days
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -2148,65 +2229,41 @@ export default function InvoiceDetailsPage() {
                                 { value: "Due on Receipt", label: "Due on Receipt" }
                               ]}
                             />
-                            <EditableField
-                              fieldName="glAccount"
-                              label="GL Account / Cost Center"
-                              value="6200-001 - Professional Services"
-                              type="select"
-                              options={[
-                                { value: "6200-001 - Professional Services", label: "6200-001 - Professional Services" },
-                                { value: "6100-002 - IT Services", label: "6100-002 - IT Services" },
-                                { value: "5500-003 - Marketing", label: "5500-003 - Marketing" },
-                                { value: "4400-004 - Operations", label: "4400-004 - Operations" }
-                              ]}
-                            />
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-4">
-                            <EditableField
-                              fieldName="spendCategory"
-                              label="Spend Category"
-                              value={invoice?.spend_category || "Professional Services"}
-                              type="select"
-                              options={[
-                                { value: "Professional Services", label: "Professional Services (UNSPSC: 81111500)" },
-                                { value: "IT Services", label: "IT Services (UNSPSC: 81101500)" },
-                                { value: "Marketing Services", label: "Marketing Services (UNSPSC: 82101500)" },
-                                { value: "Facilities Management", label: "Facilities Management (UNSPSC: 72100000)" }
-                              ]}
-                            />
-                            <div></div>
-                          </div>
-                        </div>
-
-                        {/* PAYMENT SCHEDULE Section */}
-                        <div className="space-y-4">
-                          <div className="flex items-center gap-2 pt-2">
-                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Payment Schedule</span>
-                            <div className="flex-1 h-[2px] bg-gray-200"></div>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-4">
-                            <EditableField
-                              fieldName="date"
-                              label="Invoice Date"
-                              value={invoice?.date || ''}
-                              type="date"
-                            />
-                            <div className="space-y-1">
+                            {/* GL Account / Cost Center - Only show for non-PO invoices */}
+                            {!isPOBacked && (
                               <EditableField
-                                fieldName="dueDate"
-                                label="Due Date"
-                                value={invoice?.due_date || ''}
-                                type="date"
+                                fieldName="glAccount"
+                                label="GL Account / Cost Center"
+                                value="6200-001 - Professional Services"
+                                type="select"
+                                options={[
+                                  { value: "6200-001 - Professional Services", label: "6200-001 - Professional Services" },
+                                  { value: "6100-002 - IT Services", label: "6100-002 - IT Services" },
+                                  { value: "5500-003 - Marketing", label: "5500-003 - Marketing" },
+                                  { value: "4400-004 - Operations", label: "4400-004 - Operations" }
+                                ]}
                               />
-                              {invoice?.due_date && new Date(invoice.due_date) < new Date() && (
-                                <div className="text-xs text-red-600 font-medium">
-                                  Overdue by {Math.floor((new Date().getTime() - new Date(invoice.due_date).getTime()) / (1000 * 60 * 60 * 24))} days
-                                </div>
-                              )}
-                            </div>
+                            )}
                           </div>
+                          
+                          {/* Spend Category - Only show for non-PO invoices */}
+                          {!isPOBacked && (
+                            <div className="grid grid-cols-2 gap-4">
+                              <EditableField
+                                fieldName="spendCategory"
+                                label="Spend Category"
+                                value={invoice?.spend_category || "Professional Services"}
+                                type="select"
+                                options={[
+                                  { value: "Professional Services", label: "Professional Services (UNSPSC: 81111500)" },
+                                  { value: "IT Services", label: "IT Services (UNSPSC: 81101500)" },
+                                  { value: "Marketing Services", label: "Marketing Services (UNSPSC: 82101500)" },
+                                  { value: "Facilities Management", label: "Facilities Management (UNSPSC: 72100000)" }
+                                ]}
+                              />
+                              <div></div>
+                            </div>
+                          )}
                         </div>
 
 
