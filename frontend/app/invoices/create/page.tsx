@@ -198,6 +198,7 @@ export default function InvoiceDetailsPage() {
   const [showWorkflowDetails, setShowWorkflowDetails] = useState(false)
   const [currentAssignee, setCurrentAssignee] = useState('SC')
   const [lineItemsSwitch, setLineItemsSwitch] = useState(false)
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
   const pdfContainerRef = useRef<HTMLDivElement>(null)
   const descriptionInputRefs = useRef<{[key: number]: HTMLInputElement | null}>({})
   
@@ -231,12 +232,12 @@ export default function InvoiceDetailsPage() {
 
   // Mock PO line items for matching
   const mockPOLines = [
-    { id: "PO-001-1", description: "Office Chair", quantity: 4, unit_price: 75.00, total: 300.00 },
-    { id: "PO-001-2", description: "Office Desk", quantity: 3, unit_price: 200.00, total: 600.00 },
-    { id: "PO-001-3", description: "Office TV", quantity: 2, unit_price: 500.00, total: 1000.00 },
-    { id: "PO-001-4", description: "Office Couch", quantity: 1, unit_price: 750.00, total: 750.00 },
-    { id: "PO-001-5", description: "Office Lamp", quantity: 5, unit_price: 25.00, total: 125.00 },
-    { id: "PO-001-6", description: "Office Water Dispenser", quantity: 1, unit_price: 280.00, total: 280.00 },
+    { id: "PO-001-1", sku: "CH-002", description: "Office Chair", quantity: 4, unit_price: 75.00, total: 300.00 },
+    { id: "PO-001-2", sku: "DK-002", description: "Office Desk", quantity: 3, unit_price: 200.00, total: 600.00 },
+    { id: "PO-001-3", sku: "TV-002", description: "Office TV", quantity: 2, unit_price: 500.00, total: 1000.00 },
+    { id: "PO-001-4", sku: "SF-001", description: "Office Couch", quantity: 1, unit_price: 750.00, total: 750.00 },
+    { id: "PO-001-5", sku: "LM-002", description: "Office Lamp", quantity: 5, unit_price: 25.00, total: 125.00 },
+    { id: "PO-001-6", sku: "WD-001", description: "Office Water Dispenser", quantity: 1, unit_price: 280.00, total: 280.00 },
   ]
 
   // Mock GR line items for matching
@@ -281,8 +282,40 @@ export default function InvoiceDetailsPage() {
     }))
   }
 
+  // Toggle row expansion
+  const toggleRowExpansion = (index: number) => {
+    setExpandedRows(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(index)) {
+        newSet.delete(index)
+      } else {
+        newSet.add(index)
+      }
+      return newSet
+    })
+  }
+
   // Line item matching state
   const [lineItemMatches, setLineItemMatches] = useState<{[key: number]: {poLineId?: string, grLineId?: string}}>({})
+
+  // Check if a row should auto-expand (has mismatches)
+  const shouldAutoExpand = (index: number) => {
+    const status = getLineItemStatus(index)
+    return status === 'mismatch'
+  }
+
+  // Initialize auto-expansion for rows with mismatches
+  useEffect(() => {
+    if (lineItemsSwitch && invoice?.line_items) {
+      const autoExpandRows = new Set<number>()
+      invoice.line_items.forEach((_, index) => {
+        if (shouldAutoExpand(index)) {
+          autoExpandRows.add(index)
+        }
+      })
+      setExpandedRows(autoExpandRows)
+    }
+  }, [lineItemsSwitch, invoice?.line_items, lineItemMatches, forcedMatchedItems])
   
   // Auto-assign PO lines on page load
   useEffect(() => {
@@ -2925,6 +2958,8 @@ export default function InvoiceDetailsPage() {
 
             <div className="relative overflow-hidden">
               {invoice?.line_items && invoice.line_items.length > 0 ? (
+                !lineItemsSwitch ? (
+                  /* Current Table Layout */
                 <div className="flex">
                   {/* Frozen Invoice Columns */}
                   <div className="flex-shrink-0 bg-white z-10 shadow-sm" style={{ boxShadow: '4px 0 8px -2px rgba(0, 0, 0, 0.1)' }}>
@@ -3055,6 +3090,7 @@ export default function InvoiceDetailsPage() {
                           {linkedPO && (
                             <>
                               <TableHead className="min-w-[70px] text-xs font-medium py-2 px-2 pl-4" title="Purchase Order Line Source">PO Line</TableHead>
+                              <TableHead className="min-w-[70px] text-xs font-medium py-2 px-2" title="Purchase Order SKU">PO SKU</TableHead>
                               <TableHead className="min-w-[140px] text-xs font-medium py-2 px-2" title="Purchase Order Description">PO Description</TableHead>
                               <TableHead className="min-w-[50px] text-right text-xs font-medium py-2 px-2 whitespace-nowrap" title="Purchase Order Quantity">PO Qty</TableHead>
                               <TableHead className="min-w-[70px] text-right text-xs font-medium py-2 px-2" title="Purchase Order Unit Price">PO Price</TableHead>
@@ -3113,6 +3149,13 @@ export default function InvoiceDetailsPage() {
                                       currency={invoice.currency_code}
                                       selectedItems={selectedPOItems}
                                     />
+                                  </TableCell>
+                                  
+                                  {/* PO SKU */}
+                                  <TableCell className="text-sm text-gray-600 h-[50px] py-1 px-2 align-middle">
+                                    <div className="truncate w-full" title={poLine?.sku || "—"}>
+                                      {poLine?.sku || "—"}
+                                    </div>
                                   </TableCell>
                                   
                                   {/* PO Details */}
@@ -3254,6 +3297,401 @@ export default function InvoiceDetailsPage() {
                 </Table>
                   </div>
                 </div>
+                ) : (
+                  /* Expandable Row Layout */
+                  <div className="space-y-0">
+                    {/* Header Row */}
+                    <div className="bg-gray-50 border-b px-4 py-3">
+                      <div className="grid grid-cols-12 gap-4 items-center text-xs font-medium text-gray-600 uppercase tracking-wider">
+                        <div className="col-span-1"></div>
+                        <div className="col-span-1">#</div>
+                        <div className="col-span-1">Status</div>
+                        <div className="col-span-1">SKU</div>
+                        <div className="col-span-3">Description</div>
+                        <div className="col-span-1 text-right">Qty</div>
+                        <div className="col-span-1 text-right">Unit Price</div>
+                        <div className="col-span-2 text-right">Total</div>
+                        <div className="col-span-1 text-center">Actions</div>
+                      </div>
+                    </div>
+                    
+                    {/* Invoice Line Items */}
+                    {invoice.line_items.map((item, index) => {
+                      const status = getLineItemStatus(index)
+                      const match = lineItemMatches[index]
+                      const poLine = match?.poLineId ? mockPOLines.find(po => po.id === match.poLineId) : null
+                      const grLine = match?.grLineId ? mockGRLines.find(gr => gr.id === match.grLineId) : null
+                      const isExpanded = expandedRows.has(index)
+                      const hasMismatch = status === 'mismatch'
+                      
+                      // Auto-expand rows with mismatches if not manually controlled
+                      if (hasMismatch && !expandedRows.has(index) && !expandedRows.has(-index-1)) {
+                        expandedRows.add(index)
+                      }
+                      
+                      return (
+                        <div key={index} className="border-b">
+                          {/* Main Invoice Row */}
+                          <div 
+                            className={cn(
+                              "px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer",
+                              hasMismatch && "bg-amber-25 border-l-4 border-amber-400"
+                            )}
+                            onClick={() => {
+                              if ((poLine || grLine) && editingLineItem !== index) {
+                                const newExpanded = new Set(expandedRows)
+                                if (isExpanded) {
+                                  newExpanded.delete(index)
+                                  newExpanded.add(-index-1) // Mark as manually collapsed
+                                } else {
+                                  newExpanded.add(index)
+                                  newExpanded.delete(-index-1) // Remove manual collapse mark
+                                }
+                                setExpandedRows(newExpanded)
+                              }
+                            }}
+                          >
+                            <div className="grid grid-cols-12 gap-4 items-center">
+                              {/* Chevron Toggle */}
+                              <div className="col-span-1 w-6">
+                                {(poLine || grLine) && (
+                                  <ChevronRight className={cn(
+                                    "h-3 w-3 transition-transform text-gray-400",
+                                    isExpanded && "rotate-90"
+                                  )} />
+                                )}
+                              </div>
+                              
+                              {/* Row Number */}
+                              <div className="col-span-1 text-sm font-medium text-gray-600">
+                                {index + 1}
+                              </div>
+                              
+                              {/* Status */}
+                              <div className="col-span-1">
+                                <Badge 
+                                  variant="secondary" 
+                                  className={cn(
+                                    "text-xs font-medium px-2 py-1",
+                                    status === 'matched' && "bg-green-100 text-green-700 hover:bg-green-100",
+                                    status === 'mismatch' && "bg-amber-100 text-amber-700 hover:bg-amber-100",
+                                    status === 'missing' && "bg-red-100 text-red-700 hover:bg-red-100"
+                                  )}
+                                >
+                                  {status === 'matched' ? 'Matched' : status === 'mismatch' ? 'Variance' : 'Unmatched'}
+                                </Badge>
+                              </div>
+                              
+                              {/* SKU */}
+                              <div className="col-span-1 text-sm font-medium">
+                                {editingLineItem === index ? (
+                                  <Input
+                                    value={skuValues[index] !== undefined ? skuValues[index] : getLineItemSKU(index)}
+                                    onChange={(e) => handleSKUValueChange(index, e.target.value)}
+                                    onKeyDown={(e) => handleKeyDown(e, index)}
+                                    className="h-8 text-sm px-2 py-1"
+                                    placeholder="Enter SKU"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                ) : (
+                                  <div className="truncate max-w-20" title={getLineItemSKU(index) === "—" ? "SKU not available" : getLineItemSKU(index)}>
+                                    {getLineItemSKU(index)}
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* Description */}
+                              <div className="col-span-3 text-sm font-medium">
+                                {editingLineItem === index ? (
+                                  <Input
+                                    ref={(el) => { descriptionInputRefs.current[index] = el }}
+                                    value={lineItemValues[index]?.description || ''}
+                                    onChange={(e) => handleLineItemValueChange(index, 'description', e.target.value)}
+                                    onKeyDown={(e) => handleKeyDown(e, index)}
+                                    className="h-8 text-sm px-2 py-1"
+                                    placeholder="Enter description"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                ) : (
+                                  <div className="truncate" title={item.description}>
+                                    {item.description}
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* Quantity */}
+                              <div className={cn(
+                                "col-span-1 text-right text-sm font-medium",
+                                !forcedMatchedItems.has(index) && ((poLine && Number(item.quantity) !== Number(poLine.quantity)) || (grLine && Number(item.quantity) !== Number(grLine.quantity))) && "text-red-600"
+                              )}>
+                                {editingLineItem === index ? (
+                                  <Input
+                                    type="number"
+                                    value={lineItemValues[index]?.quantity || ''}
+                                    onChange={(e) => handleLineItemValueChange(index, 'quantity', e.target.value)}
+                                    onKeyDown={(e) => handleKeyDown(e, index)}
+                                    className="h-8 text-sm px-2 py-1 text-right"
+                                    placeholder="0.00"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                ) : (
+                                  Number(item.quantity).toFixed(2)
+                                )}
+                              </div>
+                              
+                              {/* Unit Price */}
+                              <div className={cn(
+                                "col-span-1 text-right text-sm font-medium",
+                                !forcedMatchedItems.has(index) && ((poLine && Number(item.unit_price) !== Number(poLine.unit_price)) || (grLine && Number(item.unit_price) !== Number(grLine.unit_price))) && "text-red-600"
+                              )}>
+                                {editingLineItem === index ? (
+                                  <Input
+                                    type="number"
+                                    value={lineItemValues[index]?.unit_price || ''}
+                                    onChange={(e) => handleLineItemValueChange(index, 'unit_price', e.target.value)}
+                                    onKeyDown={(e) => handleKeyDown(e, index)}
+                                    className="h-8 text-sm px-2 py-1 text-right"
+                                    placeholder="0.00"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                ) : (
+                                  `$${Number(item.unit_price).toFixed(2)}`
+                                )}
+                              </div>
+                              
+                              {/* Total */}
+                              <div className={cn(
+                                "col-span-2 text-right text-sm font-medium",
+                                !forcedMatchedItems.has(index) && ((poLine && Number(item.total) !== Number(poLine.total)) || (grLine && Number(item.total) !== Number(grLine.total))) && "text-red-600"
+                              )}>
+                                {editingLineItem === index ? (
+                                  `$${((Number(lineItemValues[index]?.quantity) || 0) * (Number(lineItemValues[index]?.unit_price) || 0)).toFixed(2)}`
+                                ) : (
+                                  `$${Number(item.total).toFixed(2)}`
+                                )}
+                              </div>
+                              
+                              {/* Actions */}
+                              <div className="col-span-1 text-center" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center justify-center gap-1">
+                                  {editingLineItem === index ? (
+                                    <>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-6 w-6 p-0 hover:bg-green-100"
+                                        onClick={handleSaveLineItem}
+                                      >
+                                        <Check className="h-3 w-3 text-green-600" />
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-6 w-6 p-0 hover:bg-red-100"
+                                        onClick={handleCancelEditLineItem}
+                                      >
+                                        <X className="h-3 w-3 text-red-600" />
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-6 w-6 p-0 hover:bg-violet-100 relative"
+                                        title="Comments"
+                                      >
+                                        <MessageCircle className="h-3 w-3 text-violet-600" />
+                                        {mockComments[index] && (
+                                          <span className="absolute -top-1 -right-1 h-3 w-3 bg-violet-600 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
+                                            {mockComments[index]}
+                                          </span>
+                                        )}
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-6 w-6 p-0 hover:bg-violet-100"
+                                        onClick={() => handleEditLineItem(index)}
+                                        title="Edit"
+                                      >
+                                        <Edit className="h-3 w-3 text-violet-600" />
+                                      </Button>
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-violet-100" title="More options">
+                                            <MoreVertical className="h-3 w-3 text-violet-600" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-48">
+                                          <DropdownMenuItem onClick={() => handleMarkAsMatched(index)}>
+                                            Mark as Matched
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => console.log('Mark as Exception')}>
+                                            Mark as Exception
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => handleRemoveLineItem(index)} className="text-red-600 focus:text-red-600">
+                                            Remove Line
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Expanded PO/GR Data */}
+                          {isExpanded && (poLine || grLine) && (
+                            <div className="bg-gray-50 border-t px-4 py-2">
+                              <div className="space-y-1">
+                                {/* PO Line Details */}
+                                {poLine && (
+                                  <div className="bg-blue-50 border border-blue-200 rounded p-2">
+                                    <div className="grid grid-cols-12 gap-4 items-center text-sm">
+                                      <div className="col-span-1 w-6">
+                                        <FileText className="h-3 w-3 text-blue-600" />
+                                      </div>
+                                      <div className="col-span-1 text-blue-600 text-xs font-medium">
+                                        PO {poLine.line_number}
+                                      </div>
+                                      <div className="col-span-1">
+                                        <Badge variant="secondary" className="bg-blue-100 text-blue-700 text-xs px-1 py-0">
+                                          PO Line
+                                        </Badge>
+                                      </div>
+                                      <div className="col-span-1 text-blue-800 text-xs font-medium">
+                                        {poLine.sku}
+                                      </div>
+                                      <div className="col-span-3 text-blue-800 font-medium truncate">
+                                        {poLine.description}
+                                      </div>
+                                      <div className={cn(
+                                        "col-span-1 text-right font-medium",
+                                        Number(item.quantity) !== Number(poLine.quantity) ? "text-red-600" : "text-blue-800"
+                                      )}>
+                                        {Number(poLine.quantity).toFixed(2)}
+                                      </div>
+                                      <div className={cn(
+                                        "col-span-1 text-right font-medium",
+                                        Number(item.unit_price) !== Number(poLine.unit_price) ? "text-red-600" : "text-blue-800"
+                                      )}>
+                                        ${Number(poLine.unit_price).toFixed(2)}
+                                      </div>
+                                      <div className={cn(
+                                        "col-span-2 text-right font-medium",
+                                        Number(item.total) !== Number(poLine.total) ? "text-red-600" : "text-blue-800"
+                                      )}>
+                                        ${Number(poLine.total).toFixed(2)}
+                                      </div>
+                                      <div className="col-span-1 text-center">
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-blue-100">
+                                              <MoreVertical className="h-3 w-3 text-blue-600" />
+                                            </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end" className="w-40">
+                                            <DropdownMenuItem 
+                                              onClick={() => {
+                                                const newMatches = {...lineItemMatches}
+                                                delete newMatches[index]
+                                                setLineItemMatches(newMatches)
+                                              }}
+                                              className="text-red-600 focus:text-red-600"
+                                            >
+                                              Remove PO Line
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => console.log('Reassign PO Line')}>
+                                              Reassign PO Line
+                                            </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* GR Line Details */}
+                                {grLine && (
+                                  <div className="bg-green-50 border border-green-200 rounded p-2">
+                                    <div className="grid grid-cols-12 gap-4 items-center text-sm">
+                                      <div className="col-span-1 w-6">
+                                        <Truck className="h-3 w-3 text-green-600" />
+                                      </div>
+                                      <div className="col-span-1 text-green-600 text-xs font-medium">
+                                        GR {grLine.line_number}
+                                      </div>
+                                      <div className="col-span-1">
+                                        <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs px-1 py-0">
+                                          Received
+                                        </Badge>
+                                      </div>
+                                      <div className="col-span-1 text-green-800 text-xs font-medium">
+                                        {grLine.sku}
+                                      </div>
+                                      <div className="col-span-3 text-green-800 font-medium truncate">
+                                        {grLine.description}
+                                      </div>
+                                      <div className={cn(
+                                        "col-span-1 text-right font-medium",
+                                        Number(item.quantity) !== Number(grLine.quantity) ? "text-red-600" : "text-green-800"
+                                      )}>
+                                        {Number(grLine.quantity).toFixed(2)}
+                                      </div>
+                                      <div className={cn(
+                                        "col-span-1 text-right font-medium",
+                                        Number(item.unit_price) !== Number(grLine.unit_price) ? "text-red-600" : "text-green-800"
+                                      )}>
+                                        ${Number(grLine.unit_price).toFixed(2)}
+                                      </div>
+                                      <div className={cn(
+                                        "col-span-2 text-right font-medium",
+                                        Number(item.total) !== Number(grLine.total) ? "text-red-600" : "text-green-800"
+                                      )}>
+                                        ${Number(grLine.total).toFixed(2)}
+                                      </div>
+                                      <div className="col-span-1 text-center">
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-green-100">
+                                              <MoreVertical className="h-3 w-3 text-green-600" />
+                                            </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end" className="w-40">
+                                            <DropdownMenuItem 
+                                              onClick={() => {
+                                                const newMatches = {...lineItemMatches}
+                                                if (newMatches[index]) {
+                                                  delete newMatches[index].grLineId
+                                                  if (!newMatches[index].poLineId) {
+                                                    delete newMatches[index]
+                                                  }
+                                                }
+                                                setLineItemMatches(newMatches)
+                                              }}
+                                              className="text-red-600 focus:text-red-600"
+                                            >
+                                              Remove GR Line
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => console.log('Reassign GR Line')}>
+                                              Reassign GR Line
+                                            </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
               ) : (
                 <div className="p-8 text-center text-gray-500">
                   <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
