@@ -119,7 +119,7 @@ const invoiceFieldValidation = {
   ],
   dueDate: [
     validationRules.required('Due date is required'),
-    validationRules.futureDate('Due date should be in the future'),
+    validationRules.overdue(),
     crossFieldValidationRules.dueDateAfterInvoiceDate()
   ],
   
@@ -206,6 +206,28 @@ export default function InvoiceDetailsPage() {
     validationRules: invoiceFieldValidation,
     initialData: invoice
   })
+
+  // Trigger validation on component mount for all fields (client-side only)
+  const hasRunInitialValidation = useRef(false)
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined' && invoice && !hasRunInitialValidation.current) {
+      console.log('Running initial validation for all fields...')
+      hasRunInitialValidation.current = true
+      
+      // Small delay to ensure component is fully mounted
+      setTimeout(() => {
+        Object.keys(invoiceFieldValidation).forEach(async (fieldName) => {
+          const invoiceFieldName = getInvoiceFieldName(fieldName)
+          const fieldValue = invoice[invoiceFieldName as keyof typeof invoice]
+          if (fieldValue) {
+            console.log(`Validating ${fieldName} with value:`, fieldValue)
+            await validation.validateField(fieldName, fieldValue, invoice)
+          }
+        })
+      }, 100)
+    }
+  }, [invoice]) // Removed validation from dependencies
 
   // Mock PO line items for matching
   const mockPOLines = [
@@ -634,12 +656,19 @@ export default function InvoiceDetailsPage() {
         setEditingField(field)
       })
       
-      // Merge matching issues with existing validation
+      // Merge matching issues with existing validation (deduplicated)
       Object.entries(matchingIssues).forEach(([field, issues]) => {
         if (issues.length > 0) {
+          const existingIssues = newValidationIssues[field] || []
+          const uniqueIssues = issues.filter(newIssue => 
+            !existingIssues.some(existingIssue => 
+              existingIssue.message === newIssue.message && 
+              existingIssue.type === newIssue.type
+            )
+          )
           newValidationIssues[field] = [
-            ...(newValidationIssues[field] || []),
-            ...issues
+            ...existingIssues,
+            ...uniqueIssues
           ]
         }
       })
@@ -650,9 +679,16 @@ export default function InvoiceDetailsPage() {
       const crossFieldIssues = runCrossFieldValidations(invoice)
       Object.entries(crossFieldIssues).forEach(([field, issues]) => {
         if (issues.length > 0) {
+          const existingIssues = newValidationIssues[field] || []
+          const uniqueIssues = issues.filter(newIssue => 
+            !existingIssues.some(existingIssue => 
+              existingIssue.message === newIssue.message && 
+              existingIssue.type === newIssue.type
+            )
+          )
           newValidationIssues[field] = [
-            ...(newValidationIssues[field] || []),
-            ...issues
+            ...existingIssues,
+            ...uniqueIssues
           ]
         }
       })
@@ -808,11 +844,13 @@ export default function InvoiceDetailsPage() {
     if ((!fieldIssues || fieldIssues.length === 0) && matchStatus === 'matched') {
       if (matchResult === 'perfect_match') {
         return (
-          <div className="ml-2">
+          <div className="ml-2 inline-flex items-center">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <CheckCircle className="h-4 w-4 text-green-500 cursor-help" />
+                  <div className="inline-flex">
+                    <CheckCircle className="h-4 w-4 text-green-500 cursor-help" />
+                  </div>
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>Perfect Match with PO</p>
@@ -836,12 +874,14 @@ export default function InvoiceDetailsPage() {
         const sign = variance > 0 ? '+' : ''
         
         return (
-          <div className="ml-2 flex items-center gap-1">
+          <div className="ml-2 inline-flex items-center gap-1">
             <CheckCircle className="h-4 w-4 text-green-400" />
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="text-[10px] px-1.5 py-0.5 bg-green-50 text-green-600 rounded-full font-medium cursor-help">Within Tolerance</span>
+                  <div className="inline-flex">
+                    <span className="text-[10px] px-1.5 py-0.5 bg-green-50 text-green-600 rounded-full font-medium cursor-help">Within Tolerance</span>
+                  </div>
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>{sign}{formatCurrency(Math.abs(variance), invoice?.currency_code)} ({sign}{Math.abs(variancePercent).toFixed(1)}%) difference vs PO</p>
@@ -856,7 +896,7 @@ export default function InvoiceDetailsPage() {
     // Show green checkmark for fields with no issues
     if (!fieldIssues || fieldIssues.length === 0) {
       return (
-        <div className="ml-2">
+        <div className="ml-2 inline-flex items-center">
           <CheckCircle className="h-4 w-4 text-green-500" />
         </div>
       )
@@ -1157,7 +1197,7 @@ export default function InvoiceDetailsPage() {
                       <div className="w-0.5 h-4 bg-gray-800 animate-pulse"></div>
                       {!value && <span className="text-gray-400">Select vendor...</span>}
                     </div>
-                    <div className="absolute right-3 flex items-center">
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
                       <div data-validation-indicator className="flex items-center">{renderValidationIndicator(fieldName)}</div>
                     </div>
                   </div>
@@ -1336,8 +1376,8 @@ export default function InvoiceDetailsPage() {
                 />
               )}
               <div className={cn(
-                "absolute right-3 flex items-center",
-                multiline && fieldName === "billingAddress" ? "top-[11px]" : ""
+                "absolute right-3 top-1/2 -translate-y-1/2 flex items-center",
+                multiline && fieldName === "billingAddress" ? "top-[11px] translate-y-0" : ""
               )}>
                 <div data-validation-indicator className="flex items-center">
                   {renderValidationIndicator(fieldName)}
@@ -1375,7 +1415,7 @@ export default function InvoiceDetailsPage() {
                       </Tooltip>
                     </TooltipProvider>
                   </div>
-                  <div className="absolute right-3 flex items-center gap-0.5">
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                     <Edit className="h-3.5 w-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                     <div data-validation-indicator className="flex items-center">{renderValidationIndicator(fieldName)}</div>
                   </div>
@@ -1409,7 +1449,7 @@ export default function InvoiceDetailsPage() {
               )}
               <div className={cn(
                 "absolute right-3 flex items-center gap-0.5",
-                multiline && fieldName === "billingAddress" ? "top-[11px]" : ""
+                multiline && fieldName === "billingAddress" ? "top-[11px] translate-y-0" : "top-1/2 -translate-y-1/2"
               )}>
                 <Edit className="h-3.5 w-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                 <div data-validation-indicator className="flex items-center">{renderValidationIndicator(fieldName)}</div>
@@ -2112,7 +2152,7 @@ export default function InvoiceDetailsPage() {
                     )}
                   </div>
 
-                      <div className="space-y-8">
+                      <div className="space-y-5">
                         {/* GENERAL INFO Section */}
                         <div className="space-y-4">
                           <div className="flex items-center gap-2 pt-2">
@@ -2162,6 +2202,29 @@ export default function InvoiceDetailsPage() {
                           </div>
                         </div>
 
+                        {/* PAYMENT SCHEDULE Section */}
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2 pt-2">
+                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Payment Schedule</span>
+                            <div className="flex-1 h-[2px] bg-gray-200"></div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3">
+                            <EditableField
+                              fieldName="date"
+                              label="Invoice Date"
+                              value={invoice?.date || ''}
+                              type="date"
+                            />
+                            <EditableField
+                              fieldName="dueDate"
+                              label="Due Date"
+                              value={invoice?.due_date || ''}
+                              type="date"
+                            />
+                          </div>
+                        </div>
+
                         {/* FINANCIAL Section */}
                         <div className="space-y-3">
                           <div className="flex items-center gap-2 pt-2">
@@ -2198,7 +2261,7 @@ export default function InvoiceDetailsPage() {
                               <EditableField
                                 fieldName="subtotalAmount"
                                 label="Subtotal"
-                                value={invoice?.subtotal?.toString() || (invoice?.amount && invoice?.tax_amount ? (invoice.amount - invoice.tax_amount).toString() : '')}
+                                value={invoice?.subtotal?.toString() || (invoice?.amount && invoice?.tax_amount ? (invoice.amount - invoice.tax_amount).toFixed(2) : '')}
                                 type="number"
                               />
                               <EditableField
@@ -2226,36 +2289,6 @@ export default function InvoiceDetailsPage() {
                                 type="number"
                               />
                               <div></div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* PAYMENT SCHEDULE Section */}
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2 pt-2">
-                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Payment Schedule</span>
-                            <div className="flex-1 h-[2px] bg-gray-200"></div>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-3">
-                            <EditableField
-                              fieldName="date"
-                              label="Invoice Date"
-                              value={invoice?.date || ''}
-                              type="date"
-                            />
-                            <div className="space-y-1">
-                              <EditableField
-                                fieldName="dueDate"
-                                label="Due Date"
-                                value={invoice?.due_date || ''}
-                                type="date"
-                              />
-                              {invoice?.due_date && new Date(invoice.due_date) < new Date() && (
-                                <div className="text-xs text-red-600 font-medium">
-                                  Overdue by {Math.floor((new Date().getTime() - new Date(invoice.due_date).getTime()) / (1000 * 60 * 60 * 24))} days
-                                </div>
-                              )}
                             </div>
                           </div>
                         </div>

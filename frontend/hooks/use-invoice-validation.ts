@@ -81,9 +81,14 @@ export function useInvoiceValidation({
         const isValid = await rule.validate(value, allData)
         
         if (!isValid) {
+          // Use custom message generator if available, otherwise use static message
+          const message = (rule as any).getCustomMessage 
+            ? (rule as any).getCustomMessage(value)
+            : rule.message || `Validation failed for ${fieldName}`
+            
           issues.push({
             type: rule.severity || 'error',
-            message: rule.message || `Validation failed for ${fieldName}`,
+            message,
             field: fieldName
           })
         }
@@ -228,6 +233,51 @@ export const validationRules = {
     validate: (value) => {
       if (!value) return true
       return new Date(value) > new Date()
+    }
+  }),
+
+  overdue: (message?: string): ValidationRule => ({
+    type: 'custom',
+    severity: 'warning',
+    validate: (value) => {
+      if (!value) return true
+      
+      // Only run on client side to avoid hydration issues
+      if (typeof window === 'undefined') return true
+      
+      // Parse dates more carefully
+      const dueDate = new Date(value)
+      const today = new Date()
+      
+      // Normalize to start of day for fair comparison
+      dueDate.setHours(0, 0, 0, 0)
+      today.setHours(0, 0, 0, 0)
+      
+      // Return false if overdue (validation fails), true if not overdue
+      const isOverdue = dueDate.getTime() < today.getTime()
+      
+      // Debug: uncomment for troubleshooting
+      // console.log('Overdue check:', { value, dueDateTime: dueDate.getTime(), todayTime: today.getTime(), isOverdue, returning: !isOverdue })
+      
+      return !isOverdue
+    },
+    message: message || 'Invoice is overdue',
+    getCustomMessage: (value) => {
+      if (!value) return 'Invoice is overdue'
+      
+      // Only run on client side to avoid hydration issues
+      if (typeof window === 'undefined') return 'Invoice is overdue'
+      
+      const dueDate = new Date(value)
+      const today = new Date()
+      dueDate.setHours(0, 0, 0, 0)
+      today.setHours(0, 0, 0, 0)
+      
+      if (dueDate.getTime() < today.getTime()) {
+        const daysDiff = Math.ceil((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
+        return `Overdue by ${daysDiff} day${daysDiff !== 1 ? 's' : ''}`
+      }
+      return 'Invoice is overdue'
     }
   }),
 
