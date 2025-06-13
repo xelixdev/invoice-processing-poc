@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input"
 import { format } from "date-fns"
 import { LineItemSelector } from "@/components/line-item-selector"
 import { useInvoiceValidation, validationRules } from "@/hooks/use-invoice-validation"
-import { parseMatchingValidation, getFieldMatchStatus, getMatchingSummary } from "@/lib/validation/matching-parser"
+import { parseMatchingValidation, getFieldMatchStatus, getFieldMatchResult, getMatchingSummary } from "@/lib/validation/matching-parser"
 import { runCrossFieldValidations, calculateExpectedValues, crossFieldValidationRules } from "@/lib/validation/cross-field-validation"
 
 interface InvoiceData {
@@ -137,6 +137,38 @@ const invoiceFieldValidation = {
   ],
   paymentMethod: [
     validationRules.required('Payment method is required')
+  ],
+  
+  // GL Account and Spend Category - required only for non-PO invoices
+  glAccount: [
+    {
+      type: 'custom' as const,
+      severity: 'error' as const,
+      message: 'GL Account / Cost Center is required for non-PO invoices',
+      validate: (value: any, formData?: any) => {
+        // If PO-backed, field is not required
+        const isPOBacked = !!(formData?.po_number || linkedPO || matchingData?.matched_po)
+        if (isPOBacked) return true
+        
+        // For non-PO invoices, field is required
+        return value && value.trim().length > 0
+      }
+    }
+  ],
+  spendCategory: [
+    {
+      type: 'custom' as const,
+      severity: 'error' as const,
+      message: 'Spend Category is required for non-PO invoices',
+      validate: (value: any, formData?: any) => {
+        // If PO-backed, field is not required
+        const isPOBacked = !!(formData?.po_number || linkedPO || matchingData?.matched_po)
+        if (isPOBacked) return true
+        
+        // For non-PO invoices, field is required
+        return value && value.trim().length > 0
+      }
+    }
   ]
 }
 
@@ -159,7 +191,7 @@ export default function InvoiceDetailsPage() {
   const [editingLineItem, setEditingLineItem] = useState<number | null>(null)
   const [lineItemValues, setLineItemValues] = useState<{[key: number]: Partial<LineItem>}>({})
   const [forcedMatchedItems, setForcedMatchedItems] = useState<Set<number>>(new Set())
-  const [budgetSectionExpanded, setBudgetSectionExpanded] = useState(true)
+  const [budgetSectionExpanded, setBudgetSectionExpanded] = useState(false)
   const [workflowStage, setWorkflowStage] = useState<'draft' | 'validation' | 'pending_approval' | 'approved' | 'processing' | 'paid'>('validation')
   const [showWorkflowDetails, setShowWorkflowDetails] = useState(false)
   const [currentAssignee, setCurrentAssignee] = useState('SC')
@@ -505,8 +537,7 @@ export default function InvoiceDetailsPage() {
         
         // Initialize linked PO state
         setLinkedPO(firstInvoice.po_number)
-        // Initialize with a sample GR for demonstration
-        setLinkedGR("GR-2023-001")
+        // Do not initialize GR - let user link manually when needed
       }
     }
 
@@ -661,6 +692,11 @@ export default function InvoiceDetailsPage() {
         text: 'Perfect Match',
         className: 'bg-green-50 text-green-700 border-green-200'
       }
+    } else if (summary.status === 'tolerance') {
+      return {
+        text: 'Within Tolerance',
+        className: 'bg-green-25 text-green-600 border-green-100'
+      }
     } else if (summary.status === 'partial') {
       return {
         text: 'Partial Match',
@@ -694,6 +730,7 @@ export default function InvoiceDetailsPage() {
     const fieldValidation = validation.getFieldValidation(fieldKey)
     const fieldIssues = fieldValidation.issues
     const matchStatus = getFieldMatchStatus(matchingData, fieldKey)
+    const matchResult = getFieldMatchResult(matchingData, fieldKey)
     
     // Show loading indicator if validating
     if (fieldValidation.isValidating) {
@@ -704,14 +741,53 @@ export default function InvoiceDetailsPage() {
       )
     }
     
-    // Show green checkmark with PO badge for matched fields
+    // Show badges for matched fields (both perfect match and within tolerance)
     if ((!fieldIssues || fieldIssues.length === 0) && matchStatus === 'matched') {
-      return (
-        <div className="ml-2 flex items-center gap-1">
-          <CheckCircle className="h-4 w-4 text-green-500" />
-          <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium">PO</span>
-        </div>
-      )
+      if (matchResult === 'perfect_match') {
+        return (
+          <div className="ml-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <CheckCircle className="h-4 w-4 text-green-500 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Perfect Match with PO</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        )
+      } else if (matchResult === 'within_tolerance') {
+        // Get variance details for tooltip
+        const fieldMap: { [key: string]: keyof typeof matchingData.data_comparison.comparisons } = {
+          amount: 'amount',
+          currency: 'currency',
+          paymentTerms: 'payment_terms',
+          vendor: 'vendor'
+        }
+        const comparisonKey = fieldMap[fieldKey]
+        const comparison = matchingData?.data_comparison?.comparisons?.[comparisonKey]
+        const variance = comparison?.details?.variance || 0
+        const variancePercent = comparison?.details?.variance_percent || 0
+        const sign = variance > 0 ? '+' : ''
+        
+        return (
+          <div className="ml-2 flex items-center gap-1">
+            <CheckCircle className="h-4 w-4 text-green-400" />
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-[10px] px-1.5 py-0.5 bg-green-50 text-green-600 rounded-full font-medium cursor-help">Within Tolerance</span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{sign}{formatCurrency(Math.abs(variance), invoice?.currency_code)} ({sign}{Math.abs(variancePercent).toFixed(1)}%) difference vs PO</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        )
+      }
     }
     
     // Show green checkmark for fields with no issues
@@ -925,6 +1001,9 @@ export default function InvoiceDetailsPage() {
     { value: "Digital Dynamics", label: "Digital Dynamics" }
   ]
 
+  // Determine if this invoice is PO-backed
+  const isPOBacked = !!(invoice?.po_number || linkedPO || matchingData?.matched_po)
+
   // EditableField component
   const EditableField = ({ 
     fieldName, 
@@ -986,14 +1065,14 @@ export default function InvoiceDetailsPage() {
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <span className="inline-flex items-center px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-medium rounded-full max-w-full">
-                                  <span className="truncate max-w-[160px]">
-                                    {value}
+                                <span className="inline-flex items-center px-3 py-0.5 bg-gray-100 text-gray-700 text-xs font-medium rounded-full max-w-full">
+                                  <span className="truncate max-w-[200px]">
+                                    V078 - {value}
                                   </span>
                                 </span>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p>{value}</p>
+                                <p>V078 - {value}</p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
@@ -1053,7 +1132,8 @@ export default function InvoiceDetailsPage() {
               ) : multiline ? (
                 <textarea
                   className={cn(
-                    "w-full text-sm text-gray-900 py-2 px-3 pr-10 rounded-md border transition-all duration-200 focus:outline-none focus:border-violet-500 resize-none",
+                    "w-full text-sm text-gray-900 py-2 px-3 pr-10 rounded-md border transition-all duration-200 focus:outline-none focus:border-violet-500 resize-none overflow-y-auto",
+                    fieldName === "billingAddress" ? "h-[100px]" : "h-20",
                     hasError ? "border-red-300 bg-red-50" : 
                     hasWarning ? "border-amber-300 bg-amber-50" : 
                     "border-violet-500 bg-white"
@@ -1068,7 +1148,6 @@ export default function InvoiceDetailsPage() {
                     }
                   }}
                   autoFocus
-                  rows={2}
                 />
               ) : type === "select" ? (
                 <Select
@@ -1193,8 +1272,13 @@ export default function InvoiceDetailsPage() {
                   autoFocus
                 />
               )}
-              <div data-validation-indicator className="absolute right-3 top-1/2 -translate-y-1/2">
-                {renderValidationIndicator(fieldName)}
+              <div className={cn(
+                "absolute right-3 flex items-center",
+                multiline && fieldName === "billingAddress" ? "top-[11px]" : ""
+              )}>
+                <div data-validation-indicator className="flex items-center">
+                  {renderValidationIndicator(fieldName)}
+                </div>
               </div>
             </div>
           ) : (
@@ -1202,8 +1286,8 @@ export default function InvoiceDetailsPage() {
               onClick={handleFieldClick}
               data-editable-field
               className={cn(
-                "relative text-sm py-2 pl-3 pr-10 rounded-md border transition-all duration-200 cursor-text flex items-center",
-                multiline ? "min-h-[40px]" : "h-[40px]",
+                "relative text-sm py-2 pl-3 pr-10 rounded-md border transition-all duration-200 cursor-text flex",
+                multiline ? "min-h-[40px] items-start" : "h-[40px] items-center",
                 hasError ? "border-red-200 bg-red-50/50 hover:bg-red-50" : 
                 hasWarning ? "border-amber-200 bg-amber-50/50 hover:bg-amber-50" : 
                 hasValidationIssues ? "border-gray-200 bg-gray-50/30 hover:border-violet-200 hover:bg-violet-50/50" :
@@ -1216,14 +1300,14 @@ export default function InvoiceDetailsPage() {
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-medium rounded-full max-w-full">
-                            <span className="truncate max-w-[160px]">
-                              {value}
+                          <span className="inline-flex items-center gap-1 px-3 py-0.5 bg-gray-100 text-gray-700 text-xs font-medium rounded-full max-w-full">
+                            <span className="truncate max-w-[200px]">
+                              V078 - {value}
                             </span>
                           </span>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>{value}</p>
+                          <p>V078 - {value}</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
@@ -1233,11 +1317,22 @@ export default function InvoiceDetailsPage() {
                     <div data-validation-indicator className="flex items-center">{renderValidationIndicator(fieldName)}</div>
                   </div>
                 </>
+              ) : multiline ? (
+                <div className={cn(
+                  "flex-1 overflow-y-auto pr-2",
+                  fieldName === "billingAddress" ? "h-[100px]" : "h-20"
+                )}>
+                  <span className={cn(
+                    !value ? "text-gray-400" : "text-gray-900",
+                    "whitespace-pre-wrap"
+                  )}>
+                    {value || placeholder}
+                  </span>
+                </div>
               ) : (
                 <span className={cn(
                   "flex-1 truncate pr-2",
-                  !value ? "text-gray-400" : "text-gray-900",
-                  multiline && "!whitespace-pre-wrap !truncate-none"
+                  !value ? "text-gray-400" : "text-gray-900"
                 )}>
                   {(() => {
                     if (!value) return placeholder
@@ -1249,7 +1344,10 @@ export default function InvoiceDetailsPage() {
                   })()}
                 </span>
               )}
-              <div className="absolute right-3 flex items-center gap-0.5">
+              <div className={cn(
+                "absolute right-3 flex items-center gap-0.5",
+                multiline && fieldName === "billingAddress" ? "top-[11px]" : ""
+              )}>
                 <Edit className="h-3.5 w-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                 <div data-validation-indicator className="flex items-center">{renderValidationIndicator(fieldName)}</div>
               </div>
@@ -1568,6 +1666,28 @@ export default function InvoiceDetailsPage() {
                             return (
                               <div className="inline-flex items-center px-2 py-0.5 bg-green-100 text-green-700 rounded-full mt-0.5">
                                 <span className="text-[10px] font-medium">Perfect Match</span>
+                              </div>
+                            )
+                          }
+                          
+                          if (amountComparison.result === 'within_tolerance') {
+                            const variance = amountComparison.details?.variance || 0
+                            const variancePercent = amountComparison.details?.variance_percent || 0
+                            const sign = variance > 0 ? '+' : ''
+                            
+                            return (
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1">
+                                  <p className="text-sm font-semibold text-green-600">
+                                    {sign}{formatCurrency(variance, invoice.currency_code)}
+                                  </p>
+                                  <span className="text-xs text-green-600">
+                                    ({sign}{variancePercent.toFixed(1)}%)
+                                  </span>
+                                </div>
+                                <div className="inline-flex items-center px-2 py-0.5 bg-green-50 text-green-600 rounded-full mt-0.5">
+                                  <span className="text-[10px] font-medium">Within 5% Tolerance</span>
+                                </div>
                               </div>
                             )
                           }
@@ -1938,8 +2058,8 @@ export default function InvoiceDetailsPage() {
                           </div>
                           
                           {/* Critical matching fields */}
-                          <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-3">
                               <EditableField
                                 fieldName="invoiceNumber"
                                 label="Invoice Number"
@@ -1980,54 +2100,21 @@ export default function InvoiceDetailsPage() {
                         </div>
 
                         {/* FINANCIAL Section */}
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                           <div className="flex items-center gap-2 pt-2">
                             <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Financial Details</span>
                             <div className="flex-1 h-[2px] bg-gray-200"></div>
                           </div>
                           
-                          <div className="space-y-4">
-                            {/* Row 1: Total Amount, Subtotal */}
-                            <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-3">
+                            {/* Row 1: Total Amount, Currency */}
+                            <div className="grid grid-cols-2 gap-3">
                               <EditableField
                                 fieldName="amount"
                                 label="Total Amount"
                                 value={invoice?.amount?.toString() || ''}
                                 type="number"
                               />
-                              <EditableField
-                                fieldName="subtotalAmount"
-                                label="Subtotal"
-                                value={invoice?.subtotal?.toString() || (invoice?.amount && invoice?.tax_amount ? (invoice.amount - invoice.tax_amount).toString() : '')}
-                                type="number"
-                              />
-                            </div>
-                            
-                            {/* Row 2: Tax Rate, Tax Amount */}
-                            <div className="grid grid-cols-2 gap-4">
-                              <EditableField
-                                fieldName="taxRate"
-                                label="Tax Rate"
-                                value={invoice?.tax_rate ? `${invoice.tax_rate}% VAT` : '15% VAT'}
-                                type="select"
-                                options={[
-                                  { value: "0% VAT", label: "0% VAT" },
-                                  { value: "5% VAT", label: "5% VAT" },
-                                  { value: "10% VAT", label: "10% VAT" },
-                                  { value: "15% VAT", label: "15% VAT" },
-                                  { value: "20% VAT", label: "20% VAT" }
-                                ]}
-                              />
-                              <EditableField
-                                fieldName="taxAmount"
-                                label="Tax Amount"
-                                value={invoice?.tax_amount?.toString() || ''}
-                                type="number"
-                              />
-                            </div>
-                            
-                            {/* Row 3: Currency (first column only) */}
-                            <div className="grid grid-cols-2 gap-4">
                               <EditableField
                                 fieldName="currency"
                                 label="Currency"
@@ -2041,99 +2128,53 @@ export default function InvoiceDetailsPage() {
                                   { value: "AUD", label: "AUD - Australian Dollar" }
                                 ]}
                               />
+                            </div>
+                            
+                            {/* Row 2: Subtotal, Tax Rate */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <EditableField
+                                fieldName="subtotalAmount"
+                                label="Subtotal"
+                                value={invoice?.subtotal?.toString() || (invoice?.amount && invoice?.tax_amount ? (invoice.amount - invoice.tax_amount).toString() : '')}
+                                type="number"
+                              />
+                              <EditableField
+                                fieldName="taxRate"
+                                label="Tax Rate"
+                                value={invoice?.tax_rate ? `${invoice.tax_rate}%` : '17.5%'}
+                                type="select"
+                                options={[
+                                  { value: "0%", label: "0%" },
+                                  { value: "5%", label: "5%" },
+                                  { value: "10%", label: "10%" },
+                                  { value: "15%", label: "15%" },
+                                  { value: "17.5%", label: "17.5%" },
+                                  { value: "20%", label: "20%" }
+                                ]}
+                              />
+                            </div>
+                            
+                            {/* Row 3: Tax Amount (first column only) */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <EditableField
+                                fieldName="taxAmount"
+                                label="Tax Amount"
+                                value={invoice?.tax_amount?.toString() || ''}
+                                type="number"
+                              />
                               <div></div>
                             </div>
                           </div>
                         </div>
 
-                        {/* PAYMENT Section */}
-                        <div className="space-y-4">
-                          <div className="flex items-center gap-2 pt-2">
-                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Payment Terms</span>
-                            <div className="flex-1 h-[2px] bg-gray-200"></div>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-4">
-                            <EditableField
-                              fieldName="billingAddress"
-                              label="Billing Address"
-                              value={invoice?.billing_address || ''}
-                              multiline={true}
-                            />
-                            <div className="space-y-1">
-                              <EditableField
-                                fieldName="paymentMethod"
-                                label="Payment Method"
-                                value={invoice?.payment_method || ''}
-                                type="select"
-                                options={[
-                                  { value: "ACH Transfer", label: "ACH Transfer" },
-                                  { value: "Wire Transfer", label: "Wire Transfer" },
-                                  { value: "Check", label: "Check" },
-                                  { value: "Credit Card", label: "Credit Card" }
-                                ]}
-                              />
-                              {invoice?.payment_method === "ACH Transfer" ? (
-                                <div className="text-xs text-gray-600">
-                                  Bank: Wells Fargo ***1234
-                                </div>
-                              ) : null}
-                            </div>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-4">
-                            <EditableField
-                              fieldName="paymentTerms"
-                              label="Payment Terms"
-                              value={invoice?.payment_term_days || ''}
-                              type="select"
-                              options={[
-                                { value: "Net 7", label: "Net 7 (No early payment discount)" },
-                                { value: "Net 15", label: "Net 15" },
-                                { value: "Net 30", label: "Net 30" },
-                                { value: "2/10 Net 30", label: "2/10 Net 30 (2% discount if paid in 10 days)" },
-                                { value: "Due on Receipt", label: "Due on Receipt" }
-                              ]}
-                            />
-                            <EditableField
-                              fieldName="glAccount"
-                              label="GL Account / Cost Center"
-                              value="6200-001 - Professional Services"
-                              type="select"
-                              options={[
-                                { value: "6200-001 - Professional Services", label: "6200-001 - Professional Services" },
-                                { value: "6100-002 - IT Services", label: "6100-002 - IT Services" },
-                                { value: "5500-003 - Marketing", label: "5500-003 - Marketing" },
-                                { value: "4400-004 - Operations", label: "4400-004 - Operations" }
-                              ]}
-                            />
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-4">
-                            <EditableField
-                              fieldName="spendCategory"
-                              label="Spend Category"
-                              value={invoice?.spend_category || "Professional Services"}
-                              type="select"
-                              options={[
-                                { value: "Professional Services", label: "Professional Services (UNSPSC: 81111500)" },
-                                { value: "IT Services", label: "IT Services (UNSPSC: 81101500)" },
-                                { value: "Marketing Services", label: "Marketing Services (UNSPSC: 82101500)" },
-                                { value: "Facilities Management", label: "Facilities Management (UNSPSC: 72100000)" }
-                              ]}
-                            />
-                            <div></div>
-                          </div>
-                        </div>
-
                         {/* PAYMENT SCHEDULE Section */}
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                           <div className="flex items-center gap-2 pt-2">
                             <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Payment Schedule</span>
                             <div className="flex-1 h-[2px] bg-gray-200"></div>
                           </div>
                           
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-2 gap-3">
                             <EditableField
                               fieldName="date"
                               label="Invoice Date"
@@ -2156,6 +2197,91 @@ export default function InvoiceDetailsPage() {
                           </div>
                         </div>
 
+                        {/* PAYMENT Section */}
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2 pt-2">
+                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Payment Information</span>
+                            <div className="flex-1 h-[2px] bg-gray-200"></div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3">
+                            {/* Left Column - Payment Method and Payment Terms */}
+                            <div className="space-y-3">
+                              <div className="space-y-1">
+                                <EditableField
+                                  fieldName="paymentMethod"
+                                  label="Payment Method"
+                                  value={invoice?.payment_method || ''}
+                                  type="select"
+                                  options={[
+                                    { value: "ACH Transfer", label: "ACH Transfer" },
+                                    { value: "Wire Transfer", label: "Wire Transfer" },
+                                    { value: "Check", label: "Check" },
+                                    { value: "Credit Card", label: "Credit Card" }
+                                  ]}
+                                />
+                                {invoice?.payment_method === "ACH Transfer" ? (
+                                  <div className="text-xs text-gray-600">
+                                    Bank: Wells Fargo ***1234
+                                  </div>
+                                ) : null}
+                              </div>
+                              
+                              <EditableField
+                                fieldName="paymentTerms"
+                                label="Payment Terms"
+                                value={invoice?.payment_term_days || ''}
+                                type="select"
+                                options={[
+                                  { value: "Net 7", label: "Net 7 (No early payment discount)" },
+                                  { value: "Net 15", label: "Net 15" },
+                                  { value: "Net 30", label: "Net 30" },
+                                  { value: "2/10 Net 30", label: "2/10 Net 30 (2% discount if paid in 10 days)" },
+                                  { value: "Due on Receipt", label: "Due on Receipt" }
+                                ]}
+                              />
+                            </div>
+                            
+                            {/* Right Column - Billing Address */}
+                            <EditableField
+                              fieldName="billingAddress"
+                              label="Billing Address"
+                              value={invoice?.billing_address || ''}
+                              multiline={true}
+                            />
+                          </div>
+                          
+                          {/* Conditional fields for non-PO invoices */}
+                          {!isPOBacked && (
+                            <div className="grid grid-cols-2 gap-3">
+                              <EditableField
+                                fieldName="glAccount"
+                                label="GL Account / Cost Center"
+                                value="6200-001 - Professional Services"
+                                type="select"
+                                options={[
+                                  { value: "6200-001 - Professional Services", label: "6200-001 - Professional Services" },
+                                  { value: "6100-002 - IT Services", label: "6100-002 - IT Services" },
+                                  { value: "5500-003 - Marketing", label: "5500-003 - Marketing" },
+                                  { value: "4400-004 - Operations", label: "4400-004 - Operations" }
+                                ]}
+                              />
+                              <EditableField
+                                fieldName="spendCategory"
+                                label="Spend Category"
+                                value={invoice?.spend_category || "Professional Services"}
+                                type="select"
+                                options={[
+                                  { value: "Professional Services", label: "Professional Services (UNSPSC: 81111500)" },
+                                  { value: "IT Services", label: "IT Services (UNSPSC: 81101500)" },
+                                  { value: "Marketing Services", label: "Marketing Services (UNSPSC: 82101500)" },
+                                  { value: "Facilities Management", label: "Facilities Management (UNSPSC: 72100000)" }
+                                ]}
+                              />
+                            </div>
+                          )}
+                        </div>
+
 
                         {/* LINKED DOCUMENTS Section */}
                         <div className="space-y-4 pt-2">
@@ -2165,28 +2291,6 @@ export default function InvoiceDetailsPage() {
                           </div>
                           
                           <div className="space-y-3">
-                            {/* Matching Summary - only show when PO is linked */}
-                            {linkedPO && matchingData && (
-                              <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <div className={cn(
-                                      "h-2 w-2 rounded-full",
-                                      getMatchingSummary(matchingData).status === 'perfect' ? "bg-green-500" :
-                                      getMatchingSummary(matchingData).status === 'partial' ? "bg-amber-500" :
-                                      "bg-red-500"
-                                    )} />
-                                    <span className="text-sm font-medium text-gray-700">
-                                      {getMatchingSummary(matchingData).message}
-                                    </span>
-                                  </div>
-                                  <span className="text-xs text-gray-500">
-                                    {getMatchingSummary(matchingData).confidence}% match
-                                  </span>
-                                </div>
-                              </div>
-                            )}
-                            
                             {/* Purchase Order Link */}
                             {linkedPO ? (
                               <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors animate-in fade-in-0 slide-in-from-top-2 duration-300">

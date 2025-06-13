@@ -142,4 +142,5 @@ dmypy.json
 .pyre/
 
 # pytype static type analyzer
-.pytype/
+.pytype/node_modules/
+venv/
