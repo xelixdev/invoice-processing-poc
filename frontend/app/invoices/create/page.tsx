@@ -191,6 +191,7 @@ export default function InvoiceDetailsPage() {
   const [resolvedIssues, setResolvedIssues] = useState<Set<string>>(new Set())
   const [editingLineItem, setEditingLineItem] = useState<number | null>(null)
   const [lineItemValues, setLineItemValues] = useState<{[key: number]: Partial<LineItem>}>({})
+  const [skuValues, setSkuValues] = useState<{[key: number]: string}>({})
   const [forcedMatchedItems, setForcedMatchedItems] = useState<Set<number>>(new Set())
   const [budgetSectionExpanded, setBudgetSectionExpanded] = useState(false)
   const [workflowStage, setWorkflowStage] = useState<'draft' | 'validation' | 'pending_approval' | 'approved' | 'processing' | 'paid'>('validation')
@@ -206,15 +207,75 @@ export default function InvoiceDetailsPage() {
     initialData: invoice
   })
 
-  // Mock GR line items for matching (keeping only GR for now)
-  const mockGRLines = [
-    { id: "GR-001-1", description: "Professional consulting services", quantity: 10 },
-    { id: "GR-001-2", description: "Software development services", quantity: 8 },
-    { id: "GR-001-3", description: "Project management services", quantity: 5 },
+  // Mock PO line items for matching
+  const mockPOLines = [
+    { id: "PO-001-1", description: "Office Chair", quantity: 4, unit_price: 75.00, total: 300.00 },
+    { id: "PO-001-2", description: "Office Desk", quantity: 3, unit_price: 200.00, total: 600.00 },
+    { id: "PO-001-3", description: "Office TV", quantity: 2, unit_price: 500.00, total: 1000.00 },
+    { id: "PO-001-4", description: "Office Couch", quantity: 1, unit_price: 750.00, total: 750.00 },
+    { id: "PO-001-5", description: "Office Lamp", quantity: 5, unit_price: 25.00, total: 125.00 },
+    { id: "PO-001-6", description: "Office Water Dispenser", quantity: 1, unit_price: 280.00, total: 280.00 },
   ]
+
+  // Mock GR line items for matching
+  const mockGRLines = [
+    { id: "GR-001-1", description: "Office Chair", quantity: 4 },
+    { id: "GR-001-2", description: "Office Desk", quantity: 3 },
+    { id: "GR-001-3", description: "Office TV", quantity: 2 },
+    { id: "GR-001-4", description: "Office Couch", quantity: 1 },
+    { id: "GR-001-5", description: "Office Lamp", quantity: 5 },
+    { id: "GR-001-6", description: "Office Water Dispenser", quantity: 1 },
+  ]
+
+  // Mock SKU codes for invoice line items
+  const mockSKUCodes = [
+    "CH-002",
+    "DK-002", 
+    "TV-002",
+    "SF-001",
+    "LM-002",
+    "WD-001"
+  ]
+
+  // Function to get SKU for a line item
+  const getLineItemSKU = (itemIndex: number) => {
+    // Check if there's an edited SKU value
+    if (skuValues[itemIndex] !== undefined) {
+      return skuValues[itemIndex]
+    }
+    
+    // Fall back to mock data
+    if (!invoice?.line_items || invoice.line_items.length > 6 || itemIndex >= mockSKUCodes.length) {
+      return "—"
+    }
+    return mockSKUCodes[itemIndex]
+  }
+
+  // Handle SKU value change
+  const handleSKUValueChange = (index: number, value: string) => {
+    setSkuValues(prev => ({
+      ...prev,
+      [index]: value
+    }))
+  }
 
   // Line item matching state
   const [lineItemMatches, setLineItemMatches] = useState<{[key: number]: {poLineId?: string, grLineId?: string}}>({})
+  
+  // Auto-assign PO lines on page load
+  useEffect(() => {
+    if (invoice?.line_items && invoice.line_items.length > 0 && invoice.line_items.length <= 6) {
+      const autoMatches: {[key: number]: {poLineId?: string, grLineId?: string}} = {}
+      
+      for (let i = 0; i < invoice.line_items.length; i++) {
+        autoMatches[i] = {
+          poLineId: `PO-001-${i + 1}`
+        }
+      }
+      
+      setLineItemMatches(autoMatches)
+    }
+  }, [invoice?.line_items])
   
   // Mock comment data for some line items
   const mockComments: {[key: number]: number} = {
@@ -233,8 +294,7 @@ export default function InvoiceDetailsPage() {
     if (!match?.poLineId) return 'missing'
     
     const invoiceItem = invoice?.line_items[itemIndex]
-    // TODO: Get PO line items from backend matching data
-    const poLine = null // mockPOLines.find(po => po.id === match.poLineId)
+    const poLine = mockPOLines.find(po => po.id === match.poLineId)
     
     if (!poLine || !invoiceItem) return 'missing'
     
@@ -730,7 +790,8 @@ export default function InvoiceDetailsPage() {
   // Helper function to render validation indicator
   const renderValidationIndicator = (fieldKey: string) => {
     const fieldValidation = validation.getFieldValidation(fieldKey)
-    const fieldIssues = fieldValidation.issues
+    // Use comprehensive validation issues that include PO matching
+    const fieldIssues = validationIssues[fieldKey] || []
     const matchStatus = getFieldMatchStatus(matchingData, fieldKey)
     const matchResult = getFieldMatchResult(matchingData, fieldKey)
     
@@ -2837,19 +2898,20 @@ export default function InvoiceDetailsPage() {
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-gray-50 h-auto">
-                          <TableHead className="w-8 text-center text-sm font-medium py-2 px-2">#</TableHead>
-                          <TableHead className="w-20 text-sm font-medium py-2 px-2">Status</TableHead>
-                          <TableHead className="w-48 text-sm font-medium py-2 px-2">Description<br/>(Invoice)</TableHead>
-                          <TableHead className="w-12 text-right text-sm font-medium py-2 px-2">Qty</TableHead>
-                          <TableHead className="w-16 text-right text-sm font-medium py-2 px-2">Unit<br/>Price</TableHead>
-                          <TableHead className="w-16 text-right text-sm font-medium py-2 px-2 border-r-2 border-violet-300">Total</TableHead>
+                          <TableHead className="w-8 text-center text-xs font-medium py-2 px-2">#</TableHead>
+                          <TableHead className="w-20 text-xs font-medium py-2 px-2">Status</TableHead>
+                          <TableHead className="w-28 text-xs font-medium py-2 px-2">SKU</TableHead>
+                          <TableHead className="w-56 text-xs font-medium py-2 px-2">Description<br/>(Invoice)</TableHead>
+                          <TableHead className="w-14 text-right text-xs font-medium py-2 px-2">Qty</TableHead>
+                          <TableHead className="w-18 text-right text-xs font-medium py-2 px-2">Unit<br/>Price</TableHead>
+                          <TableHead className="w-18 text-right text-xs font-medium py-2 px-2 pr-4 border-r-2 border-violet-300">Total</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {invoice.line_items.map((item, index) => {
                           const status = getLineItemStatus(index)
                           const match = lineItemMatches[index]
-                          const poLine = null // TODO: Get from backend data
+                          const poLine = match?.poLineId ? mockPOLines.find(po => po.id === match.poLineId) : null
                           const grLine = match?.grLineId ? mockGRLines.find(gr => gr.id === match.grLineId) : null
                           
                           return (
@@ -2871,6 +2933,21 @@ export default function InvoiceDetailsPage() {
                               <TableCell className="text-sm font-medium h-[50px] py-1 px-2 align-middle">
                                 {editingLineItem === index ? (
                                   <Input
+                                    value={skuValues[index] !== undefined ? skuValues[index] : getLineItemSKU(index)}
+                                    onChange={(e) => handleSKUValueChange(index, e.target.value)}
+                                    onKeyDown={(e) => handleKeyDown(e, index)}
+                                    className="h-8 text-sm px-2 py-1"
+                                    placeholder="Enter SKU"
+                                  />
+                                ) : (
+                                  <div className="truncate max-w-26" title={getLineItemSKU(index) === "—" ? "SKU not available" : getLineItemSKU(index)}>
+                                    {getLineItemSKU(index)}
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-sm font-medium h-[50px] py-1 px-2 align-middle">
+                                {editingLineItem === index ? (
+                                  <Input
                                     ref={(el) => { descriptionInputRefs.current[index] = el }}
                                     value={lineItemValues[index]?.description || ''}
                                     onChange={(e) => handleLineItemValueChange(index, 'description', e.target.value)}
@@ -2879,14 +2956,14 @@ export default function InvoiceDetailsPage() {
                                     placeholder="Enter description"
                                   />
                                 ) : (
-                                  <div className="truncate max-w-44" title={item.description}>
+                                  <div className="truncate max-w-52" title={item.description}>
                                     {item.description}
                                   </div>
                                 )}
                               </TableCell>
                               <TableCell className={cn(
                                 "text-right text-sm h-[50px] py-1 px-2 align-middle",
-                                !forcedMatchedItems.has(index) && ((poLine && Number(item.quantity) !== Number(poLine.quantity)) || (grLine && Number(item.quantity) !== Number(grLine.quantity))) && "bg-amber-50"
+                                !forcedMatchedItems.has(index) && ((poLine && Number(item.quantity) !== Number(poLine.quantity)) || (grLine && Number(item.quantity) !== Number(grLine.quantity))) && "bg-red-50 border border-red-400"
                               )}>
                                 {editingLineItem === index ? (
                                   <Input
@@ -2898,12 +2975,12 @@ export default function InvoiceDetailsPage() {
                                     placeholder="0"
                                   />
                                 ) : (
-                                  item.quantity
+                                  Number(item.quantity).toFixed(2)
                                 )}
                               </TableCell>
                               <TableCell className={cn(
                                 "text-right text-sm h-[50px] py-1 px-2 align-middle",
-                                !forcedMatchedItems.has(index) && (poLine && Number(item.unit_price) !== Number(poLine.unit_price)) && "bg-amber-50"
+                                !forcedMatchedItems.has(index) && (poLine && Number(item.unit_price) !== Number(poLine.unit_price)) && "bg-red-50 border border-red-400"
                               )}>
                                 {editingLineItem === index ? (
                                   <Input
@@ -2919,7 +2996,7 @@ export default function InvoiceDetailsPage() {
                                   formatCurrency(item.unit_price, invoice.currency_code)
                                 )}
                               </TableCell>
-                              <TableCell className="text-right text-sm h-[50px] py-1 px-2 border-r-2 border-violet-300 align-middle">
+                              <TableCell className="text-right text-sm h-[50px] py-1 px-2 pr-4 border-r-2 border-violet-300 align-middle">
                                 {editingLineItem === index ? 
                                   formatCurrency(lineItemValues[index]?.total || 0, invoice.currency_code) :
                                   formatCurrency(item.total, invoice.currency_code)
@@ -2941,43 +3018,39 @@ export default function InvoiceDetailsPage() {
                       !linkedPO && linkedGR && "min-w-[300px]"
                     )}>
                       <TableHeader>
-                        <TableRow className="bg-gray-50 h-auto">
+                        <TableRow className="bg-gray-50 h-12">
                           {linkedPO && (
                             <>
-                              <TableHead className="min-w-[60px] text-sm font-medium py-2 px-2">PO Line<br/>Source</TableHead>
-                              <TableHead className="min-w-[120px] text-sm font-medium py-2 px-2">PO Description</TableHead>
-                              <TableHead className="min-w-[40px] text-right text-sm font-medium py-2 px-2">PO<br/>Qty</TableHead>
-                              <TableHead className="min-w-[60px] text-right text-sm font-medium py-2 px-2">PO Unit<br/>Price</TableHead>
+                              <TableHead className="min-w-[70px] text-xs font-medium py-2 px-2 pl-4" title="Purchase Order Line Source">PO Line</TableHead>
+                              <TableHead className="min-w-[140px] text-xs font-medium py-2 px-2" title="Purchase Order Description">PO Description</TableHead>
+                              <TableHead className="min-w-[50px] text-right text-xs font-medium py-2 px-2 whitespace-nowrap" title="Purchase Order Quantity">PO Qty</TableHead>
+                              <TableHead className="min-w-[70px] text-right text-xs font-medium py-2 px-2" title="Purchase Order Unit Price">PO Price</TableHead>
                               <TableHead className={cn(
-                                "min-w-[60px] text-right text-sm font-medium py-2 px-2",
+                                "min-w-[70px] text-right text-xs font-medium py-2 px-2 pr-4",
                                 !linkedGR && "border-r-2 border-violet-300"
-                              )}>PO<br/>Total</TableHead>
+                              )} title="Purchase Order Total">PO Total</TableHead>
                             </>
                           )}
                           {linkedGR && (
                             <>
                               <TableHead className={cn(
-                                "min-w-[60px] text-sm font-medium py-2 px-2",
+                                "min-w-[70px] text-xs font-medium py-2 px-2 pl-4",
                                 linkedPO && "border-l-2 border-violet-300"
-                              )}>GR Line<br/>Source</TableHead>
-                              <TableHead className="min-w-[120px] text-sm font-medium py-2 px-2">GR Description</TableHead>
-                              <TableHead className="min-w-[40px] text-right text-sm font-medium py-2 px-2 border-r-2 border-violet-300">GR<br/>Qty</TableHead>
+                              )} title="Goods Receipt Line Source">GR Line</TableHead>
+                              <TableHead className="min-w-[140px] text-xs font-medium py-2 px-2" title="Goods Receipt Description">GR Description</TableHead>
+                              <TableHead className="min-w-[50px] text-right text-xs font-medium py-2 px-2 pr-4 border-r-2 border-violet-300 whitespace-nowrap" title="Goods Receipt Quantity">GR Qty</TableHead>
                             </>
                           )}
                           <TableHead className={cn(
-                            "text-center text-sm font-medium py-2 px-2",
-                            !linkedPO && !linkedGR ? "w-1/2" : "min-w-[40px]"
-                          )}>Comments</TableHead>
-                          <TableHead className={cn(
-                            "text-center text-sm font-medium py-2 px-2",
-                            !linkedPO && !linkedGR ? "w-1/2" : "min-w-[40px]"
+                            "text-center text-xs font-medium py-2 px-2",
+                            !linkedPO && !linkedGR ? "w-full" : "min-w-[80px]"
                           )}>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {invoice.line_items.map((item, index) => {
                           const match = lineItemMatches[index]
-                          const poLine = null // TODO: Get from backend data
+                          const poLine = match?.poLineId ? mockPOLines.find(po => po.id === match.poLineId) : null
                           const grLine = match?.grLineId ? mockGRLines.find(gr => gr.id === match.grLineId) : null
                           
                           // Get all selected PO and GR items for this dropdown
@@ -2994,9 +3067,9 @@ export default function InvoiceDetailsPage() {
                               {linkedPO && (
                                 <>
                                   {/* PO Line Source */}
-                                  <TableCell className="h-[50px] py-1 px-2 align-middle">
+                                  <TableCell className="h-[50px] py-1 px-2 pl-4 align-middle">
                                     <LineItemSelector
-                                      items={[]} // TODO: Get PO line items from backend
+                                      items={mockPOLines}
                                       value={match?.poLineId}
                                       onSelect={(value) => handleLineItemMatch(index, 'po', value)}
                                       placeholder="Select line"
@@ -3017,18 +3090,18 @@ export default function InvoiceDetailsPage() {
                                   </TableCell>
                                   <TableCell className={cn(
                                     "text-right text-sm text-gray-600 h-[50px] py-1 px-2 align-middle",
-                                    !forcedMatchedItems.has(index) && poLine && Number(item.quantity) !== Number(poLine.quantity) && "bg-amber-50"
+                                    !forcedMatchedItems.has(index) && poLine && Number(item.quantity) !== Number(poLine.quantity) && "bg-red-50 border border-red-400"
                                   )}>
                                     {poLine?.quantity || "—"}
                                   </TableCell>
                                   <TableCell className={cn(
                                     "text-right text-sm text-gray-600 h-[50px] py-1 px-2 align-middle",
-                                    !forcedMatchedItems.has(index) && poLine && Number(item.unit_price) !== Number(poLine.unit_price) && "bg-amber-50"
+                                    !forcedMatchedItems.has(index) && poLine && Number(item.unit_price) !== Number(poLine.unit_price) && "bg-red-50 border border-red-400"
                                   )}>
                                     {poLine ? formatCurrency(poLine.unit_price, invoice.currency_code) : "—"}
                                   </TableCell>
                                   <TableCell className={cn(
-                                    "text-right text-sm text-gray-600 h-[50px] py-1 px-2 align-middle",
+                                    "text-right text-sm text-gray-600 h-[50px] py-1 px-2 pr-4 align-middle",
                                     !linkedGR && "border-r-2 border-violet-300"
                                   )}>
                                     {poLine ? formatCurrency(poLine.total, invoice.currency_code) : "—"}
@@ -3041,7 +3114,7 @@ export default function InvoiceDetailsPage() {
                                 <>
                                   {/* GR Line Source */}
                                   <TableCell className={cn(
-                                    "h-[50px] py-1 px-2 align-middle",
+                                    "h-[50px] py-1 px-2 pl-4 align-middle",
                                     linkedPO && "border-l-2 border-violet-300"
                                   )}>
                                     <LineItemSelector
@@ -3065,25 +3138,13 @@ export default function InvoiceDetailsPage() {
                                     </div>
                                   </TableCell>
                                   <TableCell className={cn(
-                                    "text-right text-sm text-gray-600 h-[50px] py-1 px-2 border-r-2 border-violet-300 align-middle",
-                                    !forcedMatchedItems.has(index) && grLine && Number(item.quantity) !== Number(grLine.quantity) && "bg-amber-50"
+                                    "text-right text-sm text-gray-600 h-[50px] py-1 px-2 pr-4 border-r-2 border-violet-300 align-middle",
+                                    !forcedMatchedItems.has(index) && grLine && Number(item.quantity) !== Number(grLine.quantity) && "bg-red-50 border border-red-400"
                                   )}>
                                     {grLine?.quantity || "—"}
                                   </TableCell>
                                 </>
                               )}
-                              
-                              {/* Comments */}
-                              <TableCell className="h-[50px] py-1 px-2 text-center align-middle">
-                                <Button variant="ghost" size="sm" className="h-5 w-5 p-0 mx-auto relative">
-                                  <MessageCircle className="h-2.5 w-2.5" />
-                                  {mockComments[index] && (
-                                    <span className="absolute -top-0.5 -right-1 h-3 w-3 bg-gray-600 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
-                                      {mockComments[index]}
-                                    </span>
-                                  )}
-                                </Button>
-                              </TableCell>
                               
                               {/* Actions */}
                               <TableCell className="h-[50px] py-1 px-2 text-center align-middle">
@@ -3093,18 +3154,18 @@ export default function InvoiceDetailsPage() {
                                       <Button 
                                         variant="ghost" 
                                         size="sm" 
-                                        className="h-6 w-6 p-0 hover:bg-green-100"
+                                        className="h-6 w-6 p-0 hover:bg-violet-100"
                                         onClick={() => handleSaveLineItem(index)}
                                       >
-                                        <CheckCircle className="h-3 w-3 text-green-600" />
+                                        <CheckCircle className="h-3 w-3 text-violet-600" />
                                       </Button>
                                       <Button 
                                         variant="ghost" 
                                         size="sm" 
-                                        className="h-6 w-6 p-0 hover:bg-red-100"
+                                        className="h-6 w-6 p-0 hover:bg-violet-100"
                                         onClick={handleCancelEditLineItem}
                                       >
-                                        <X className="h-3 w-3 text-red-600" />
+                                        <X className="h-3 w-3 text-violet-600" />
                                       </Button>
                                     </>
                                   ) : (
@@ -3112,15 +3173,29 @@ export default function InvoiceDetailsPage() {
                                       <Button 
                                         variant="ghost" 
                                         size="sm" 
+                                        className="h-6 w-6 p-0 hover:bg-violet-100 relative"
+                                        title="Comments"
+                                      >
+                                        <MessageCircle className="h-3 w-3 text-violet-600" />
+                                        {mockComments[index] && (
+                                          <span className="absolute top-0 right-0 h-3 w-3 bg-violet-600 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
+                                            {mockComments[index]}
+                                          </span>
+                                        )}
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
                                         className="h-6 w-6 p-0 hover:bg-violet-100"
                                         onClick={() => handleEditLineItem(index)}
+                                        title="Edit"
                                       >
                                         <Edit className="h-3 w-3 text-violet-600" />
                                       </Button>
                                       <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-gray-100">
-                                            <MoreVertical className="h-3 w-3 text-gray-600" />
+                                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-violet-100" title="More options">
+                                            <MoreVertical className="h-3 w-3 text-violet-600" />
                                           </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end" className="w-48">
