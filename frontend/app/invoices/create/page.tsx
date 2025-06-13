@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input"
 import { format } from "date-fns"
 import { LineItemSelector } from "@/components/line-item-selector"
 import { useInvoiceValidation, validationRules } from "@/hooks/use-invoice-validation"
-import { parseMatchingValidation, getFieldMatchStatus, getFieldMatchResult, getMatchingSummary } from "@/lib/validation/matching-parser"
+import { parseMatchingValidation, getFieldMatchStatus, getMatchingSummary } from "@/lib/validation/matching-parser"
 import { runCrossFieldValidations, calculateExpectedValues, crossFieldValidationRules } from "@/lib/validation/cross-field-validation"
 
 interface InvoiceData {
@@ -879,7 +879,6 @@ export default function InvoiceDetailsPage() {
     // Use comprehensive validation issues that include PO matching
     const fieldIssues = validationIssues[fieldKey] || []
     const matchStatus = getFieldMatchStatus(matchingData, fieldKey)
-    const matchResult = getFieldMatchResult(matchingData, fieldKey)
     
     // Show loading indicator if validating
     if (fieldValidation.isValidating) {
@@ -890,57 +889,24 @@ export default function InvoiceDetailsPage() {
       )
     }
     
-    // Show badges for matched fields (both perfect match and within tolerance)
+    // Show badges for matched fields
     if ((!fieldIssues || fieldIssues.length === 0) && matchStatus === 'matched') {
-      if (matchResult === 'perfect_match') {
-        return (
-          <div className="ml-2 inline-flex items-center">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="inline-flex">
-                    <CheckCircle className="h-4 w-4 text-green-500 cursor-help" />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Perfect Match with PO</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-        )
-      } else if (matchResult === 'within_tolerance') {
-        // Get variance details for tooltip
-        const fieldMap: { [key: string]: keyof typeof matchingData.data_comparison.comparisons } = {
-          amount: 'amount',
-          currency: 'currency',
-          paymentTerms: 'payment_terms',
-          vendor: 'vendor'
-        }
-        const comparisonKey = fieldMap[fieldKey]
-        const comparison = matchingData?.data_comparison?.comparisons?.[comparisonKey]
-        const variance = comparison?.details?.variance || 0
-        const variancePercent = comparison?.details?.variance_percent || 0
-        const sign = variance > 0 ? '+' : ''
-        
-        return (
-          <div className="ml-2 inline-flex items-center gap-1">
-            <CheckCircle className="h-4 w-4 text-green-400" />
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="inline-flex">
-                    <span className="text-[10px] px-1.5 py-0.5 bg-green-50 text-green-600 rounded-full font-medium cursor-help">Within Tolerance</span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{sign}{formatCurrency(Math.abs(variance), invoice?.currency_code)} ({sign}{Math.abs(variancePercent).toFixed(1)}%) difference vs PO</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-        )
-      }
+      return (
+        <div className="ml-2 inline-flex items-center">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="inline-flex">
+                  <CheckCircle className="h-4 w-4 text-green-500 cursor-help" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Matched with PO</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      )
     }
     
     // Show green checkmark for fields with no issues
