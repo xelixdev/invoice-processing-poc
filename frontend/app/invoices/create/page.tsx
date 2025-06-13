@@ -7,13 +7,14 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogOverlay, DialogPortal } from "@/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Sheet, SheetHeader, SheetTitle, SheetTrigger, SheetPortal, SheetClose } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetPortal, SheetClose } from "@/components/ui/sheet"
 import * as SheetPrimitive from "@radix-ui/react-dialog"
 import Sidebar from "@/components/sidebar"
 import Link from "next/link"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Calendar } from "@/components/ui/calendar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -118,7 +119,7 @@ const invoiceFieldValidation = {
   ],
   dueDate: [
     validationRules.required('Due date is required'),
-    validationRules.futureDate('Due date should be in the future'),
+    validationRules.overdue(),
     crossFieldValidationRules.dueDateAfterInvoiceDate()
   ],
   
@@ -137,6 +138,38 @@ const invoiceFieldValidation = {
   ],
   paymentMethod: [
     validationRules.required('Payment method is required')
+  ],
+  
+  // GL Account and Spend Category - required only for non-PO invoices
+  glAccount: [
+    {
+      type: 'custom' as const,
+      severity: 'error' as const,
+      message: 'GL Account / Cost Center is required for non-PO invoices',
+      validate: (value: any, formData?: any) => {
+        // If PO-backed, field is not required
+        const isPOBacked = !!(formData?.po_number || linkedPO || matchingData?.matched_po)
+        if (isPOBacked) return true
+        
+        // For non-PO invoices, field is required
+        return value && value.trim().length > 0
+      }
+    }
+  ],
+  spendCategory: [
+    {
+      type: 'custom' as const,
+      severity: 'error' as const,
+      message: 'Spend Category is required for non-PO invoices',
+      validate: (value: any, formData?: any) => {
+        // If PO-backed, field is not required
+        const isPOBacked = !!(formData?.po_number || linkedPO || matchingData?.matched_po)
+        if (isPOBacked) return true
+        
+        // For non-PO invoices, field is required
+        return value && value.trim().length > 0
+      }
+    }
   ]
 }
 
@@ -151,6 +184,7 @@ export default function InvoiceDetailsPage() {
   const [linkedGR, setLinkedGR] = useState<string | null>(null)
   const [validationIssues, setValidationIssues] = useState<{[key: string]: ValidationIssue[]}>({}) // Keep for backward compatibility
   const [isIssuesDrawerOpen, setIsIssuesDrawerOpen] = useState(false)
+  const [exceptionsOpen, setExceptionsOpen] = useState(false)
   const [editingField, setEditingField] = useState<string | null>(null)
   const [fieldValues, setFieldValues] = useState<{[key: string]: string}>({})
   const [removingVendor, setRemovingVendor] = useState(false)
@@ -158,11 +192,14 @@ export default function InvoiceDetailsPage() {
   const [resolvedIssues, setResolvedIssues] = useState<Set<string>>(new Set())
   const [editingLineItem, setEditingLineItem] = useState<number | null>(null)
   const [lineItemValues, setLineItemValues] = useState<{[key: number]: Partial<LineItem>}>({})
+  const [skuValues, setSkuValues] = useState<{[key: number]: string}>({})
   const [forcedMatchedItems, setForcedMatchedItems] = useState<Set<number>>(new Set())
-  const [budgetSectionExpanded, setBudgetSectionExpanded] = useState(true)
+  const [budgetSectionExpanded, setBudgetSectionExpanded] = useState(false)
   const [workflowStage, setWorkflowStage] = useState<'draft' | 'validation' | 'pending_approval' | 'approved' | 'processing' | 'paid'>('validation')
   const [showWorkflowDetails, setShowWorkflowDetails] = useState(false)
   const [currentAssignee, setCurrentAssignee] = useState('SC')
+  const [lineItemsSwitch, setLineItemsSwitch] = useState(false)
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
   const pdfContainerRef = useRef<HTMLDivElement>(null)
   const descriptionInputRefs = useRef<{[key: number]: HTMLInputElement | null}>({})
   
@@ -172,15 +209,129 @@ export default function InvoiceDetailsPage() {
     initialData: invoice
   })
 
-  // Mock GR line items for matching (keeping only GR for now)
-  const mockGRLines = [
-    { id: "GR-001-1", description: "Professional consulting services", quantity: 10 },
-    { id: "GR-001-2", description: "Software development services", quantity: 8 },
-    { id: "GR-001-3", description: "Project management services", quantity: 5 },
+  // Trigger validation on component mount for all fields (client-side only)
+  const hasRunInitialValidation = useRef(false)
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined' && invoice && !hasRunInitialValidation.current) {
+      console.log('Running initial validation for all fields...')
+      hasRunInitialValidation.current = true
+      
+      // Small delay to ensure component is fully mounted
+      setTimeout(() => {
+        Object.keys(invoiceFieldValidation).forEach(async (fieldName) => {
+          const invoiceFieldName = getInvoiceFieldName(fieldName)
+          const fieldValue = invoice[invoiceFieldName as keyof typeof invoice]
+          if (fieldValue) {
+            console.log(`Validating ${fieldName} with value:`, fieldValue)
+            await validation.validateField(fieldName, fieldValue, invoice)
+          }
+        })
+      }, 100)
+    }
+  }, [invoice]) // Removed validation from dependencies
+
+  // Mock PO line items for matching
+  const mockPOLines = [
+    { id: "PO-001-1", po_number: "PO-001", line_number: 1, sku: "CH-002", description: "Office Chair", quantity: 4, unit_price: 75.00, total: 300.00 },
+    { id: "PO-001-2", po_number: "PO-001", line_number: 2, sku: "DK-002", description: "Office Desk", quantity: 3, unit_price: 200.00, total: 600.00 },
+    { id: "PO-001-3", po_number: "PO-001", line_number: 3, sku: "TV-002", description: "Office TV", quantity: 2, unit_price: 500.00, total: 1000.00 },
+    { id: "PO-001-4", po_number: "PO-001", line_number: 4, sku: "SF-001", description: "Office Couch", quantity: 1, unit_price: 750.00, total: 750.00 },
+    { id: "PO-001-5", po_number: "PO-001", line_number: 5, sku: "LM-002", description: "Office Lamp", quantity: 5, unit_price: 25.00, total: 125.00 },
+    { id: "PO-001-6", po_number: "PO-001", line_number: 6, sku: "WD-001", description: "Office Water Dispenser", quantity: 1, unit_price: 280.00, total: 280.00 },
   ]
+
+  // Mock GR line items for matching
+  const mockGRLines = [
+    { id: "GR-001-1", line_number: 1, sku: "CH-002", description: "Office Chair", quantity: 4, unit_price: 75.00, total: 300.00, received_date: "2024-12-01" },
+    { id: "GR-001-2", line_number: 2, sku: "DK-002", description: "Office Desk", quantity: 3, unit_price: 200.00, total: 600.00, received_date: "2024-12-02" },
+    { id: "GR-001-3", line_number: 3, sku: "TV-002", description: "Office TV", quantity: 2, unit_price: 500.00, total: 1000.00, received_date: "2024-12-03" },
+    { id: "GR-001-4", line_number: 4, sku: "SF-001", description: "Office Couch", quantity: 1, unit_price: 750.00, total: 750.00, received_date: "2024-12-04" },
+    { id: "GR-001-5", line_number: 5, sku: "LM-002", description: "Office Lamp", quantity: 5, unit_price: 25.00, total: 125.00, received_date: "2024-12-05" },
+    { id: "GR-001-6", line_number: 6, sku: "WD-001", description: "Office Water Dispenser", quantity: 1, unit_price: 280.00, total: 280.00, received_date: "2024-12-06" },
+  ]
+
+  // Mock SKU codes for invoice line items
+  const mockSKUCodes = [
+    "CH-002",
+    "DK-002", 
+    "TV-002",
+    "SF-001",
+    "LM-002",
+    "WD-001"
+  ]
+
+  // Function to get SKU for a line item
+  const getLineItemSKU = (itemIndex: number) => {
+    // Check if there's an edited SKU value
+    if (skuValues[itemIndex] !== undefined) {
+      return skuValues[itemIndex]
+    }
+    
+    // Fall back to mock data
+    if (!invoice?.line_items || invoice.line_items.length > 6 || itemIndex >= mockSKUCodes.length) {
+      return "—"
+    }
+    return mockSKUCodes[itemIndex]
+  }
+
+  // Handle SKU value change
+  const handleSKUValueChange = (index: number, value: string) => {
+    setSkuValues(prev => ({
+      ...prev,
+      [index]: value
+    }))
+  }
+
+  // Toggle row expansion
+  const toggleRowExpansion = (index: number) => {
+    setExpandedRows(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(index)) {
+        newSet.delete(index)
+      } else {
+        newSet.add(index)
+      }
+      return newSet
+    })
+  }
 
   // Line item matching state
   const [lineItemMatches, setLineItemMatches] = useState<{[key: number]: {poLineId?: string, grLineId?: string}}>({})
+
+  // Check if a row should auto-expand (has mismatches)
+  const shouldAutoExpand = (index: number) => {
+    const status = getLineItemStatus(index)
+    return status === 'mismatch'
+  }
+
+  // Initialize auto-expansion for rows with mismatches
+  useEffect(() => {
+    if (lineItemsSwitch && invoice?.line_items) {
+      const autoExpandRows = new Set<number>()
+      invoice.line_items.forEach((_, index) => {
+        if (shouldAutoExpand(index)) {
+          autoExpandRows.add(index)
+        }
+      })
+      setExpandedRows(autoExpandRows)
+    }
+  }, [lineItemsSwitch, invoice?.line_items, lineItemMatches, forcedMatchedItems])
+  
+  // Auto-assign PO lines on page load
+  useEffect(() => {
+    if (invoice?.line_items && invoice.line_items.length > 0 && invoice.line_items.length <= 6) {
+      const autoMatches: {[key: number]: {poLineId?: string, grLineId?: string}} = {}
+      
+      for (let i = 0; i < invoice.line_items.length; i++) {
+        autoMatches[i] = {
+          poLineId: `PO-001-${i + 1}`
+        }
+      }
+      
+      setLineItemMatches(autoMatches)
+    }
+  }, [invoice?.line_items])
   
   // Mock comment data for some line items
   const mockComments: {[key: number]: number} = {
@@ -199,8 +350,7 @@ export default function InvoiceDetailsPage() {
     if (!match?.poLineId) return 'missing'
     
     const invoiceItem = invoice?.line_items[itemIndex]
-    // TODO: Get PO line items from backend matching data
-    const poLine = null // mockPOLines.find(po => po.id === match.poLineId)
+    const poLine = mockPOLines.find(po => po.id === match.poLineId)
     
     if (!poLine || !invoiceItem) return 'missing'
     
@@ -505,8 +655,7 @@ export default function InvoiceDetailsPage() {
         
         // Initialize linked PO state
         setLinkedPO(firstInvoice.po_number)
-        // Initialize with a sample GR for demonstration
-        setLinkedGR("GR-2023-001")
+        // Do not initialize GR - let user link manually when needed
       }
     }
 
@@ -541,12 +690,19 @@ export default function InvoiceDetailsPage() {
         setEditingField(field)
       })
       
-      // Merge matching issues with existing validation
+      // Merge matching issues with existing validation (deduplicated)
       Object.entries(matchingIssues).forEach(([field, issues]) => {
         if (issues.length > 0) {
+          const existingIssues = newValidationIssues[field] || []
+          const uniqueIssues = issues.filter(newIssue => 
+            !existingIssues.some(existingIssue => 
+              existingIssue.message === newIssue.message && 
+              existingIssue.type === newIssue.type
+            )
+          )
           newValidationIssues[field] = [
-            ...(newValidationIssues[field] || []),
-            ...issues
+            ...existingIssues,
+            ...uniqueIssues
           ]
         }
       })
@@ -557,9 +713,16 @@ export default function InvoiceDetailsPage() {
       const crossFieldIssues = runCrossFieldValidations(invoice)
       Object.entries(crossFieldIssues).forEach(([field, issues]) => {
         if (issues.length > 0) {
+          const existingIssues = newValidationIssues[field] || []
+          const uniqueIssues = issues.filter(newIssue => 
+            !existingIssues.some(existingIssue => 
+              existingIssue.message === newIssue.message && 
+              existingIssue.type === newIssue.type
+            )
+          )
           newValidationIssues[field] = [
-            ...(newValidationIssues[field] || []),
-            ...issues
+            ...existingIssues,
+            ...uniqueIssues
           ]
         }
       })
@@ -626,6 +789,7 @@ export default function InvoiceDetailsPage() {
     let matched = 0
     let total = 0
     
+    // Count header field matches
     fields.forEach(field => {
       if (comparisons[field]) {
         total++
@@ -635,13 +799,17 @@ export default function InvoiceDetailsPage() {
       }
     })
     
-    // Add line items if available
+    // Add line items if available - use actual line item matching status
     if (invoice?.line_items) {
       total += invoice.line_items.length
-      // For now, assume line items are matched if overall status is good
-      if (matchingData.match_confidence && matchingData.match_confidence > 80) {
-        matched += invoice.line_items.length
-      }
+      
+      // Count actually matched line items based on their status
+      invoice.line_items.forEach((_, index) => {
+        const status = getLineItemStatus(index)
+        if (status === 'matched') {
+          matched++
+        }
+      })
     }
     
     return {
@@ -654,27 +822,43 @@ export default function InvoiceDetailsPage() {
   // Helper function to get match status badge
   const getMatchStatusBadge = () => {
     const stats = getPOMatchingStats()
-    const summary = getMatchingSummary(matchingData)
     
-    if (summary.status === 'perfect') {
+    // If no stats available, return not validated
+    if (stats.total === 0) {
+      return {
+        text: 'Not Validated',
+        className: 'bg-gray-50 text-gray-700 border-gray-200'
+      }
+    }
+    
+    // Calculate match percentage
+    const matchPercentage = (stats.matched / stats.total) * 100
+    
+    // Determine status based on actual line item matching
+    if (matchPercentage === 100) {
       return {
         text: 'Perfect Match',
         className: 'bg-green-50 text-green-700 border-green-200'
       }
-    } else if (summary.status === 'partial') {
+    } else if (matchPercentage >= 90) {
+      return {
+        text: 'Within Tolerance',
+        className: 'bg-green-25 text-green-600 border-green-100'
+      }
+    } else if (matchPercentage >= 70) {
       return {
         text: 'Partial Match',
         className: 'bg-amber-50 text-amber-700 border-amber-200'
       }
-    } else if (summary.status === 'poor') {
+    } else if (matchPercentage >= 50) {
       return {
         text: 'Poor Match',
         className: 'bg-red-50 text-red-700 border-red-200'
       }
     } else {
       return {
-        text: 'Not Validated',
-        className: 'bg-gray-50 text-gray-700 border-gray-200'
+        text: 'Mismatch',
+        className: 'bg-red-100 text-red-800 border-red-300'
       }
     }
   }
@@ -692,7 +876,8 @@ export default function InvoiceDetailsPage() {
   // Helper function to render validation indicator
   const renderValidationIndicator = (fieldKey: string) => {
     const fieldValidation = validation.getFieldValidation(fieldKey)
-    const fieldIssues = fieldValidation.issues
+    // Use comprehensive validation issues that include PO matching
+    const fieldIssues = validationIssues[fieldKey] || []
     const matchStatus = getFieldMatchStatus(matchingData, fieldKey)
     
     // Show loading indicator if validating
@@ -704,12 +889,22 @@ export default function InvoiceDetailsPage() {
       )
     }
     
-    // Show green checkmark with PO badge for matched fields
+    // Show badges for matched fields
     if ((!fieldIssues || fieldIssues.length === 0) && matchStatus === 'matched') {
       return (
-        <div className="ml-2 flex items-center gap-1">
-          <CheckCircle className="h-4 w-4 text-green-500" />
-          <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium">PO</span>
+        <div className="ml-2 inline-flex items-center">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="inline-flex">
+                  <CheckCircle className="h-4 w-4 text-green-500 cursor-help" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Matched with PO</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       )
     }
@@ -717,7 +912,7 @@ export default function InvoiceDetailsPage() {
     // Show green checkmark for fields with no issues
     if (!fieldIssues || fieldIssues.length === 0) {
       return (
-        <div className="ml-2">
+        <div className="ml-2 inline-flex items-center">
           <CheckCircle className="h-4 w-4 text-green-500" />
         </div>
       )
@@ -925,6 +1120,9 @@ export default function InvoiceDetailsPage() {
     { value: "Digital Dynamics", label: "Digital Dynamics" }
   ]
 
+  // Determine if this invoice is PO-backed
+  const isPOBacked = !!(invoice?.po_number || linkedPO || matchingData?.matched_po)
+
   // EditableField component
   const EditableField = ({ 
     fieldName, 
@@ -986,14 +1184,14 @@ export default function InvoiceDetailsPage() {
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <span className="inline-flex items-center px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-medium rounded-full max-w-full">
-                                  <span className="truncate max-w-[160px]">
-                                    {value}
+                                <span className="inline-flex items-center px-3 py-0.5 bg-gray-100 text-gray-700 text-xs font-medium rounded-full max-w-full">
+                                  <span className="truncate max-w-[200px]">
+                                    V078 - {value}
                                   </span>
                                 </span>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p>{value}</p>
+                                <p>V078 - {value}</p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
@@ -1015,7 +1213,7 @@ export default function InvoiceDetailsPage() {
                       <div className="w-0.5 h-4 bg-gray-800 animate-pulse"></div>
                       {!value && <span className="text-gray-400">Select vendor...</span>}
                     </div>
-                    <div className="absolute right-3 flex items-center">
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
                       <div data-validation-indicator className="flex items-center">{renderValidationIndicator(fieldName)}</div>
                     </div>
                   </div>
@@ -1053,7 +1251,8 @@ export default function InvoiceDetailsPage() {
               ) : multiline ? (
                 <textarea
                   className={cn(
-                    "w-full text-sm text-gray-900 py-2 px-3 pr-10 rounded-md border transition-all duration-200 focus:outline-none focus:border-violet-500 resize-none",
+                    "w-full text-sm text-gray-900 py-2 px-3 pr-10 rounded-md border transition-all duration-200 focus:outline-none focus:border-violet-500 resize-none overflow-y-auto",
+                    fieldName === "billingAddress" ? "h-[100px]" : "h-20",
                     hasError ? "border-red-300 bg-red-50" : 
                     hasWarning ? "border-amber-300 bg-amber-50" : 
                     "border-violet-500 bg-white"
@@ -1068,7 +1267,6 @@ export default function InvoiceDetailsPage() {
                     }
                   }}
                   autoFocus
-                  rows={2}
                 />
               ) : type === "select" ? (
                 <Select
@@ -1193,8 +1391,13 @@ export default function InvoiceDetailsPage() {
                   autoFocus
                 />
               )}
-              <div data-validation-indicator className="absolute right-3 top-1/2 -translate-y-1/2">
-                {renderValidationIndicator(fieldName)}
+              <div className={cn(
+                "absolute right-3 top-1/2 -translate-y-1/2 flex items-center",
+                multiline && fieldName === "billingAddress" ? "top-[11px] translate-y-0" : ""
+              )}>
+                <div data-validation-indicator className="flex items-center">
+                  {renderValidationIndicator(fieldName)}
+                </div>
               </div>
             </div>
           ) : (
@@ -1202,8 +1405,8 @@ export default function InvoiceDetailsPage() {
               onClick={handleFieldClick}
               data-editable-field
               className={cn(
-                "relative text-sm py-2 pl-3 pr-10 rounded-md border transition-all duration-200 cursor-text flex items-center",
-                multiline ? "min-h-[40px]" : "h-[40px]",
+                "relative text-sm py-2 pl-3 pr-10 rounded-md border transition-all duration-200 cursor-text flex",
+                multiline ? "min-h-[40px] items-start" : "h-[40px] items-center",
                 hasError ? "border-red-200 bg-red-50/50 hover:bg-red-50" : 
                 hasWarning ? "border-amber-200 bg-amber-50/50 hover:bg-amber-50" : 
                 hasValidationIssues ? "border-gray-200 bg-gray-50/30 hover:border-violet-200 hover:bg-violet-50/50" :
@@ -1216,28 +1419,39 @@ export default function InvoiceDetailsPage() {
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-medium rounded-full max-w-full">
-                            <span className="truncate max-w-[160px]">
-                              {value}
+                          <span className="inline-flex items-center gap-1 px-3 py-0.5 bg-gray-100 text-gray-700 text-xs font-medium rounded-full max-w-full">
+                            <span className="truncate max-w-[200px]">
+                              V078 - {value}
                             </span>
                           </span>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>{value}</p>
+                          <p>V078 - {value}</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                   </div>
-                  <div className="absolute right-3 flex items-center gap-0.5">
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                     <Edit className="h-3.5 w-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                     <div data-validation-indicator className="flex items-center">{renderValidationIndicator(fieldName)}</div>
                   </div>
                 </>
+              ) : multiline ? (
+                <div className={cn(
+                  "flex-1 overflow-y-auto pr-2",
+                  fieldName === "billingAddress" ? "h-[100px]" : "h-20"
+                )}>
+                  <span className={cn(
+                    !value ? "text-gray-400" : "text-gray-900",
+                    "whitespace-pre-wrap"
+                  )}>
+                    {value || placeholder}
+                  </span>
+                </div>
               ) : (
                 <span className={cn(
                   "flex-1 truncate pr-2",
-                  !value ? "text-gray-400" : "text-gray-900",
-                  multiline && "!whitespace-pre-wrap !truncate-none"
+                  !value ? "text-gray-400" : "text-gray-900"
                 )}>
                   {(() => {
                     if (!value) return placeholder
@@ -1249,7 +1463,10 @@ export default function InvoiceDetailsPage() {
                   })()}
                 </span>
               )}
-              <div className="absolute right-3 flex items-center gap-0.5">
+              <div className={cn(
+                "absolute right-3 flex items-center gap-0.5",
+                multiline && fieldName === "billingAddress" ? "top-[11px] translate-y-0" : "top-1/2 -translate-y-1/2"
+              )}>
                 <Edit className="h-3.5 w-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                 <div data-validation-indicator className="flex items-center">{renderValidationIndicator(fieldName)}</div>
               </div>
@@ -1572,6 +1789,28 @@ export default function InvoiceDetailsPage() {
                             )
                           }
                           
+                          if (amountComparison.result === 'within_tolerance') {
+                            const variance = amountComparison.details?.variance || 0
+                            const variancePercent = amountComparison.details?.variance_percent || 0
+                            const sign = variance > 0 ? '+' : ''
+                            
+                            return (
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1">
+                                  <p className="text-sm font-semibold text-green-600">
+                                    {sign}{formatCurrency(variance, invoice.currency_code)}
+                                  </p>
+                                  <span className="text-xs text-green-600">
+                                    ({sign}{variancePercent.toFixed(1)}%)
+                                  </span>
+                                </div>
+                                <div className="inline-flex items-center px-2 py-0.5 bg-green-50 text-green-600 rounded-full mt-0.5">
+                                  <span className="text-[10px] font-medium">Within 5% Tolerance</span>
+                                </div>
+                              </div>
+                            )
+                          }
+                          
                           // Show actual variance
                           const variance = amountComparison.details?.variance || 0
                           const variancePercent = amountComparison.details?.variance_percent || 0
@@ -1744,192 +1983,115 @@ export default function InvoiceDetailsPage() {
                     <div className="p-6">
                       <div className="flex items-center justify-between mb-4">
                         <h2 className="text-lg font-semibold">Invoice Details</h2>
+                        
+                        {/* Exceptions Button */}
                         {getIssueCounts().total > 0 && (
-                          <Sheet open={isIssuesDrawerOpen} onOpenChange={setIsIssuesDrawerOpen}>
+                          <Sheet open={exceptionsOpen} onOpenChange={setExceptionsOpen}>
                             <SheetTrigger asChild>
-                              <button className={cn(
-                                "px-3 py-1.5 text-xs font-medium rounded-full transition-colors",
-                                getIssueCounts().errors > 0 
-                                  ? "bg-red-100 text-red-700 hover:bg-red-200" 
-                                  : "bg-amber-100 text-amber-700 hover:bg-amber-200"
-                              )}>
-                                Exceptions ({getIssueCounts().total})
-                              </button>
-                            </SheetTrigger>
-                            <SheetPortal>
-                              <SheetPrimitive.Content
-                                className="fixed inset-y-0 right-0 z-50 h-full w-[60vw] max-w-[500px] sm:max-w-[600px] flex flex-col gap-4 bg-background p-6 transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right border-l"
-                                style={{boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'}}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className={cn(
+                                  "text-xs font-medium px-3 py-1.5 h-auto",
+                                  getIssueCounts().errors > 0 
+                                    ? "border-red-200 text-red-700 bg-red-50 hover:bg-red-100" 
+                                    : "border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100"
+                                )}
                               >
-                              <SheetHeader className="flex-shrink-0 pb-4 border-b">
-                                <SheetTitle className="text-lg font-semibold text-gray-900">Processing Exceptions</SheetTitle>
-                                <p className="text-sm text-gray-600 mt-1">Review and resolve validation exceptions before approval</p>
-                          </SheetHeader>
-
-                          <div className="flex-1 overflow-y-auto mt-4">
-                            {/* Summary */}
-                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-3 mb-4">
-                              <div className="flex items-center justify-between mb-2">
-                                <h3 className="font-semibold text-gray-900 text-base">Exception Summary</h3>
-                                <div className="flex items-center gap-4 text-sm">
-                                  {getIssueCounts().errors > 0 && (
-                                    <div className="flex items-center gap-1.5 text-red-700 bg-red-100 px-2.5 py-1 rounded-full">
-                                      <AlertCircle className="h-4 w-4" />
-                                      <span className="font-medium">{getIssueCounts().errors} critical</span>
-                                    </div>
-                                  )}
-                                  {getIssueCounts().warnings > 0 && (
-                                    <div className="flex items-center gap-1.5 text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full">
-                                      <AlertTriangle className="h-4 w-4" />
-                                      <span className="font-medium">{getIssueCounts().warnings} review required</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              <p className="text-xs text-gray-700 leading-relaxed">
-                                The following exceptions require review before this invoice can be processed for payment. Critical exceptions must be resolved, while others may be approved with authorization.
-                              </p>
-                            </div>
-
-                            {/* Issues by Field */}
-                            <div className="space-y-4">
-                              {Object.entries(validationIssues).map(([fieldKey, fieldIssues]) => {
-                                // Filter out resolved issues
-                                const activeIssues = fieldIssues.filter((_, index) => {
-                                  const issueId = `${fieldKey}-${index}`
-                                  return !resolvedIssues.has(issueId)
-                                })
-                                
-                                // Don't render section if no active issues
-                                if (activeIssues.length === 0) return null
-                                
-                                return (
-                                  <div key={fieldKey} className="mb-4">
-                                    <div className="mb-3 border-l-4 border-indigo-500 pl-3">
-                                      <h4 className="font-semibold text-gray-900 text-sm">{getFieldDisplayName(fieldKey)}</h4>
-                                      <p className="text-xs text-gray-600 mt-0.5">{activeIssues.length} exception{activeIssues.length > 1 ? 's' : ''} found</p>
-                                    </div>
-                                  
-                                    <div className="space-y-4">
-                                      {fieldIssues.map((issue, index) => {
-                                        const issueId = `${fieldKey}-${index}`
-                                        const isResolving = resolvingIssues.has(issueId)
-                                        const isResolved = resolvedIssues.has(issueId)
-
-                                        return (
-                                          <div 
-                                            key={index} 
-                                            className={`relative bg-white border rounded-lg p-3 hover:shadow-md transition-all duration-300 ${
-                                              isResolved ? 'transform translate-x-full opacity-0 pointer-events-none' :
-                                              isResolving ? 'border-green-300 bg-green-50' : 
-                                              issue.type === 'error' ? 'border-red-200 hover:shadow-lg hover:border-red-300' :
-                                              'border-amber-200 hover:shadow-lg hover:border-amber-300'
-                                            }`}
-                                            style={{
-                                              height: isResolved ? '0' : 'auto',
-                                              marginBottom: isResolved ? '0' : undefined,
-                                              overflow: isResolved ? 'hidden' : 'visible'
-                                            }}
-                                          >
-                                            <div className="flex items-start gap-3">
-                                              <div className="flex-shrink-0">
-                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center border ${
-                                                  isResolving ? 'bg-green-100 border-green-300' : 
-                                                  issue.type === 'error' ? 'bg-red-50 border-red-200' : 
-                                                  issue.type === 'warning' ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'
-                                                }`}>
-                                                  {isResolving ? (
-                                                    <CheckCircle className="h-4 w-4 text-green-600" />
-                                                  ) : issue.type === 'error' ? (
-                                                    <AlertCircle className="h-4 w-4 text-red-600" />
-                                                  ) : issue.type === 'warning' ? (
-                                                    <AlertTriangle className="h-4 w-4 text-amber-600" />
-                                                  ) : (
-                                                    <AlertCircle className="h-4 w-4 text-blue-600" />
-                                                  )}
-                                                </div>
+                                <AlertCircle className="h-3 w-3 mr-1.5" />
+                                {getIssueCounts().total} Exception{getIssueCounts().total !== 1 ? 's' : ''}
+                              </Button>
+                            </SheetTrigger>
+                            <SheetContent className="w-[500px] sm:w-[600px]">
+                              <SheetHeader>
+                                <SheetTitle className="flex items-center gap-2">
+                                  <AlertCircle className="h-5 w-5 text-amber-600" />
+                                  Validation Issues
+                                </SheetTitle>
+                                <SheetDescription>
+                                  Review and resolve the following issues with this invoice
+                                </SheetDescription>
+                              </SheetHeader>
+                              
+                              <div className="mt-6 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+                                {Object.entries(validationIssues)
+                                  .filter(([_, issues]) => issues.length > 0)
+                                  .map(([fieldKey, issues]) => (
+                                    <div key={fieldKey} className="border rounded-lg p-4">
+                                      <h4 className="font-medium text-gray-900 mb-2">
+                                        {getFieldDisplayName(fieldKey)}
+                                      </h4>
+                                      
+                                      <div className="space-y-2">
+                                        {issues.map((issue, index) => {
+                                          const issueId = `${fieldKey}-${index}`
+                                          const isResolving = resolvingIssues.has(issueId)
+                                          const isResolved = resolvedIssues.has(issueId)
+                                          
+                                          return (
+                                            <div
+                                              key={index}
+                                              className={cn(
+                                                "flex items-start gap-3 p-3 rounded-md transition-all duration-500",
+                                                issue.type === 'error' && "bg-red-50 border border-red-200",
+                                                issue.type === 'warning' && "bg-amber-50 border border-amber-200",
+                                                issue.type === 'info' && "bg-blue-50 border border-blue-200",
+                                                isResolved && "opacity-0 transform translate-x-full"
+                                              )}
+                                            >
+                                              <div className="flex-shrink-0 mt-0.5">
+                                                {issue.type === 'error' && <AlertCircle className="h-4 w-4 text-red-600" />}
+                                                {issue.type === 'warning' && <AlertTriangle className="h-4 w-4 text-amber-600" />}
+                                                {issue.type === 'info' && <Info className="h-4 w-4 text-blue-600" />}
                                               </div>
+                                              
                                               <div className="flex-1 min-w-0">
-                                                <div className="flex items-start justify-between mb-2">
-                                                  <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium uppercase tracking-wide ${
-                                                    issue.type === 'error' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
-                                                  }`}>
-                                                    {issue.type === 'error' ? 'Critical' : 'Review Required'}
-                                                  </span>
-                                                </div>
-                                                <p className="text-xs font-medium text-gray-900 mb-2 leading-snug">{issue.message}</p>
+                                                <p className="text-sm text-gray-900">{issue.message}</p>
                                                 {issue.action && (
-                                                  <div className="flex items-center gap-2 mt-1.5">
-                                                    <Button
-                                                      variant="outline"
-                                                      size="sm"
-                                                      className={`h-7 text-xs font-medium px-3 transition-all duration-300 ${
-                                                        isResolving 
-                                                          ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-100' 
-                                                          : issue.type === 'error'
-                                                            ? 'border-red-300 text-red-700 hover:bg-red-50 hover:border-red-400'
-                                                            : 'border-amber-300 text-amber-700 hover:bg-amber-50 hover:border-amber-400'
-                                                      }`}
-                                                      disabled={isResolving}
-                                                      onClick={() => {
-                                                        if (!isResolving) {
-                                                          issue.action?.onClick()
-                                                          handleResolveIssue(fieldKey, index)
-                                                        }
-                                                      }}
-                                                    >
-                                                      {isResolving ? (
-                                                        <>
-                                                          <CheckCircle className="h-3 w-3 mr-1.5" />
-                                                          Resolved
-                                                        </>
-                                                      ) : (
-                                                        issue.action.label
-                                                      )}
-                                                    </Button>
-                                                    {!isResolving && (
-                                                      <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="h-7 text-xs font-medium px-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100"
-                                                        onClick={() => handleResolveIssue(fieldKey, index)}
-                                                      >
-                                                        Mark as Reviewed
-                                                      </Button>
-                                                    )}
-                                                  </div>
+                                                  <Button
+                                                    variant="link"
+                                                    size="sm"
+                                                    className="px-0 py-1 h-auto text-xs"
+                                                    onClick={issue.action.onClick}
+                                                  >
+                                                    {issue.action.label}
+                                                  </Button>
                                                 )}
                                               </div>
+                                              
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 w-6 p-0 hover:bg-gray-200"
+                                                onClick={() => handleResolveIssue(fieldKey, index)}
+                                                disabled={isResolving}
+                                              >
+                                                {isResolving ? (
+                                                  <div className="h-3 w-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                                                ) : (
+                                                  <X className="h-3 w-3" />
+                                                )}
+                                              </Button>
                                             </div>
-                                          </div>
-                                        )
-                                      })}
+                                          )
+                                        })}
+                                      </div>
                                     </div>
+                                  ))}
+                                
+                                {Object.keys(validationIssues).length === 0 && (
+                                  <div className="text-center py-8 text-gray-500">
+                                    <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-2" />
+                                    <p>No validation issues found</p>
                                   </div>
-                                )
-                              })}
-                            </div>
-                          </div>
+                                )}
+                              </div>
+                            </SheetContent>
+                          </Sheet>
+                        )}
+                      </div>
 
-                          {/* Actions - Fixed at bottom */}
-                          {getIssueCounts().errors === 0 && (
-                            <div className="flex-shrink-0 mt-8 pt-6 border-t">
-                              <Button className="w-full bg-violet-600 hover:bg-violet-700">
-                                Save with Warnings
-                              </Button>
-                            </div>
-                          )}
-                                <SheetClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
-                                  <X className="h-4 w-4" />
-                                  <span className="sr-only">Close</span>
-                                </SheetClose>
-                              </SheetPrimitive.Content>
-                            </SheetPortal>
-                      </Sheet>
-                    )}
-                  </div>
-
-                      <div className="space-y-8">
+                      <div className="space-y-5">
                         {/* GENERAL INFO Section */}
                         <div className="space-y-4">
                           <div className="flex items-center gap-2 pt-2">
@@ -1938,8 +2100,8 @@ export default function InvoiceDetailsPage() {
                           </div>
                           
                           {/* Critical matching fields */}
-                          <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-3">
                               <EditableField
                                 fieldName="invoiceNumber"
                                 label="Invoice Number"
@@ -1979,55 +2141,45 @@ export default function InvoiceDetailsPage() {
                           </div>
                         </div>
 
+                        {/* PAYMENT SCHEDULE Section */}
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2 pt-2">
+                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Payment Schedule</span>
+                            <div className="flex-1 h-[2px] bg-gray-200"></div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3">
+                            <EditableField
+                              fieldName="date"
+                              label="Invoice Date"
+                              value={invoice?.date || ''}
+                              type="date"
+                            />
+                            <EditableField
+                              fieldName="dueDate"
+                              label="Due Date"
+                              value={invoice?.due_date || ''}
+                              type="date"
+                            />
+                          </div>
+                        </div>
+
                         {/* FINANCIAL Section */}
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                           <div className="flex items-center gap-2 pt-2">
                             <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Financial Details</span>
                             <div className="flex-1 h-[2px] bg-gray-200"></div>
                           </div>
                           
-                          <div className="space-y-4">
-                            {/* Row 1: Total Amount, Subtotal */}
-                            <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-3">
+                            {/* Row 1: Total Amount, Currency */}
+                            <div className="grid grid-cols-2 gap-3">
                               <EditableField
                                 fieldName="amount"
                                 label="Total Amount"
                                 value={invoice?.amount?.toString() || ''}
                                 type="number"
                               />
-                              <EditableField
-                                fieldName="subtotalAmount"
-                                label="Subtotal"
-                                value={invoice?.subtotal?.toString() || (invoice?.amount && invoice?.tax_amount ? (invoice.amount - invoice.tax_amount).toString() : '')}
-                                type="number"
-                              />
-                            </div>
-                            
-                            {/* Row 2: Tax Rate, Tax Amount */}
-                            <div className="grid grid-cols-2 gap-4">
-                              <EditableField
-                                fieldName="taxRate"
-                                label="Tax Rate"
-                                value={invoice?.tax_rate ? `${invoice.tax_rate}% VAT` : '15% VAT'}
-                                type="select"
-                                options={[
-                                  { value: "0% VAT", label: "0% VAT" },
-                                  { value: "5% VAT", label: "5% VAT" },
-                                  { value: "10% VAT", label: "10% VAT" },
-                                  { value: "15% VAT", label: "15% VAT" },
-                                  { value: "20% VAT", label: "20% VAT" }
-                                ]}
-                              />
-                              <EditableField
-                                fieldName="taxAmount"
-                                label="Tax Amount"
-                                value={invoice?.tax_amount?.toString() || ''}
-                                type="number"
-                              />
-                            </div>
-                            
-                            {/* Row 3: Currency (first column only) */}
-                            <div className="grid grid-cols-2 gap-4">
                               <EditableField
                                 fieldName="currency"
                                 label="Currency"
@@ -2041,119 +2193,128 @@ export default function InvoiceDetailsPage() {
                                   { value: "AUD", label: "AUD - Australian Dollar" }
                                 ]}
                               />
+                            </div>
+                            
+                            {/* Row 2: Subtotal, Tax Rate */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <EditableField
+                                fieldName="subtotalAmount"
+                                label="Subtotal"
+                                value={invoice?.subtotal?.toString() || (invoice?.amount && invoice?.tax_amount ? (invoice.amount - invoice.tax_amount).toFixed(2) : '')}
+                                type="number"
+                              />
+                              <EditableField
+                                fieldName="taxRate"
+                                label="Tax Rate"
+                                value={invoice?.tax_rate ? `${invoice.tax_rate}%` : '17.5%'}
+                                type="select"
+                                options={[
+                                  { value: "0%", label: "0%" },
+                                  { value: "5%", label: "5%" },
+                                  { value: "10%", label: "10%" },
+                                  { value: "15%", label: "15%" },
+                                  { value: "17.5%", label: "17.5%" },
+                                  { value: "20%", label: "20%" }
+                                ]}
+                              />
+                            </div>
+                            
+                            {/* Row 3: Tax Amount (first column only) */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <EditableField
+                                fieldName="taxAmount"
+                                label="Tax Amount"
+                                value={invoice?.tax_amount?.toString() || ''}
+                                type="number"
+                              />
                               <div></div>
                             </div>
                           </div>
                         </div>
 
                         {/* PAYMENT Section */}
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                           <div className="flex items-center gap-2 pt-2">
-                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Payment Terms</span>
+                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Payment Information</span>
                             <div className="flex-1 h-[2px] bg-gray-200"></div>
                           </div>
                           
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-2 gap-3">
+                            {/* Left Column - Payment Method and Payment Terms */}
+                            <div className="space-y-3">
+                              <div className="space-y-1">
+                                <EditableField
+                                  fieldName="paymentMethod"
+                                  label="Payment Method"
+                                  value={invoice?.payment_method || ''}
+                                  type="select"
+                                  options={[
+                                    { value: "ACH Transfer", label: "ACH Transfer" },
+                                    { value: "Wire Transfer", label: "Wire Transfer" },
+                                    { value: "Check", label: "Check" },
+                                    { value: "Credit Card", label: "Credit Card" }
+                                  ]}
+                                />
+                                {invoice?.payment_method === "ACH Transfer" ? (
+                                  <div className="text-xs text-gray-600">
+                                    Bank: Wells Fargo ***1234
+                                  </div>
+                                ) : null}
+                              </div>
+                              
+                              <EditableField
+                                fieldName="paymentTerms"
+                                label="Payment Terms"
+                                value={invoice?.payment_term_days || ''}
+                                type="select"
+                                options={[
+                                  { value: "Net 7", label: "Net 7 (No early payment discount)" },
+                                  { value: "Net 15", label: "Net 15" },
+                                  { value: "Net 30", label: "Net 30" },
+                                  { value: "2/10 Net 30", label: "2/10 Net 30 (2% discount if paid in 10 days)" },
+                                  { value: "Due on Receipt", label: "Due on Receipt" }
+                                ]}
+                              />
+                            </div>
+                            
+                            {/* Right Column - Billing Address */}
                             <EditableField
                               fieldName="billingAddress"
                               label="Billing Address"
                               value={invoice?.billing_address || ''}
                               multiline={true}
                             />
-                            <div className="space-y-1">
+                          </div>
+                          
+                          {/* Conditional fields for non-PO invoices */}
+                          {!isPOBacked && (
+                            <div className="grid grid-cols-2 gap-3">
                               <EditableField
-                                fieldName="paymentMethod"
-                                label="Payment Method"
-                                value={invoice?.payment_method || ''}
+                                fieldName="glAccount"
+                                label="GL Account / Cost Center"
+                                value="6200-001 - Professional Services"
                                 type="select"
                                 options={[
-                                  { value: "ACH Transfer", label: "ACH Transfer" },
-                                  { value: "Wire Transfer", label: "Wire Transfer" },
-                                  { value: "Check", label: "Check" },
-                                  { value: "Credit Card", label: "Credit Card" }
+                                  { value: "6200-001 - Professional Services", label: "6200-001 - Professional Services" },
+                                  { value: "6100-002 - IT Services", label: "6100-002 - IT Services" },
+                                  { value: "5500-003 - Marketing", label: "5500-003 - Marketing" },
+                                  { value: "4400-004 - Operations", label: "4400-004 - Operations" }
                                 ]}
                               />
-                              {invoice?.payment_method === "ACH Transfer" ? (
-                                <div className="text-xs text-gray-600">
-                                  Bank: Wells Fargo ***1234
-                                </div>
-                              ) : null}
-                            </div>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-4">
-                            <EditableField
-                              fieldName="paymentTerms"
-                              label="Payment Terms"
-                              value={invoice?.payment_term_days || ''}
-                              type="select"
-                              options={[
-                                { value: "Net 7", label: "Net 7 (No early payment discount)" },
-                                { value: "Net 15", label: "Net 15" },
-                                { value: "Net 30", label: "Net 30" },
-                                { value: "2/10 Net 30", label: "2/10 Net 30 (2% discount if paid in 10 days)" },
-                                { value: "Due on Receipt", label: "Due on Receipt" }
-                              ]}
-                            />
-                            <EditableField
-                              fieldName="glAccount"
-                              label="GL Account / Cost Center"
-                              value="6200-001 - Professional Services"
-                              type="select"
-                              options={[
-                                { value: "6200-001 - Professional Services", label: "6200-001 - Professional Services" },
-                                { value: "6100-002 - IT Services", label: "6100-002 - IT Services" },
-                                { value: "5500-003 - Marketing", label: "5500-003 - Marketing" },
-                                { value: "4400-004 - Operations", label: "4400-004 - Operations" }
-                              ]}
-                            />
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-4">
-                            <EditableField
-                              fieldName="spendCategory"
-                              label="Spend Category"
-                              value={invoice?.spend_category || "Professional Services"}
-                              type="select"
-                              options={[
-                                { value: "Professional Services", label: "Professional Services (UNSPSC: 81111500)" },
-                                { value: "IT Services", label: "IT Services (UNSPSC: 81101500)" },
-                                { value: "Marketing Services", label: "Marketing Services (UNSPSC: 82101500)" },
-                                { value: "Facilities Management", label: "Facilities Management (UNSPSC: 72100000)" }
-                              ]}
-                            />
-                            <div></div>
-                          </div>
-                        </div>
-
-                        {/* PAYMENT SCHEDULE Section */}
-                        <div className="space-y-4">
-                          <div className="flex items-center gap-2 pt-2">
-                            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Payment Schedule</span>
-                            <div className="flex-1 h-[2px] bg-gray-200"></div>
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-4">
-                            <EditableField
-                              fieldName="date"
-                              label="Invoice Date"
-                              value={invoice?.date || ''}
-                              type="date"
-                            />
-                            <div className="space-y-1">
                               <EditableField
-                                fieldName="dueDate"
-                                label="Due Date"
-                                value={invoice?.due_date || ''}
-                                type="date"
+                                fieldName="spendCategory"
+                                label="Spend Category"
+                                value={invoice?.spend_category || "Professional Services"}
+                                type="select"
+                                options={[
+                                  { value: "Professional Services", label: "Professional Services (UNSPSC: 81111500)" },
+                                  { value: "IT Services", label: "IT Services (UNSPSC: 81101500)" },
+                                  { value: "Marketing Services", label: "Marketing Services (UNSPSC: 82101500)" },
+                                  { value: "Facilities Management", label: "Facilities Management (UNSPSC: 72100000)" }
+                                ]}
                               />
-                              {invoice?.due_date && new Date(invoice.due_date) < new Date() && (
-                                <div className="text-xs text-red-600 font-medium">
-                                  Overdue by {Math.floor((new Date().getTime() - new Date(invoice.due_date).getTime()) / (1000 * 60 * 60 * 24))} days
-                                </div>
-                              )}
                             </div>
-                          </div>
+                          )}
                         </div>
 
 
@@ -2165,28 +2326,6 @@ export default function InvoiceDetailsPage() {
                           </div>
                           
                           <div className="space-y-3">
-                            {/* Matching Summary - only show when PO is linked */}
-                            {linkedPO && matchingData && (
-                              <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <div className={cn(
-                                      "h-2 w-2 rounded-full",
-                                      getMatchingSummary(matchingData).status === 'perfect' ? "bg-green-500" :
-                                      getMatchingSummary(matchingData).status === 'partial' ? "bg-amber-500" :
-                                      "bg-red-500"
-                                    )} />
-                                    <span className="text-sm font-medium text-gray-700">
-                                      {getMatchingSummary(matchingData).message}
-                                    </span>
-                                  </div>
-                                  <span className="text-xs text-gray-500">
-                                    {getMatchingSummary(matchingData).confidence}% match
-                                  </span>
-                                </div>
-                              </div>
-                            )}
-                            
                             {/* Purchase Order Link */}
                             {linkedPO ? (
                               <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors animate-in fade-in-0 slide-in-from-top-2 duration-300">
@@ -2715,29 +2854,38 @@ export default function InvoiceDetailsPage() {
                   </div>
                 )}
               </div>
+              <div className="flex items-center">
+                <Switch
+                  checked={lineItemsSwitch}
+                  onCheckedChange={setLineItemsSwitch}
+                />
+              </div>
             </div>
 
             <div className="relative overflow-hidden">
               {invoice?.line_items && invoice.line_items.length > 0 ? (
+                !lineItemsSwitch ? (
+                  /* Current Table Layout */
                 <div className="flex">
                   {/* Frozen Invoice Columns */}
                   <div className="flex-shrink-0 bg-white z-10 shadow-sm" style={{ boxShadow: '4px 0 8px -2px rgba(0, 0, 0, 0.1)' }}>
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-gray-50 h-auto">
-                          <TableHead className="w-8 text-center text-sm font-medium py-2 px-2">#</TableHead>
-                          <TableHead className="w-20 text-sm font-medium py-2 px-2">Status</TableHead>
-                          <TableHead className="w-48 text-sm font-medium py-2 px-2">Description<br/>(Invoice)</TableHead>
-                          <TableHead className="w-12 text-right text-sm font-medium py-2 px-2">Qty</TableHead>
-                          <TableHead className="w-16 text-right text-sm font-medium py-2 px-2">Unit<br/>Price</TableHead>
-                          <TableHead className="w-16 text-right text-sm font-medium py-2 px-2 border-r-2 border-violet-300">Total</TableHead>
+                          <TableHead className="w-8 text-center text-xs font-medium py-2 px-2">#</TableHead>
+                          <TableHead className="w-20 text-xs font-medium py-2 px-2">Status</TableHead>
+                          <TableHead className="w-28 text-xs font-medium py-2 px-2">SKU</TableHead>
+                          <TableHead className="w-56 text-xs font-medium py-2 px-2">Description<br/>(Invoice)</TableHead>
+                          <TableHead className="w-14 text-right text-xs font-medium py-2 px-2">Qty</TableHead>
+                          <TableHead className="w-18 text-right text-xs font-medium py-2 px-2">Unit<br/>Price</TableHead>
+                          <TableHead className="w-18 text-right text-xs font-medium py-2 px-2 pr-4 border-r-2 border-violet-300">Total</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {invoice.line_items.map((item, index) => {
                           const status = getLineItemStatus(index)
                           const match = lineItemMatches[index]
-                          const poLine = null // TODO: Get from backend data
+                          const poLine = match?.poLineId ? mockPOLines.find(po => po.id === match.poLineId) : null
                           const grLine = match?.grLineId ? mockGRLines.find(gr => gr.id === match.grLineId) : null
                           
                           return (
@@ -2759,6 +2907,21 @@ export default function InvoiceDetailsPage() {
                               <TableCell className="text-sm font-medium h-[50px] py-1 px-2 align-middle">
                                 {editingLineItem === index ? (
                                   <Input
+                                    value={skuValues[index] !== undefined ? skuValues[index] : getLineItemSKU(index)}
+                                    onChange={(e) => handleSKUValueChange(index, e.target.value)}
+                                    onKeyDown={(e) => handleKeyDown(e, index)}
+                                    className="h-8 text-sm px-2 py-1"
+                                    placeholder="Enter SKU"
+                                  />
+                                ) : (
+                                  <div className="truncate max-w-26" title={getLineItemSKU(index) === "—" ? "SKU not available" : getLineItemSKU(index)}>
+                                    {getLineItemSKU(index)}
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-sm font-medium h-[50px] py-1 px-2 align-middle">
+                                {editingLineItem === index ? (
+                                  <Input
                                     ref={(el) => { descriptionInputRefs.current[index] = el }}
                                     value={lineItemValues[index]?.description || ''}
                                     onChange={(e) => handleLineItemValueChange(index, 'description', e.target.value)}
@@ -2767,14 +2930,14 @@ export default function InvoiceDetailsPage() {
                                     placeholder="Enter description"
                                   />
                                 ) : (
-                                  <div className="truncate max-w-44" title={item.description}>
+                                  <div className="truncate max-w-52" title={item.description}>
                                     {item.description}
                                   </div>
                                 )}
                               </TableCell>
                               <TableCell className={cn(
                                 "text-right text-sm h-[50px] py-1 px-2 align-middle",
-                                !forcedMatchedItems.has(index) && ((poLine && Number(item.quantity) !== Number(poLine.quantity)) || (grLine && Number(item.quantity) !== Number(grLine.quantity))) && "bg-amber-50"
+                                !forcedMatchedItems.has(index) && ((poLine && Number(item.quantity) !== Number(poLine.quantity)) || (grLine && Number(item.quantity) !== Number(grLine.quantity))) && "bg-red-50 border border-red-400"
                               )}>
                                 {editingLineItem === index ? (
                                   <Input
@@ -2786,12 +2949,12 @@ export default function InvoiceDetailsPage() {
                                     placeholder="0"
                                   />
                                 ) : (
-                                  item.quantity
+                                  Number(item.quantity).toFixed(2)
                                 )}
                               </TableCell>
                               <TableCell className={cn(
                                 "text-right text-sm h-[50px] py-1 px-2 align-middle",
-                                !forcedMatchedItems.has(index) && (poLine && Number(item.unit_price) !== Number(poLine.unit_price)) && "bg-amber-50"
+                                !forcedMatchedItems.has(index) && (poLine && Number(item.unit_price) !== Number(poLine.unit_price)) && "bg-red-50 border border-red-400"
                               )}>
                                 {editingLineItem === index ? (
                                   <Input
@@ -2807,7 +2970,7 @@ export default function InvoiceDetailsPage() {
                                   formatCurrency(item.unit_price, invoice.currency_code)
                                 )}
                               </TableCell>
-                              <TableCell className="text-right text-sm h-[50px] py-1 px-2 border-r-2 border-violet-300 align-middle">
+                              <TableCell className="text-right text-sm h-[50px] py-1 px-2 pr-4 border-r-2 border-violet-300 align-middle">
                                 {editingLineItem === index ? 
                                   formatCurrency(lineItemValues[index]?.total || 0, invoice.currency_code) :
                                   formatCurrency(item.total, invoice.currency_code)
@@ -2829,43 +2992,40 @@ export default function InvoiceDetailsPage() {
                       !linkedPO && linkedGR && "min-w-[300px]"
                     )}>
                       <TableHeader>
-                        <TableRow className="bg-gray-50 h-auto">
+                        <TableRow className="bg-gray-50 h-12">
                           {linkedPO && (
                             <>
-                              <TableHead className="min-w-[60px] text-sm font-medium py-2 px-2">PO Line<br/>Source</TableHead>
-                              <TableHead className="min-w-[120px] text-sm font-medium py-2 px-2">PO Description</TableHead>
-                              <TableHead className="min-w-[40px] text-right text-sm font-medium py-2 px-2">PO<br/>Qty</TableHead>
-                              <TableHead className="min-w-[60px] text-right text-sm font-medium py-2 px-2">PO Unit<br/>Price</TableHead>
+                              <TableHead className="min-w-[70px] text-xs font-medium py-2 px-2 pl-4" title="Purchase Order Line Source">PO Line</TableHead>
+                              <TableHead className="min-w-[70px] text-xs font-medium py-2 px-2" title="Purchase Order SKU">PO SKU</TableHead>
+                              <TableHead className="min-w-[140px] text-xs font-medium py-2 px-2" title="Purchase Order Description">PO Description</TableHead>
+                              <TableHead className="min-w-[50px] text-right text-xs font-medium py-2 px-2 whitespace-nowrap" title="Purchase Order Quantity">PO Qty</TableHead>
+                              <TableHead className="min-w-[70px] text-right text-xs font-medium py-2 px-2" title="Purchase Order Unit Price">PO Price</TableHead>
                               <TableHead className={cn(
-                                "min-w-[60px] text-right text-sm font-medium py-2 px-2",
+                                "min-w-[70px] text-right text-xs font-medium py-2 px-2 pr-4",
                                 !linkedGR && "border-r-2 border-violet-300"
-                              )}>PO<br/>Total</TableHead>
+                              )} title="Purchase Order Total">PO Total</TableHead>
                             </>
                           )}
                           {linkedGR && (
                             <>
                               <TableHead className={cn(
-                                "min-w-[60px] text-sm font-medium py-2 px-2",
+                                "min-w-[70px] text-xs font-medium py-2 px-2 pl-4",
                                 linkedPO && "border-l-2 border-violet-300"
-                              )}>GR Line<br/>Source</TableHead>
-                              <TableHead className="min-w-[120px] text-sm font-medium py-2 px-2">GR Description</TableHead>
-                              <TableHead className="min-w-[40px] text-right text-sm font-medium py-2 px-2 border-r-2 border-violet-300">GR<br/>Qty</TableHead>
+                              )} title="Goods Receipt Line Source">GR Line</TableHead>
+                              <TableHead className="min-w-[140px] text-xs font-medium py-2 px-2" title="Goods Receipt Description">GR Description</TableHead>
+                              <TableHead className="min-w-[50px] text-right text-xs font-medium py-2 px-2 pr-4 border-r-2 border-violet-300 whitespace-nowrap" title="Goods Receipt Quantity">GR Qty</TableHead>
                             </>
                           )}
                           <TableHead className={cn(
-                            "text-center text-sm font-medium py-2 px-2",
-                            !linkedPO && !linkedGR ? "w-1/2" : "min-w-[40px]"
-                          )}>Comments</TableHead>
-                          <TableHead className={cn(
-                            "text-center text-sm font-medium py-2 px-2",
-                            !linkedPO && !linkedGR ? "w-1/2" : "min-w-[40px]"
+                            "text-center text-xs font-medium py-2 px-2",
+                            !linkedPO && !linkedGR ? "w-full" : "min-w-[80px]"
                           )}>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {invoice.line_items.map((item, index) => {
                           const match = lineItemMatches[index]
-                          const poLine = null // TODO: Get from backend data
+                          const poLine = match?.poLineId ? mockPOLines.find(po => po.id === match.poLineId) : null
                           const grLine = match?.grLineId ? mockGRLines.find(gr => gr.id === match.grLineId) : null
                           
                           // Get all selected PO and GR items for this dropdown
@@ -2882,9 +3042,9 @@ export default function InvoiceDetailsPage() {
                               {linkedPO && (
                                 <>
                                   {/* PO Line Source */}
-                                  <TableCell className="h-[50px] py-1 px-2 align-middle">
+                                  <TableCell className="h-[50px] py-1 px-2 pl-4 align-middle">
                                     <LineItemSelector
-                                      items={[]} // TODO: Get PO line items from backend
+                                      items={mockPOLines}
                                       value={match?.poLineId}
                                       onSelect={(value) => handleLineItemMatch(index, 'po', value)}
                                       placeholder="Select line"
@@ -2897,6 +3057,13 @@ export default function InvoiceDetailsPage() {
                                     />
                                   </TableCell>
                                   
+                                  {/* PO SKU */}
+                                  <TableCell className="text-sm text-gray-600 h-[50px] py-1 px-2 align-middle">
+                                    <div className="truncate w-full" title={poLine?.sku || "—"}>
+                                      {poLine?.sku || "—"}
+                                    </div>
+                                  </TableCell>
+                                  
                                   {/* PO Details */}
                                   <TableCell className="text-sm text-gray-600 h-[50px] py-1 px-2 align-middle">
                                     <div className="truncate w-full" title={poLine?.description || "—"}>
@@ -2905,18 +3072,18 @@ export default function InvoiceDetailsPage() {
                                   </TableCell>
                                   <TableCell className={cn(
                                     "text-right text-sm text-gray-600 h-[50px] py-1 px-2 align-middle",
-                                    !forcedMatchedItems.has(index) && poLine && Number(item.quantity) !== Number(poLine.quantity) && "bg-amber-50"
+                                    !forcedMatchedItems.has(index) && poLine && Number(item.quantity) !== Number(poLine.quantity) && "bg-red-50 border border-red-400"
                                   )}>
                                     {poLine?.quantity || "—"}
                                   </TableCell>
                                   <TableCell className={cn(
                                     "text-right text-sm text-gray-600 h-[50px] py-1 px-2 align-middle",
-                                    !forcedMatchedItems.has(index) && poLine && Number(item.unit_price) !== Number(poLine.unit_price) && "bg-amber-50"
+                                    !forcedMatchedItems.has(index) && poLine && Number(item.unit_price) !== Number(poLine.unit_price) && "bg-red-50 border border-red-400"
                                   )}>
                                     {poLine ? formatCurrency(poLine.unit_price, invoice.currency_code) : "—"}
                                   </TableCell>
                                   <TableCell className={cn(
-                                    "text-right text-sm text-gray-600 h-[50px] py-1 px-2 align-middle",
+                                    "text-right text-sm text-gray-600 h-[50px] py-1 px-2 pr-4 align-middle",
                                     !linkedGR && "border-r-2 border-violet-300"
                                   )}>
                                     {poLine ? formatCurrency(poLine.total, invoice.currency_code) : "—"}
@@ -2929,7 +3096,7 @@ export default function InvoiceDetailsPage() {
                                 <>
                                   {/* GR Line Source */}
                                   <TableCell className={cn(
-                                    "h-[50px] py-1 px-2 align-middle",
+                                    "h-[50px] py-1 px-2 pl-4 align-middle",
                                     linkedPO && "border-l-2 border-violet-300"
                                   )}>
                                     <LineItemSelector
@@ -2953,25 +3120,13 @@ export default function InvoiceDetailsPage() {
                                     </div>
                                   </TableCell>
                                   <TableCell className={cn(
-                                    "text-right text-sm text-gray-600 h-[50px] py-1 px-2 border-r-2 border-violet-300 align-middle",
-                                    !forcedMatchedItems.has(index) && grLine && Number(item.quantity) !== Number(grLine.quantity) && "bg-amber-50"
+                                    "text-right text-sm text-gray-600 h-[50px] py-1 px-2 pr-4 border-r-2 border-violet-300 align-middle",
+                                    !forcedMatchedItems.has(index) && grLine && Number(item.quantity) !== Number(grLine.quantity) && "bg-red-50 border border-red-400"
                                   )}>
                                     {grLine?.quantity || "—"}
                                   </TableCell>
                                 </>
                               )}
-                              
-                              {/* Comments */}
-                              <TableCell className="h-[50px] py-1 px-2 text-center align-middle">
-                                <Button variant="ghost" size="sm" className="h-5 w-5 p-0 mx-auto relative">
-                                  <MessageCircle className="h-2.5 w-2.5" />
-                                  {mockComments[index] && (
-                                    <span className="absolute -top-0.5 -right-1 h-3 w-3 bg-gray-600 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
-                                      {mockComments[index]}
-                                    </span>
-                                  )}
-                                </Button>
-                              </TableCell>
                               
                               {/* Actions */}
                               <TableCell className="h-[50px] py-1 px-2 text-center align-middle">
@@ -2981,18 +3136,18 @@ export default function InvoiceDetailsPage() {
                                       <Button 
                                         variant="ghost" 
                                         size="sm" 
-                                        className="h-6 w-6 p-0 hover:bg-green-100"
+                                        className="h-6 w-6 p-0 hover:bg-violet-100"
                                         onClick={() => handleSaveLineItem(index)}
                                       >
-                                        <CheckCircle className="h-3 w-3 text-green-600" />
+                                        <CheckCircle className="h-3 w-3 text-violet-600" />
                                       </Button>
                                       <Button 
                                         variant="ghost" 
                                         size="sm" 
-                                        className="h-6 w-6 p-0 hover:bg-red-100"
+                                        className="h-6 w-6 p-0 hover:bg-violet-100"
                                         onClick={handleCancelEditLineItem}
                                       >
-                                        <X className="h-3 w-3 text-red-600" />
+                                        <X className="h-3 w-3 text-violet-600" />
                                       </Button>
                                     </>
                                   ) : (
@@ -3000,15 +3155,29 @@ export default function InvoiceDetailsPage() {
                                       <Button 
                                         variant="ghost" 
                                         size="sm" 
+                                        className="h-6 w-6 p-0 hover:bg-violet-100 relative"
+                                        title="Comments"
+                                      >
+                                        <MessageCircle className="h-3 w-3 text-violet-600" />
+                                        {mockComments[index] && (
+                                          <span className="absolute top-0 right-0 h-3 w-3 bg-violet-600 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
+                                            {mockComments[index]}
+                                          </span>
+                                        )}
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
                                         className="h-6 w-6 p-0 hover:bg-violet-100"
                                         onClick={() => handleEditLineItem(index)}
+                                        title="Edit"
                                       >
                                         <Edit className="h-3 w-3 text-violet-600" />
                                       </Button>
                                       <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-gray-100">
-                                            <MoreVertical className="h-3 w-3 text-gray-600" />
+                                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-violet-100" title="More options">
+                                            <MoreVertical className="h-3 w-3 text-violet-600" />
                                           </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end" className="w-48">
@@ -3034,6 +3203,423 @@ export default function InvoiceDetailsPage() {
                 </Table>
                   </div>
                 </div>
+                ) : (
+                  /* Expandable Row Layout */
+                  <div className="space-y-0">
+                    {/* Header Row */}
+                    <div className="bg-gray-50 border-b px-4 py-3">
+                      <div className="grid grid-cols-12 gap-4 items-center text-xs font-medium text-gray-600 uppercase tracking-wider">
+                        <div className="col-span-1"></div>
+                        <div className="col-span-1">#</div>
+                        <div className="col-span-1">Status</div>
+                        <div className="col-span-1">SKU</div>
+                        <div className="col-span-3">Description</div>
+                        <div className="col-span-1 text-right">Qty</div>
+                        <div className="col-span-1 text-right">Unit Price</div>
+                        <div className="col-span-2 text-right">Total</div>
+                        <div className="col-span-1 text-center">Actions</div>
+                      </div>
+                    </div>
+                    
+                    {/* Invoice Line Items */}
+                    {invoice.line_items.map((item, index) => {
+                      const status = getLineItemStatus(index)
+                      const match = lineItemMatches[index]
+                      const poLine = match?.poLineId ? mockPOLines.find(po => po.id === match.poLineId) : null
+                      const grLine = match?.grLineId ? mockGRLines.find(gr => gr.id === match.grLineId) : null
+                      const isExpanded = expandedRows.has(index)
+                      const hasMismatch = status === 'mismatch'
+                      
+                      // Auto-expand rows with mismatches if not manually controlled
+                      if (hasMismatch && !expandedRows.has(index) && !expandedRows.has(-index-1)) {
+                        expandedRows.add(index)
+                      }
+                      
+                      // Show expansion possibility if there are any PO/GR lines available or already matched
+                      const canExpand = poLine || grLine || mockPOLines.length > 0 || mockGRLines.length > 0
+                      
+                      return (
+                        <div key={index} className="border-b">
+                          {/* Main Invoice Row */}
+                          <div 
+                            className={cn(
+                              "px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer",
+                              hasMismatch && "bg-amber-25 border-l-4 border-amber-400"
+                            )}
+                            onClick={() => {
+                              if (canExpand && editingLineItem !== index) {
+                                const newExpanded = new Set(expandedRows)
+                                if (isExpanded) {
+                                  newExpanded.delete(index)
+                                  newExpanded.add(-index-1) // Mark as manually collapsed
+                                } else {
+                                  newExpanded.add(index)
+                                  newExpanded.delete(-index-1) // Remove manual collapse mark
+                                }
+                                setExpandedRows(newExpanded)
+                              }
+                            }}
+                          >
+                            <div className="grid grid-cols-12 gap-4 items-center">
+                              {/* Chevron Toggle */}
+                              <div className="col-span-1 w-6">
+                                {canExpand && (
+                                  <ChevronRight className={cn(
+                                    "h-3 w-3 transition-transform text-gray-400",
+                                    isExpanded && "rotate-90"
+                                  )} />
+                                )}
+                              </div>
+                              
+                              {/* Row Number */}
+                              <div className="col-span-1 text-sm font-medium text-gray-600">
+                                {index + 1}
+                              </div>
+                              
+                              {/* Status */}
+                              <div className="col-span-1">
+                                <Badge 
+                                  variant="secondary" 
+                                  className={cn(
+                                    "text-xs font-medium px-2 py-1",
+                                    status === 'matched' && "bg-green-100 text-green-700 hover:bg-green-100",
+                                    status === 'mismatch' && "bg-amber-100 text-amber-700 hover:bg-amber-100",
+                                    status === 'missing' && "bg-red-100 text-red-700 hover:bg-red-100"
+                                  )}
+                                >
+                                  {status === 'matched' ? 'Matched' : status === 'mismatch' ? 'Variance' : 'Unmatched'}
+                                </Badge>
+                              </div>
+                              
+                              {/* SKU */}
+                              <div className="col-span-1 text-sm font-medium">
+                                {editingLineItem === index ? (
+                                  <Input
+                                    value={skuValues[index] !== undefined ? skuValues[index] : getLineItemSKU(index)}
+                                    onChange={(e) => handleSKUValueChange(index, e.target.value)}
+                                    onKeyDown={(e) => handleKeyDown(e, index)}
+                                    className="h-8 text-sm px-2 py-1"
+                                    placeholder="Enter SKU"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                ) : (
+                                  <div className="truncate max-w-20" title={getLineItemSKU(index) === "—" ? "SKU not available" : getLineItemSKU(index)}>
+                                    {getLineItemSKU(index)}
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* Description */}
+                              <div className="col-span-3 text-sm font-medium">
+                                {editingLineItem === index ? (
+                                  <Input
+                                    ref={(el) => { descriptionInputRefs.current[index] = el }}
+                                    value={lineItemValues[index]?.description || ''}
+                                    onChange={(e) => handleLineItemValueChange(index, 'description', e.target.value)}
+                                    onKeyDown={(e) => handleKeyDown(e, index)}
+                                    className="h-8 text-sm px-2 py-1"
+                                    placeholder="Enter description"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                ) : (
+                                  <div className="truncate" title={item.description}>
+                                    {item.description}
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* Quantity */}
+                              <div className={cn(
+                                "col-span-1 text-right text-sm font-medium",
+                                !forcedMatchedItems.has(index) && ((poLine && Number(item.quantity) !== Number(poLine.quantity)) || (grLine && Number(item.quantity) !== Number(grLine.quantity))) && "text-red-600"
+                              )}>
+                                {editingLineItem === index ? (
+                                  <Input
+                                    type="number"
+                                    value={lineItemValues[index]?.quantity || ''}
+                                    onChange={(e) => handleLineItemValueChange(index, 'quantity', e.target.value)}
+                                    onKeyDown={(e) => handleKeyDown(e, index)}
+                                    className="h-8 text-sm px-2 py-1 text-right"
+                                    placeholder="0.00"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                ) : (
+                                  Number(item.quantity).toFixed(2)
+                                )}
+                              </div>
+                              
+                              {/* Unit Price */}
+                              <div className={cn(
+                                "col-span-1 text-right text-sm font-medium",
+                                !forcedMatchedItems.has(index) && ((poLine && Number(item.unit_price) !== Number(poLine.unit_price)) || (grLine && Number(item.unit_price) !== Number(grLine.unit_price))) && "text-red-600"
+                              )}>
+                                {editingLineItem === index ? (
+                                  <Input
+                                    type="number"
+                                    value={lineItemValues[index]?.unit_price || ''}
+                                    onChange={(e) => handleLineItemValueChange(index, 'unit_price', e.target.value)}
+                                    onKeyDown={(e) => handleKeyDown(e, index)}
+                                    className="h-8 text-sm px-2 py-1 text-right"
+                                    placeholder="0.00"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                ) : (
+                                  `$${Number(item.unit_price).toFixed(2)}`
+                                )}
+                              </div>
+                              
+                              {/* Total */}
+                              <div className={cn(
+                                "col-span-2 text-right text-sm font-medium",
+                                !forcedMatchedItems.has(index) && ((poLine && Number(item.total) !== Number(poLine.total)) || (grLine && Number(item.total) !== Number(grLine.total))) && "text-red-600"
+                              )}>
+                                {editingLineItem === index ? (
+                                  `$${((Number(lineItemValues[index]?.quantity) || 0) * (Number(lineItemValues[index]?.unit_price) || 0)).toFixed(2)}`
+                                ) : (
+                                  `$${Number(item.total).toFixed(2)}`
+                                )}
+                              </div>
+                              
+                              {/* Actions */}
+                              <div className="col-span-1 text-center" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex items-center justify-center gap-1">
+                                  {editingLineItem === index ? (
+                                    <>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-6 w-6 p-0 hover:bg-green-100"
+                                        onClick={handleSaveLineItem}
+                                      >
+                                        <Check className="h-3 w-3 text-green-600" />
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-6 w-6 p-0 hover:bg-red-100"
+                                        onClick={handleCancelEditLineItem}
+                                      >
+                                        <X className="h-3 w-3 text-red-600" />
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-6 w-6 p-0 hover:bg-violet-100 relative"
+                                        title="Comments"
+                                      >
+                                        <MessageCircle className="h-3 w-3 text-violet-600" />
+                                        {mockComments[index] && (
+                                          <span className="absolute -top-1 -right-1 h-3 w-3 bg-violet-600 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
+                                            {mockComments[index]}
+                                          </span>
+                                        )}
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-6 w-6 p-0 hover:bg-violet-100"
+                                        onClick={() => handleEditLineItem(index)}
+                                        title="Edit"
+                                      >
+                                        <Edit className="h-3 w-3 text-violet-600" />
+                                      </Button>
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-violet-100" title="More options">
+                                            <MoreVertical className="h-3 w-3 text-violet-600" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-48">
+                                          <DropdownMenuItem onClick={() => handleMarkAsMatched(index)}>
+                                            Mark as Matched
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => console.log('Mark as Exception')}>
+                                            Mark as Exception
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => handleRemoveLineItem(index)} className="text-red-600 focus:text-red-600">
+                                            Remove Line
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Expanded PO/GR Data */}
+                          {isExpanded && canExpand && (
+                            <div className="bg-gray-50 border-t px-4 py-2">
+                              <div className="space-y-1">
+                                {/* PO Line Details or Add PO Placeholder */}
+                                {poLine ? (
+                                  <div className="bg-white/70 border border-blue-150 rounded p-2">
+                                    <div className="grid grid-cols-12 gap-4 items-center">
+                                      <div className="col-span-2">
+                                        <LineItemSelector
+                                          value={match?.poLineId}
+                                          items={mockPOLines.filter(line => {
+                                            const selectedPOItems = Object.values(lineItemMatches)
+                                              .map(match => match.poLineId)
+                                              .filter(Boolean)
+                                            return !selectedPOItems.includes(line.id) || line.id === match?.poLineId
+                                          })}
+                                          onSelect={(lineId) => {
+                                            const newMatches = {...lineItemMatches}
+                                            newMatches[index] = {
+                                              ...newMatches[index],
+                                              poLineId: lineId
+                                            }
+                                            setLineItemMatches(newMatches)
+                                          }}
+                                          type="po"
+                                          lineNumber={poLine.line_number}
+                                          placeholder={`PO ${mockPOLines.find(po => po.id === match?.poLineId)?.po_number || 'PO-001'} #${poLine.line_number}`}
+                                        />
+                                      </div>
+                                      <div className="col-span-1">
+                                        <Badge 
+                                          variant="secondary" 
+                                          className="bg-blue-75 text-blue-600 hover:bg-blue-75 text-xs font-medium px-2 py-1"
+                                        >
+                                          PO Line
+                                        </Badge>
+                                      </div>
+                                      <div className="col-span-1 text-blue-700 text-sm font-medium">
+                                        {poLine.sku}
+                                      </div>
+                                      <div className="col-span-3 text-blue-700 text-sm font-medium truncate">
+                                        {poLine.description}
+                                      </div>
+                                      <div className={cn(
+                                        "col-span-1 text-right text-sm font-medium",
+                                        Number(item.quantity) !== Number(poLine.quantity) ? "text-red-600" : "text-blue-700"
+                                      )}>
+                                        {Number(poLine.quantity).toFixed(2)}
+                                      </div>
+                                      <div className={cn(
+                                        "col-span-1 text-right text-sm font-medium",
+                                        Number(item.unit_price) !== Number(poLine.unit_price) ? "text-red-600" : "text-blue-700"
+                                      )}>
+                                        ${Number(poLine.unit_price).toFixed(2)}
+                                      </div>
+                                      <div className={cn(
+                                        "col-span-2 text-right text-sm font-medium",
+                                        Number(item.total) !== Number(poLine.total) ? "text-red-600" : "text-blue-700"
+                                      )}>
+                                        ${Number(poLine.total).toFixed(2)}
+                                      </div>
+                                      <div className="col-span-1"></div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="bg-white/70 border border-blue-150 rounded p-2">
+                                    <div className="grid grid-cols-12 gap-4 items-center">
+                                      <div className="col-span-2">
+                                        <LineItemSelector
+                                          value={undefined}
+                                          items={mockPOLines.filter(line => {
+                                            const selectedPOItems = Object.values(lineItemMatches)
+                                              .map(match => match.poLineId)
+                                              .filter(Boolean)
+                                            return !selectedPOItems.includes(line.id)
+                                          })}
+                                          onSelect={(lineId) => {
+                                            const newMatches = {...lineItemMatches}
+                                            newMatches[index] = {
+                                              ...newMatches[index],
+                                              poLineId: lineId
+                                            }
+                                            setLineItemMatches(newMatches)
+                                          }}
+                                          type="po"
+                                          placeholder="+ Add PO"
+                                          isEmpty={true}
+                                        />
+                                      </div>
+                                      <div className="col-span-10 text-blue-500 text-sm font-medium">
+                                        Click to add a PO line item
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* GR Line Details */}
+                                {grLine && (
+                                  <div className="bg-green-25 border border-green-150 rounded p-2">
+                                    <div className="grid grid-cols-12 gap-4 items-center">
+                                      <div className="col-span-1 w-6">
+                                        <LineItemSelector
+                                          value={match?.grLineId}
+                                          items={mockGRLines.filter(line => {
+                                            const selectedGRItems = Object.values(lineItemMatches)
+                                              .map(match => match.grLineId)
+                                              .filter(Boolean)
+                                            return !selectedGRItems.includes(line.id) || line.id === match?.grLineId
+                                          })}
+                                          onSelect={(lineId) => {
+                                            const newMatches = {...lineItemMatches}
+                                            newMatches[index] = {
+                                              ...newMatches[index],
+                                              grLineId: lineId
+                                            }
+                                            setLineItemMatches(newMatches)
+                                          }}
+                                          type="gr"
+                                          lineNumber={grLine.line_number}
+                                        />
+                                      </div>
+                                      <div className="col-span-1 text-green-500 text-sm font-medium">
+                                        {grLine.line_number}
+                                      </div>
+                                      <div className="col-span-1">
+                                        <Badge 
+                                          variant="secondary" 
+                                          className="bg-green-75 text-green-600 hover:bg-green-75 text-xs font-medium px-2 py-1"
+                                        >
+                                          Received
+                                        </Badge>
+                                      </div>
+                                      <div className="col-span-1 text-green-700 text-sm font-medium">
+                                        {grLine.sku}
+                                      </div>
+                                      <div className="col-span-3 text-green-700 text-sm font-medium truncate">
+                                        {grLine.description}
+                                      </div>
+                                      <div className={cn(
+                                        "col-span-1 text-right text-sm font-medium",
+                                        Number(item.quantity) !== Number(grLine.quantity) ? "text-red-600" : "text-green-700"
+                                      )}>
+                                        {Number(grLine.quantity).toFixed(2)}
+                                      </div>
+                                      <div className={cn(
+                                        "col-span-1 text-right text-sm font-medium",
+                                        Number(item.unit_price) !== Number(grLine.unit_price) ? "text-red-600" : "text-green-700"
+                                      )}>
+                                        ${Number(grLine.unit_price).toFixed(2)}
+                                      </div>
+                                      <div className={cn(
+                                        "col-span-2 text-right text-sm font-medium",
+                                        Number(item.total) !== Number(grLine.total) ? "text-red-600" : "text-green-700"
+                                      )}>
+                                        ${Number(grLine.total).toFixed(2)}
+                                      </div>
+                                      <div className="col-span-1"></div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
               ) : (
                 <div className="p-8 text-center text-gray-500">
                   <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
@@ -3062,6 +3648,54 @@ export default function InvoiceDetailsPage() {
                     <Plus className="h-4 w-4 mr-1" />
                     Add Item
                   </Button>
+                </div>
+              )}
+              
+              {/* Summary Section */}
+              {invoice?.line_items && invoice.line_items.length > 0 && (
+                <div className="border-t bg-gray-50/50">
+                  <div className="px-4 py-3">
+                    <div className="flex justify-end">
+                      <div className="w-80 space-y-2">
+                        {/* Subtotal */}
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Subtotal:</span>
+                          <span className="font-medium">
+                            {formatCurrency(invoice.subtotal || (invoice.amount - (invoice.tax_amount || 0)), invoice.currency_code)}
+                          </span>
+                        </div>
+                        
+                        {/* Tax */}
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">
+                            Tax ({invoice.tax_rate ? `${invoice.tax_rate}%` : 'VAT'}):
+                          </span>
+                          <span className="font-medium">
+                            {formatCurrency(invoice.tax_amount || 0, invoice.currency_code)}
+                          </span>
+                        </div>
+                        
+                        {/* Shipping (placeholder - you can add this field to your invoice data) */}
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Shipping:</span>
+                          <span className="font-medium">
+                            {formatCurrency(0, invoice.currency_code)}
+                          </span>
+                        </div>
+                        
+                        {/* Divider */}
+                        <div className="border-t border-gray-300 my-2"></div>
+                        
+                        {/* Total */}
+                        <div className="flex items-center justify-between text-base font-semibold">
+                          <span className="text-gray-900">Total:</span>
+                          <span className="text-gray-900">
+                            {formatCurrency(invoice.amount, invoice.currency_code)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

@@ -55,7 +55,7 @@ class PurchaseOrderLineItem(models.Model):
     item = models.ForeignKey(Item, on_delete=models.CASCADE)
     
     quantity = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
-    unit_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.00'))])
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     total = models.DecimalField(max_digits=12, decimal_places=2)
     
     created_at = models.DateTimeField(auto_now_add=True)

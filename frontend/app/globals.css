@@ -57,3 +57,53 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  /* Professional Blue Colors */
+  .bg-blue-25 {
+    background-color: #f8fafc;
+  }
+  .bg-blue-75 {
+    background-color: #e1effe;
+  }
+  .border-blue-150 {
+    border-color: #c3ddfd;
+  }
+  .text-blue-500 {
+    color: #3b82f6;
+  }
+  .text-blue-600 {
+    color: #2563eb;
+  }
+  .text-blue-700 {
+    color: #1d4ed8;
+  }
+  
+  /* Professional Green Colors */
+  .bg-green-25 {
+    background-color: #f7fdf7;
+  }
+  .bg-green-75 {
+    background-color: #dcfce7;
+  }
+  .border-green-150 {
+    border-color: #bbf7d0;
+  }
+  .text-green-500 {
+    color: #22c55e;
+  }
+  .text-green-600 {
+    color: #16a34a;
+  }
+  .text-green-700 {
+    color: #15803d;
+  }
+  
+  /* Hover states */
+  .hover\:bg-blue-75:hover {
+    background-color: #e1effe;
+  }
+  .hover\:bg-green-75:hover {
+    background-color: #dcfce7;
+  }
+}
