@@ -3239,11 +3239,17 @@ export default function InvoiceDetailsPage() {
                       const canExpand = poLine || grLine || mockPOLines.length > 0 || mockGRLines.length > 0
                       
                       return (
-                        <div key={index} className="border-b">
+                        <div 
+                          key={index} 
+                          className={cn(
+                            "border-b group transition-all duration-200 mx-2",
+                            "hover:shadow-[0_0_0_2px_rgb(156,163,175)] hover:rounded-sm"
+                          )}
+                        >
                           {/* Main Invoice Row */}
                           <div 
                             className={cn(
-                              "px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer",
+                              "px-2 py-3 hover:bg-gray-50 transition-colors cursor-pointer",
                               hasMismatch && "bg-amber-25 border-l-4 border-amber-400"
                             )}
                             onClick={() => {
@@ -3453,7 +3459,7 @@ export default function InvoiceDetailsPage() {
                           
                           {/* Expanded PO/GR Data */}
                           {isExpanded && canExpand && (
-                            <div className="bg-gray-50 border-t px-4 py-2">
+                            <div className="bg-gray-50 border-t px-2 py-2">
                               <div className="space-y-1">
                                 {/* PO Line Details or Add PO Placeholder */}
                                 {poLine ? (
