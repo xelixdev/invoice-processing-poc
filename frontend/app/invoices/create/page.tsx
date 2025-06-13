@@ -7,7 +7,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogOverlay, DialogPortal } from "@/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Sheet, SheetHeader, SheetTitle, SheetTrigger, SheetPortal, SheetClose } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetPortal, SheetClose } from "@/components/ui/sheet"
 import * as SheetPrimitive from "@radix-ui/react-dialog"
 import Sidebar from "@/components/sidebar"
 import Link from "next/link"
@@ -184,6 +184,7 @@ export default function InvoiceDetailsPage() {
   const [linkedGR, setLinkedGR] = useState<string | null>(null)
   const [validationIssues, setValidationIssues] = useState<{[key: string]: ValidationIssue[]}>({}) // Keep for backward compatibility
   const [isIssuesDrawerOpen, setIsIssuesDrawerOpen] = useState(false)
+  const [exceptionsOpen, setExceptionsOpen] = useState(false)
   const [editingField, setEditingField] = useState<string | null>(null)
   const [fieldValues, setFieldValues] = useState<{[key: string]: string}>({})
   const [removingVendor, setRemovingVendor] = useState(false)
@@ -232,22 +233,22 @@ export default function InvoiceDetailsPage() {
 
   // Mock PO line items for matching
   const mockPOLines = [
-    { id: "PO-001-1", sku: "CH-002", description: "Office Chair", quantity: 4, unit_price: 75.00, total: 300.00 },
-    { id: "PO-001-2", sku: "DK-002", description: "Office Desk", quantity: 3, unit_price: 200.00, total: 600.00 },
-    { id: "PO-001-3", sku: "TV-002", description: "Office TV", quantity: 2, unit_price: 500.00, total: 1000.00 },
-    { id: "PO-001-4", sku: "SF-001", description: "Office Couch", quantity: 1, unit_price: 750.00, total: 750.00 },
-    { id: "PO-001-5", sku: "LM-002", description: "Office Lamp", quantity: 5, unit_price: 25.00, total: 125.00 },
-    { id: "PO-001-6", sku: "WD-001", description: "Office Water Dispenser", quantity: 1, unit_price: 280.00, total: 280.00 },
+    { id: "PO-001-1", po_number: "PO-001", line_number: 1, sku: "CH-002", description: "Office Chair", quantity: 4, unit_price: 75.00, total: 300.00 },
+    { id: "PO-001-2", po_number: "PO-001", line_number: 2, sku: "DK-002", description: "Office Desk", quantity: 3, unit_price: 200.00, total: 600.00 },
+    { id: "PO-001-3", po_number: "PO-001", line_number: 3, sku: "TV-002", description: "Office TV", quantity: 2, unit_price: 500.00, total: 1000.00 },
+    { id: "PO-001-4", po_number: "PO-001", line_number: 4, sku: "SF-001", description: "Office Couch", quantity: 1, unit_price: 750.00, total: 750.00 },
+    { id: "PO-001-5", po_number: "PO-001", line_number: 5, sku: "LM-002", description: "Office Lamp", quantity: 5, unit_price: 25.00, total: 125.00 },
+    { id: "PO-001-6", po_number: "PO-001", line_number: 6, sku: "WD-001", description: "Office Water Dispenser", quantity: 1, unit_price: 280.00, total: 280.00 },
   ]
 
   // Mock GR line items for matching
   const mockGRLines = [
-    { id: "GR-001-1", description: "Office Chair", quantity: 4 },
-    { id: "GR-001-2", description: "Office Desk", quantity: 3 },
-    { id: "GR-001-3", description: "Office TV", quantity: 2 },
-    { id: "GR-001-4", description: "Office Couch", quantity: 1 },
-    { id: "GR-001-5", description: "Office Lamp", quantity: 5 },
-    { id: "GR-001-6", description: "Office Water Dispenser", quantity: 1 },
+    { id: "GR-001-1", line_number: 1, sku: "CH-002", description: "Office Chair", quantity: 4, unit_price: 75.00, total: 300.00, received_date: "2024-12-01" },
+    { id: "GR-001-2", line_number: 2, sku: "DK-002", description: "Office Desk", quantity: 3, unit_price: 200.00, total: 600.00, received_date: "2024-12-02" },
+    { id: "GR-001-3", line_number: 3, sku: "TV-002", description: "Office TV", quantity: 2, unit_price: 500.00, total: 1000.00, received_date: "2024-12-03" },
+    { id: "GR-001-4", line_number: 4, sku: "SF-001", description: "Office Couch", quantity: 1, unit_price: 750.00, total: 750.00, received_date: "2024-12-04" },
+    { id: "GR-001-5", line_number: 5, sku: "LM-002", description: "Office Lamp", quantity: 5, unit_price: 25.00, total: 125.00, received_date: "2024-12-05" },
+    { id: "GR-001-6", line_number: 6, sku: "WD-001", description: "Office Water Dispenser", quantity: 1, unit_price: 280.00, total: 280.00, received_date: "2024-12-06" },
   ]
 
   // Mock SKU codes for invoice line items
@@ -788,6 +789,7 @@ export default function InvoiceDetailsPage() {
     let matched = 0
     let total = 0
     
+    // Count header field matches
     fields.forEach(field => {
       if (comparisons[field]) {
         total++
@@ -797,13 +799,17 @@ export default function InvoiceDetailsPage() {
       }
     })
     
-    // Add line items if available
+    // Add line items if available - use actual line item matching status
     if (invoice?.line_items) {
       total += invoice.line_items.length
-      // For now, assume line items are matched if overall status is good
-      if (matchingData.match_confidence && matchingData.match_confidence > 80) {
-        matched += invoice.line_items.length
-      }
+      
+      // Count actually matched line items based on their status
+      invoice.line_items.forEach((_, index) => {
+        const status = getLineItemStatus(index)
+        if (status === 'matched') {
+          matched++
+        }
+      })
     }
     
     return {
@@ -816,32 +822,43 @@ export default function InvoiceDetailsPage() {
   // Helper function to get match status badge
   const getMatchStatusBadge = () => {
     const stats = getPOMatchingStats()
-    const summary = getMatchingSummary(matchingData)
     
-    if (summary.status === 'perfect') {
+    // If no stats available, return not validated
+    if (stats.total === 0) {
+      return {
+        text: 'Not Validated',
+        className: 'bg-gray-50 text-gray-700 border-gray-200'
+      }
+    }
+    
+    // Calculate match percentage
+    const matchPercentage = (stats.matched / stats.total) * 100
+    
+    // Determine status based on actual line item matching
+    if (matchPercentage === 100) {
       return {
         text: 'Perfect Match',
         className: 'bg-green-50 text-green-700 border-green-200'
       }
-    } else if (summary.status === 'tolerance') {
+    } else if (matchPercentage >= 90) {
       return {
         text: 'Within Tolerance',
         className: 'bg-green-25 text-green-600 border-green-100'
       }
-    } else if (summary.status === 'partial') {
+    } else if (matchPercentage >= 70) {
       return {
         text: 'Partial Match',
         className: 'bg-amber-50 text-amber-700 border-amber-200'
       }
-    } else if (summary.status === 'poor') {
+    } else if (matchPercentage >= 50) {
       return {
         text: 'Poor Match',
         className: 'bg-red-50 text-red-700 border-red-200'
       }
     } else {
       return {
-        text: 'Not Validated',
-        className: 'bg-gray-50 text-gray-700 border-gray-200'
+        text: 'Mismatch',
+        className: 'bg-red-100 text-red-800 border-red-300'
       }
     }
   }
@@ -2000,190 +2017,113 @@ export default function InvoiceDetailsPage() {
                     <div className="p-6">
                       <div className="flex items-center justify-between mb-4">
                         <h2 className="text-lg font-semibold">Invoice Details</h2>
+                        
+                        {/* Exceptions Button */}
                         {getIssueCounts().total > 0 && (
-                          <Sheet open={isIssuesDrawerOpen} onOpenChange={setIsIssuesDrawerOpen}>
+                          <Sheet open={exceptionsOpen} onOpenChange={setExceptionsOpen}>
                             <SheetTrigger asChild>
-                              <button className={cn(
-                                "px-3 py-1.5 text-xs font-medium rounded-full transition-colors",
-                                getIssueCounts().errors > 0 
-                                  ? "bg-red-100 text-red-700 hover:bg-red-200" 
-                                  : "bg-amber-100 text-amber-700 hover:bg-amber-200"
-                              )}>
-                                Exceptions ({getIssueCounts().total})
-                              </button>
-                            </SheetTrigger>
-                            <SheetPortal>
-                              <SheetPrimitive.Content
-                                className="fixed inset-y-0 right-0 z-50 h-full w-[60vw] max-w-[500px] sm:max-w-[600px] flex flex-col gap-4 bg-background p-6 transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right border-l"
-                                style={{boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'}}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className={cn(
+                                  "text-xs font-medium px-3 py-1.5 h-auto",
+                                  getIssueCounts().errors > 0 
+                                    ? "border-red-200 text-red-700 bg-red-50 hover:bg-red-100" 
+                                    : "border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100"
+                                )}
                               >
-                              <SheetHeader className="flex-shrink-0 pb-4 border-b">
-                                <SheetTitle className="text-lg font-semibold text-gray-900">Processing Exceptions</SheetTitle>
-                                <p className="text-sm text-gray-600 mt-1">Review and resolve validation exceptions before approval</p>
-                          </SheetHeader>
-
-                          <div className="flex-1 overflow-y-auto mt-4">
-                            {/* Summary */}
-                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-3 mb-4">
-                              <div className="flex items-center justify-between mb-2">
-                                <h3 className="font-semibold text-gray-900 text-base">Exception Summary</h3>
-                                <div className="flex items-center gap-4 text-sm">
-                                  {getIssueCounts().errors > 0 && (
-                                    <div className="flex items-center gap-1.5 text-red-700 bg-red-100 px-2.5 py-1 rounded-full">
-                                      <AlertCircle className="h-4 w-4" />
-                                      <span className="font-medium">{getIssueCounts().errors} critical</span>
-                                    </div>
-                                  )}
-                                  {getIssueCounts().warnings > 0 && (
-                                    <div className="flex items-center gap-1.5 text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full">
-                                      <AlertTriangle className="h-4 w-4" />
-                                      <span className="font-medium">{getIssueCounts().warnings} review required</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              <p className="text-xs text-gray-700 leading-relaxed">
-                                The following exceptions require review before this invoice can be processed for payment. Critical exceptions must be resolved, while others may be approved with authorization.
-                              </p>
-                            </div>
-
-                            {/* Issues by Field */}
-                            <div className="space-y-4">
-                              {Object.entries(validationIssues).map(([fieldKey, fieldIssues]) => {
-                                // Filter out resolved issues
-                                const activeIssues = fieldIssues.filter((_, index) => {
-                                  const issueId = `${fieldKey}-${index}`
-                                  return !resolvedIssues.has(issueId)
-                                })
-                                
-                                // Don't render section if no active issues
-                                if (activeIssues.length === 0) return null
-                                
-                                return (
-                                  <div key={fieldKey} className="mb-4">
-                                    <div className="mb-3 border-l-4 border-indigo-500 pl-3">
-                                      <h4 className="font-semibold text-gray-900 text-sm">{getFieldDisplayName(fieldKey)}</h4>
-                                      <p className="text-xs text-gray-600 mt-0.5">{activeIssues.length} exception{activeIssues.length > 1 ? 's' : ''} found</p>
-                                    </div>
-                                  
-                                    <div className="space-y-4">
-                                      {fieldIssues.map((issue, index) => {
-                                        const issueId = `${fieldKey}-${index}`
-                                        const isResolving = resolvingIssues.has(issueId)
-                                        const isResolved = resolvedIssues.has(issueId)
-
-                                        return (
-                                          <div 
-                                            key={index} 
-                                            className={`relative bg-white border rounded-lg p-3 hover:shadow-md transition-all duration-300 ${
-                                              isResolved ? 'transform translate-x-full opacity-0 pointer-events-none' :
-                                              isResolving ? 'border-green-300 bg-green-50' : 
-                                              issue.type === 'error' ? 'border-red-200 hover:shadow-lg hover:border-red-300' :
-                                              'border-amber-200 hover:shadow-lg hover:border-amber-300'
-                                            }`}
-                                            style={{
-                                              height: isResolved ? '0' : 'auto',
-                                              marginBottom: isResolved ? '0' : undefined,
-                                              overflow: isResolved ? 'hidden' : 'visible'
-                                            }}
-                                          >
-                                            <div className="flex items-start gap-3">
-                                              <div className="flex-shrink-0">
-                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center border ${
-                                                  isResolving ? 'bg-green-100 border-green-300' : 
-                                                  issue.type === 'error' ? 'bg-red-50 border-red-200' : 
-                                                  issue.type === 'warning' ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'
-                                                }`}>
-                                                  {isResolving ? (
-                                                    <CheckCircle className="h-4 w-4 text-green-600" />
-                                                  ) : issue.type === 'error' ? (
-                                                    <AlertCircle className="h-4 w-4 text-red-600" />
-                                                  ) : issue.type === 'warning' ? (
-                                                    <AlertTriangle className="h-4 w-4 text-amber-600" />
-                                                  ) : (
-                                                    <AlertCircle className="h-4 w-4 text-blue-600" />
-                                                  )}
-                                                </div>
+                                <AlertCircle className="h-3 w-3 mr-1.5" />
+                                {getIssueCounts().total} Exception{getIssueCounts().total !== 1 ? 's' : ''}
+                              </Button>
+                            </SheetTrigger>
+                            <SheetContent className="w-[500px] sm:w-[600px]">
+                              <SheetHeader>
+                                <SheetTitle className="flex items-center gap-2">
+                                  <AlertCircle className="h-5 w-5 text-amber-600" />
+                                  Validation Issues
+                                </SheetTitle>
+                                <SheetDescription>
+                                  Review and resolve the following issues with this invoice
+                                </SheetDescription>
+                              </SheetHeader>
+                              
+                              <div className="mt-6 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+                                {Object.entries(validationIssues)
+                                  .filter(([_, issues]) => issues.length > 0)
+                                  .map(([fieldKey, issues]) => (
+                                    <div key={fieldKey} className="border rounded-lg p-4">
+                                      <h4 className="font-medium text-gray-900 mb-2">
+                                        {getFieldDisplayName(fieldKey)}
+                                      </h4>
+                                      
+                                      <div className="space-y-2">
+                                        {issues.map((issue, index) => {
+                                          const issueId = `${fieldKey}-${index}`
+                                          const isResolving = resolvingIssues.has(issueId)
+                                          const isResolved = resolvedIssues.has(issueId)
+                                          
+                                          return (
+                                            <div
+                                              key={index}
+                                              className={cn(
+                                                "flex items-start gap-3 p-3 rounded-md transition-all duration-500",
+                                                issue.type === 'error' && "bg-red-50 border border-red-200",
+                                                issue.type === 'warning' && "bg-amber-50 border border-amber-200",
+                                                issue.type === 'info' && "bg-blue-50 border border-blue-200",
+                                                isResolved && "opacity-0 transform translate-x-full"
+                                              )}
+                                            >
+                                              <div className="flex-shrink-0 mt-0.5">
+                                                {issue.type === 'error' && <AlertCircle className="h-4 w-4 text-red-600" />}
+                                                {issue.type === 'warning' && <AlertTriangle className="h-4 w-4 text-amber-600" />}
+                                                {issue.type === 'info' && <Info className="h-4 w-4 text-blue-600" />}
                                               </div>
+                                              
                                               <div className="flex-1 min-w-0">
-                                                <div className="flex items-start justify-between mb-2">
-                                                  <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium uppercase tracking-wide ${
-                                                    issue.type === 'error' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
-                                                  }`}>
-                                                    {issue.type === 'error' ? 'Critical' : 'Review Required'}
-                                                  </span>
-                                                </div>
-                                                <p className="text-xs font-medium text-gray-900 mb-2 leading-snug">{issue.message}</p>
+                                                <p className="text-sm text-gray-900">{issue.message}</p>
                                                 {issue.action && (
-                                                  <div className="flex items-center gap-2 mt-1.5">
-                                                    <Button
-                                                      variant="outline"
-                                                      size="sm"
-                                                      className={`h-7 text-xs font-medium px-3 transition-all duration-300 ${
-                                                        isResolving 
-                                                          ? 'bg-green-100 text-green-700 border-green-300 hover:bg-green-100' 
-                                                          : issue.type === 'error'
-                                                            ? 'border-red-300 text-red-700 hover:bg-red-50 hover:border-red-400'
-                                                            : 'border-amber-300 text-amber-700 hover:bg-amber-50 hover:border-amber-400'
-                                                      }`}
-                                                      disabled={isResolving}
-                                                      onClick={() => {
-                                                        if (!isResolving) {
-                                                          issue.action?.onClick()
-                                                          handleResolveIssue(fieldKey, index)
-                                                        }
-                                                      }}
-                                                    >
-                                                      {isResolving ? (
-                                                        <>
-                                                          <CheckCircle className="h-3 w-3 mr-1.5" />
-                                                          Resolved
-                                                        </>
-                                                      ) : (
-                                                        issue.action.label
-                                                      )}
-                                                    </Button>
-                                                    {!isResolving && (
-                                                      <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="h-7 text-xs font-medium px-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100"
-                                                        onClick={() => handleResolveIssue(fieldKey, index)}
-                                                      >
-                                                        Mark as Reviewed
-                                                      </Button>
-                                                    )}
-                                                  </div>
+                                                  <Button
+                                                    variant="link"
+                                                    size="sm"
+                                                    className="px-0 py-1 h-auto text-xs"
+                                                    onClick={issue.action.onClick}
+                                                  >
+                                                    {issue.action.label}
+                                                  </Button>
                                                 )}
                                               </div>
+                                              
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 w-6 p-0 hover:bg-gray-200"
+                                                onClick={() => handleResolveIssue(fieldKey, index)}
+                                                disabled={isResolving}
+                                              >
+                                                {isResolving ? (
+                                                  <div className="h-3 w-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                                                ) : (
+                                                  <X className="h-3 w-3" />
+                                                )}
+                                              </Button>
                                             </div>
-                                          </div>
-                                        )
-                                      })}
+                                          )
+                                        })}
+                                      </div>
                                     </div>
+                                  ))}
+                                
+                                {Object.keys(validationIssues).length === 0 && (
+                                  <div className="text-center py-8 text-gray-500">
+                                    <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-2" />
+                                    <p>No validation issues found</p>
                                   </div>
-                                )
-                              })}
-                            </div>
-                          </div>
-
-                          {/* Actions - Fixed at bottom */}
-                          {getIssueCounts().errors === 0 && (
-                            <div className="flex-shrink-0 mt-8 pt-6 border-t">
-                              <Button className="w-full bg-violet-600 hover:bg-violet-700">
-                                Save with Warnings
-                              </Button>
-                            </div>
-                          )}
-                                <SheetClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
-                                  <X className="h-4 w-4" />
-                                  <span className="sr-only">Close</span>
-                                </SheetClose>
-                              </SheetPrimitive.Content>
-                            </SheetPortal>
-                      </Sheet>
-                    )}
-                  </div>
+                                )}
+                              </div>
+                            </SheetContent>
+                          </Sheet>
+                        )}
+                      </div>
 
                       <div className="space-y-5">
                         {/* GENERAL INFO Section */}
@@ -3329,6 +3269,9 @@ export default function InvoiceDetailsPage() {
                         expandedRows.add(index)
                       }
                       
+                      // Show expansion possibility if there are any PO/GR lines available or already matched
+                      const canExpand = poLine || grLine || mockPOLines.length > 0 || mockGRLines.length > 0
+                      
                       return (
                         <div key={index} className="border-b">
                           {/* Main Invoice Row */}
@@ -3338,7 +3281,7 @@ export default function InvoiceDetailsPage() {
                               hasMismatch && "bg-amber-25 border-l-4 border-amber-400"
                             )}
                             onClick={() => {
-                              if ((poLine || grLine) && editingLineItem !== index) {
+                              if (canExpand && editingLineItem !== index) {
                                 const newExpanded = new Set(expandedRows)
                                 if (isExpanded) {
                                   newExpanded.delete(index)
@@ -3354,7 +3297,7 @@ export default function InvoiceDetailsPage() {
                             <div className="grid grid-cols-12 gap-4 items-center">
                               {/* Chevron Toggle */}
                               <div className="col-span-1 w-6">
-                                {(poLine || grLine) && (
+                                {canExpand && (
                                   <ChevronRight className={cn(
                                     "h-3 w-3 transition-transform text-gray-400",
                                     isExpanded && "rotate-90"
@@ -3543,71 +3486,97 @@ export default function InvoiceDetailsPage() {
                           </div>
                           
                           {/* Expanded PO/GR Data */}
-                          {isExpanded && (poLine || grLine) && (
+                          {isExpanded && canExpand && (
                             <div className="bg-gray-50 border-t px-4 py-2">
                               <div className="space-y-1">
-                                {/* PO Line Details */}
-                                {poLine && (
-                                  <div className="bg-blue-50 border border-blue-200 rounded p-2">
-                                    <div className="grid grid-cols-12 gap-4 items-center text-sm">
-                                      <div className="col-span-1 w-6">
-                                        <FileText className="h-3 w-3 text-blue-600" />
-                                      </div>
-                                      <div className="col-span-1 text-blue-600 text-xs font-medium">
-                                        PO {poLine.line_number}
+                                {/* PO Line Details or Add PO Placeholder */}
+                                {poLine ? (
+                                  <div className="bg-white/70 border border-blue-150 rounded p-2">
+                                    <div className="grid grid-cols-12 gap-4 items-center">
+                                      <div className="col-span-2">
+                                        <LineItemSelector
+                                          value={match?.poLineId}
+                                          items={mockPOLines.filter(line => {
+                                            const selectedPOItems = Object.values(lineItemMatches)
+                                              .map(match => match.poLineId)
+                                              .filter(Boolean)
+                                            return !selectedPOItems.includes(line.id) || line.id === match?.poLineId
+                                          })}
+                                          onSelect={(lineId) => {
+                                            const newMatches = {...lineItemMatches}
+                                            newMatches[index] = {
+                                              ...newMatches[index],
+                                              poLineId: lineId
+                                            }
+                                            setLineItemMatches(newMatches)
+                                          }}
+                                          type="po"
+                                          lineNumber={poLine.line_number}
+                                          placeholder={`PO ${mockPOLines.find(po => po.id === match?.poLineId)?.po_number || 'PO-001'} #${poLine.line_number}`}
+                                        />
                                       </div>
                                       <div className="col-span-1">
-                                        <Badge variant="secondary" className="bg-blue-100 text-blue-700 text-xs px-1 py-0">
+                                        <Badge 
+                                          variant="secondary" 
+                                          className="bg-blue-75 text-blue-600 hover:bg-blue-75 text-xs font-medium px-2 py-1"
+                                        >
                                           PO Line
                                         </Badge>
                                       </div>
-                                      <div className="col-span-1 text-blue-800 text-xs font-medium">
+                                      <div className="col-span-1 text-blue-700 text-sm font-medium">
                                         {poLine.sku}
                                       </div>
-                                      <div className="col-span-3 text-blue-800 font-medium truncate">
+                                      <div className="col-span-3 text-blue-700 text-sm font-medium truncate">
                                         {poLine.description}
                                       </div>
                                       <div className={cn(
-                                        "col-span-1 text-right font-medium",
-                                        Number(item.quantity) !== Number(poLine.quantity) ? "text-red-600" : "text-blue-800"
+                                        "col-span-1 text-right text-sm font-medium",
+                                        Number(item.quantity) !== Number(poLine.quantity) ? "text-red-600" : "text-blue-700"
                                       )}>
                                         {Number(poLine.quantity).toFixed(2)}
                                       </div>
                                       <div className={cn(
-                                        "col-span-1 text-right font-medium",
-                                        Number(item.unit_price) !== Number(poLine.unit_price) ? "text-red-600" : "text-blue-800"
+                                        "col-span-1 text-right text-sm font-medium",
+                                        Number(item.unit_price) !== Number(poLine.unit_price) ? "text-red-600" : "text-blue-700"
                                       )}>
                                         ${Number(poLine.unit_price).toFixed(2)}
                                       </div>
                                       <div className={cn(
-                                        "col-span-2 text-right font-medium",
-                                        Number(item.total) !== Number(poLine.total) ? "text-red-600" : "text-blue-800"
+                                        "col-span-2 text-right text-sm font-medium",
+                                        Number(item.total) !== Number(poLine.total) ? "text-red-600" : "text-blue-700"
                                       )}>
                                         ${Number(poLine.total).toFixed(2)}
                                       </div>
-                                      <div className="col-span-1 text-center">
-                                        <DropdownMenu>
-                                          <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-blue-100">
-                                              <MoreVertical className="h-3 w-3 text-blue-600" />
-                                            </Button>
-                                          </DropdownMenuTrigger>
-                                          <DropdownMenuContent align="end" className="w-40">
-                                            <DropdownMenuItem 
-                                              onClick={() => {
-                                                const newMatches = {...lineItemMatches}
-                                                delete newMatches[index]
-                                                setLineItemMatches(newMatches)
-                                              }}
-                                              className="text-red-600 focus:text-red-600"
-                                            >
-                                              Remove PO Line
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => console.log('Reassign PO Line')}>
-                                              Reassign PO Line
-                                            </DropdownMenuItem>
-                                          </DropdownMenuContent>
-                                        </DropdownMenu>
+                                      <div className="col-span-1"></div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="bg-white/70 border border-blue-150 rounded p-2">
+                                    <div className="grid grid-cols-12 gap-4 items-center">
+                                      <div className="col-span-2">
+                                        <LineItemSelector
+                                          value={undefined}
+                                          items={mockPOLines.filter(line => {
+                                            const selectedPOItems = Object.values(lineItemMatches)
+                                              .map(match => match.poLineId)
+                                              .filter(Boolean)
+                                            return !selectedPOItems.includes(line.id)
+                                          })}
+                                          onSelect={(lineId) => {
+                                            const newMatches = {...lineItemMatches}
+                                            newMatches[index] = {
+                                              ...newMatches[index],
+                                              poLineId: lineId
+                                            }
+                                            setLineItemMatches(newMatches)
+                                          }}
+                                          type="po"
+                                          placeholder="+ Add PO"
+                                          isEmpty={true}
+                                        />
+                                      </div>
+                                      <div className="col-span-10 text-blue-500 text-sm font-medium">
+                                        Click to add a PO line item
                                       </div>
                                     </div>
                                   </div>
@@ -3615,72 +3584,65 @@ export default function InvoiceDetailsPage() {
                                 
                                 {/* GR Line Details */}
                                 {grLine && (
-                                  <div className="bg-green-50 border border-green-200 rounded p-2">
-                                    <div className="grid grid-cols-12 gap-4 items-center text-sm">
+                                  <div className="bg-green-25 border border-green-150 rounded p-2">
+                                    <div className="grid grid-cols-12 gap-4 items-center">
                                       <div className="col-span-1 w-6">
-                                        <Truck className="h-3 w-3 text-green-600" />
+                                        <LineItemSelector
+                                          value={match?.grLineId}
+                                          items={mockGRLines.filter(line => {
+                                            const selectedGRItems = Object.values(lineItemMatches)
+                                              .map(match => match.grLineId)
+                                              .filter(Boolean)
+                                            return !selectedGRItems.includes(line.id) || line.id === match?.grLineId
+                                          })}
+                                          onSelect={(lineId) => {
+                                            const newMatches = {...lineItemMatches}
+                                            newMatches[index] = {
+                                              ...newMatches[index],
+                                              grLineId: lineId
+                                            }
+                                            setLineItemMatches(newMatches)
+                                          }}
+                                          type="gr"
+                                          lineNumber={grLine.line_number}
+                                        />
                                       </div>
-                                      <div className="col-span-1 text-green-600 text-xs font-medium">
-                                        GR {grLine.line_number}
+                                      <div className="col-span-1 text-green-500 text-sm font-medium">
+                                        {grLine.line_number}
                                       </div>
                                       <div className="col-span-1">
-                                        <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs px-1 py-0">
+                                        <Badge 
+                                          variant="secondary" 
+                                          className="bg-green-75 text-green-600 hover:bg-green-75 text-xs font-medium px-2 py-1"
+                                        >
                                           Received
                                         </Badge>
                                       </div>
-                                      <div className="col-span-1 text-green-800 text-xs font-medium">
+                                      <div className="col-span-1 text-green-700 text-sm font-medium">
                                         {grLine.sku}
                                       </div>
-                                      <div className="col-span-3 text-green-800 font-medium truncate">
+                                      <div className="col-span-3 text-green-700 text-sm font-medium truncate">
                                         {grLine.description}
                                       </div>
                                       <div className={cn(
-                                        "col-span-1 text-right font-medium",
-                                        Number(item.quantity) !== Number(grLine.quantity) ? "text-red-600" : "text-green-800"
+                                        "col-span-1 text-right text-sm font-medium",
+                                        Number(item.quantity) !== Number(grLine.quantity) ? "text-red-600" : "text-green-700"
                                       )}>
                                         {Number(grLine.quantity).toFixed(2)}
                                       </div>
                                       <div className={cn(
-                                        "col-span-1 text-right font-medium",
-                                        Number(item.unit_price) !== Number(grLine.unit_price) ? "text-red-600" : "text-green-800"
+                                        "col-span-1 text-right text-sm font-medium",
+                                        Number(item.unit_price) !== Number(grLine.unit_price) ? "text-red-600" : "text-green-700"
                                       )}>
                                         ${Number(grLine.unit_price).toFixed(2)}
                                       </div>
                                       <div className={cn(
-                                        "col-span-2 text-right font-medium",
-                                        Number(item.total) !== Number(grLine.total) ? "text-red-600" : "text-green-800"
+                                        "col-span-2 text-right text-sm font-medium",
+                                        Number(item.total) !== Number(grLine.total) ? "text-red-600" : "text-green-700"
                                       )}>
                                         ${Number(grLine.total).toFixed(2)}
                                       </div>
-                                      <div className="col-span-1 text-center">
-                                        <DropdownMenu>
-                                          <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-green-100">
-                                              <MoreVertical className="h-3 w-3 text-green-600" />
-                                            </Button>
-                                          </DropdownMenuTrigger>
-                                          <DropdownMenuContent align="end" className="w-40">
-                                            <DropdownMenuItem 
-                                              onClick={() => {
-                                                const newMatches = {...lineItemMatches}
-                                                if (newMatches[index]) {
-                                                  delete newMatches[index].grLineId
-                                                  if (!newMatches[index].poLineId) {
-                                                    delete newMatches[index]
-                                                  }
-                                                }
-                                                setLineItemMatches(newMatches)
-                                              }}
-                                              className="text-red-600 focus:text-red-600"
-                                            >
-                                              Remove GR Line
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => console.log('Reassign GR Line')}>
-                                              Reassign GR Line
-                                            </DropdownMenuItem>
-                                          </DropdownMenuContent>
-                                        </DropdownMenu>
-                                      </div>
+                                      <div className="col-span-1"></div>
                                     </div>
                                   </div>
                                 )}
