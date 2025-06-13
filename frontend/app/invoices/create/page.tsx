@@ -14,6 +14,7 @@ import Link from "next/link"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { cn } from "@/lib/utils"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Calendar } from "@/components/ui/calendar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -195,6 +196,7 @@ export default function InvoiceDetailsPage() {
   const [workflowStage, setWorkflowStage] = useState<'draft' | 'validation' | 'pending_approval' | 'approved' | 'processing' | 'paid'>('validation')
   const [showWorkflowDetails, setShowWorkflowDetails] = useState(false)
   const [currentAssignee, setCurrentAssignee] = useState('SC')
+  const [lineItemsSwitch, setLineItemsSwitch] = useState(false)
   const pdfContainerRef = useRef<HTMLDivElement>(null)
   const descriptionInputRefs = useRef<{[key: number]: HTMLInputElement | null}>({})
   
@@ -2818,6 +2820,12 @@ export default function InvoiceDetailsPage() {
                     )}
                   </div>
                 )}
+              </div>
+              <div className="flex items-center">
+                <Switch
+                  checked={lineItemsSwitch}
+                  onCheckedChange={setLineItemsSwitch}
+                />
               </div>
             </div>
 
