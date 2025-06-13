@@ -3684,6 +3684,54 @@ export default function InvoiceDetailsPage() {
                   </Button>
                 </div>
               )}
+              
+              {/* Summary Section */}
+              {invoice?.line_items && invoice.line_items.length > 0 && (
+                <div className="border-t bg-gray-50/50">
+                  <div className="px-4 py-3">
+                    <div className="flex justify-end">
+                      <div className="w-80 space-y-2">
+                        {/* Subtotal */}
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Subtotal:</span>
+                          <span className="font-medium">
+                            {formatCurrency(invoice.subtotal || (invoice.amount - (invoice.tax_amount || 0)), invoice.currency_code)}
+                          </span>
+                        </div>
+                        
+                        {/* Tax */}
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">
+                            Tax ({invoice.tax_rate ? `${invoice.tax_rate}%` : 'VAT'}):
+                          </span>
+                          <span className="font-medium">
+                            {formatCurrency(invoice.tax_amount || 0, invoice.currency_code)}
+                          </span>
+                        </div>
+                        
+                        {/* Shipping (placeholder - you can add this field to your invoice data) */}
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Shipping:</span>
+                          <span className="font-medium">
+                            {formatCurrency(0, invoice.currency_code)}
+                          </span>
+                        </div>
+                        
+                        {/* Divider */}
+                        <div className="border-t border-gray-300 my-2"></div>
+                        
+                        {/* Total */}
+                        <div className="flex items-center justify-between text-base font-semibold">
+                          <span className="text-gray-900">Total:</span>
+                          <span className="text-gray-900">
+                            {formatCurrency(invoice.amount, invoice.currency_code)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             
             {/* PO Lines Not Found Section */}
