@@ -2,13 +2,14 @@ import Link from "next/link"
 import { Bell, User, HelpCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-type ActivePage = "dashboard" | "invoices" | "purchase-orders" | "goods-received"
+type ActivePage = "statements" | "invoices" | "vendors" | "helpdesk"
 
 interface MainHeaderProps {
   activePage: ActivePage
+  invoicesHref?: string
 }
 
-export default function MainHeader({ activePage }: MainHeaderProps) {
+export default function MainHeader({ activePage, invoicesHref = "/" }: MainHeaderProps) {
   return (
     <header className="border-b">
       <div className="flex h-16 items-center px-4 gap-6">
@@ -16,15 +17,15 @@ export default function MainHeader({ activePage }: MainHeaderProps) {
           <Link 
             href="#" 
             className={`text-sm font-medium px-3 py-1 rounded-full ${
-              activePage === "dashboard" 
+              activePage === "statements" 
                 ? "text-primary bg-primary/10" 
                 : "text-muted-foreground hover:text-primary"
             } transition-colors`}
           >
-            Dashboard
+            Statements
           </Link>
           <Link 
-            href="/" 
+            href={invoicesHref} 
             className={`text-sm font-medium px-3 py-1 rounded-full ${
               activePage === "invoices" 
                 ? "text-primary bg-primary/10" 
@@ -34,24 +35,24 @@ export default function MainHeader({ activePage }: MainHeaderProps) {
             Invoices
           </Link>
           <Link 
-            href="/purchase-orders" 
+            href="#" 
             className={`text-sm font-medium px-3 py-1 rounded-full ${
-              activePage === "purchase-orders" 
+              activePage === "vendors" 
                 ? "text-primary bg-primary/10" 
                 : "text-muted-foreground hover:text-primary"
             } transition-colors`}
           >
-            Purchase Orders
+            Vendors
           </Link>
           <Link 
-            href="/goods-received" 
+            href="#" 
             className={`text-sm font-medium px-3 py-1 rounded-full ${
-              activePage === "goods-received" 
+              activePage === "helpdesk" 
                 ? "text-primary bg-primary/10" 
                 : "text-muted-foreground hover:text-primary"
             } transition-colors`}
           >
-            Goods Receipt Notes
+            Helpdesk
           </Link>
         </nav>
         <div className="ml-auto flex items-center space-x-3">

@@ -12,7 +12,7 @@ import Link from "next/link"
 export default function Dashboard() {
   return (
     <div className="flex min-h-screen bg-background">
-      <Sidebar />
+      <Sidebar activePage="invoices" />
       <div className="flex-1 flex flex-col overflow-auto">
         <MainHeader activePage="invoices" />
         <main className="flex-1 overflow-auto p-6">
