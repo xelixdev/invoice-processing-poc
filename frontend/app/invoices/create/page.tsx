@@ -1,14 +1,13 @@
 "use client"
 
 import React, { useState, useEffect, useRef } from "react"
-import { ArrowLeft, FileText, Edit, Plus, Download, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Maximize, X, Receipt, FileCheck, TrendingUp, AlertCircle, AlertTriangle, CheckCircle, Calendar as CalendarIcon, Copy, List, MoreVertical, MessageCircle, Save, XIcon, Clock, Info, Check, Send, UserCheck, CreditCard, Link as LinkIcon, Eye, Shield, FileImage, Package, Truck } from "lucide-react"
+import { ArrowLeft, FileText, Edit, Plus, Download, ChevronRight, ChevronDown, ChevronUp, Maximize, X, Receipt, FileCheck, TrendingUp, AlertCircle, AlertTriangle, CheckCircle, Calendar as CalendarIcon, MoreVertical, MessageCircle, Clock, Info, Check, UserCheck, CreditCard, Link as LinkIcon, Eye, Shield, FileImage, Package, Truck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogOverlay, DialogPortal } from "@/components/ui/dialog"
+import { Dialog, DialogTrigger, DialogTitle, DialogOverlay, DialogPortal } from "@/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetPortal, SheetClose } from "@/components/ui/sheet"
-import * as SheetPrimitive from "@radix-ui/react-dialog"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import Sidebar from "@/components/sidebar"
 import Link from "next/link"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -22,8 +21,8 @@ import { Input } from "@/components/ui/input"
 import { format } from "date-fns"
 import { LineItemSelector } from "@/components/line-item-selector"
 import { useInvoiceValidation, validationRules } from "@/hooks/use-invoice-validation"
-import { parseMatchingValidation, getFieldMatchStatus, getMatchingSummary } from "@/lib/validation/matching-parser"
-import { runCrossFieldValidations, calculateExpectedValues, crossFieldValidationRules } from "@/lib/validation/cross-field-validation"
+import { parseMatchingValidation, getFieldMatchStatus } from "@/lib/validation/matching-parser"
+import { runCrossFieldValidations, crossFieldValidationRules } from "@/lib/validation/cross-field-validation"
 
 interface InvoiceData {
   document_type: string;
@@ -148,7 +147,7 @@ const invoiceFieldValidation = {
       message: 'GL Account / Cost Center is required for non-PO invoices',
       validate: (value: any, formData?: any) => {
         // If PO-backed, field is not required
-        const isPOBacked = !!(formData?.po_number || linkedPO || matchingData?.matched_po)
+        const isPOBacked = !!(formData?.po_number)
         if (isPOBacked) return true
         
         // For non-PO invoices, field is required
@@ -163,7 +162,7 @@ const invoiceFieldValidation = {
       message: 'Spend Category is required for non-PO invoices',
       validate: (value: any, formData?: any) => {
         // If PO-backed, field is not required
-        const isPOBacked = !!(formData?.po_number || linkedPO || matchingData?.matched_po)
+        const isPOBacked = !!(formData?.po_number)
         if (isPOBacked) return true
         
         // For non-PO invoices, field is required
@@ -3395,7 +3394,7 @@ export default function InvoiceDetailsPage() {
                                         variant="ghost" 
                                         size="sm" 
                                         className="h-6 w-6 p-0 hover:bg-green-100"
-                                        onClick={handleSaveLineItem}
+                                        onClick={() => handleSaveLineItem(index)}
                                       >
                                         <Check className="h-3 w-3 text-green-600" />
                                       </Button>
