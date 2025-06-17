@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, DragEvent } from 'react'
-import { X, Save, Play, Zap, Filter, Send, CheckCircle } from 'lucide-react'
+import { useState, useEffect, useRef, DragEvent } from 'react'
+import { X, Save, Play, Zap, Filter, Send, CheckCircle, Edit3, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -29,6 +29,7 @@ export default function RuleBuilderModal({ isOpen, onClose, editingRule }: RuleB
   const [currentExecutingNode, setCurrentExecutingNode] = useState<string>('')
   const [showNaturalLanguage, setShowNaturalLanguage] = useState(true)
   const [naturalLanguageDescription, setNaturalLanguageDescription] = useState('')
+  const titleInputRef = useRef<HTMLInputElement>(null)
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -176,16 +177,23 @@ export default function RuleBuilderModal({ isOpen, onClose, editingRule }: RuleB
         {/* Modal Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <div className="flex items-center space-x-3 pl-2">
-            <Input
-              value={ruleName}
-              onChange={(e) => {
-                setRuleName(e.target.value)
-                setHasUnsavedChanges(true)
-              }}
-              className="text-xl font-semibold border-none shadow-none p-0 h-auto bg-transparent focus-visible:ring-0 min-w-0"
-              placeholder="New Approval Rule"
-              style={{ fontSize: '1.25rem', lineHeight: '1.75rem' }}
-            />
+            <div className="flex items-center space-x-2 group">
+              <Input
+                ref={titleInputRef}
+                value={ruleName}
+                onChange={(e) => {
+                  setRuleName(e.target.value)
+                  setHasUnsavedChanges(true)
+                }}
+                className="text-xl font-semibold border-none shadow-none p-0 h-auto bg-transparent focus-visible:ring-0 focus:ring-0 focus:border-none focus:outline-none min-w-0"
+                placeholder="New Approval Rule"
+                style={{ fontSize: '1.25rem', lineHeight: '1.75rem' }}
+              />
+              <Edit3 
+                className="h-4 w-4 text-gray-300 group-hover:text-gray-400 transition-colors cursor-pointer" 
+                onClick={() => titleInputRef.current?.focus()}
+              />
+            </div>
             {hasUnsavedChanges && (
               <div className="px-2 py-1 bg-orange-100 text-orange-700 text-xs font-medium rounded-full">
                 Unsaved
@@ -228,7 +236,7 @@ export default function RuleBuilderModal({ isOpen, onClose, editingRule }: RuleB
               onClick={handleSave}
               className="bg-violet-600 hover:bg-violet-700 flex items-center gap-1.5 text-sm h-8"
             >
-              <Save className="h-3.5 w-3.5" />
+              <Check className="h-3.5 w-3.5" />
               Save Rule
             </Button>
             <Button
