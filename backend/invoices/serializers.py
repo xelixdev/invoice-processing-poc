@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Company, Vendor, Item, Invoice, InvoiceLineItem
+from django.contrib.auth.models import User
+from .models import Company, Vendor, Item, Invoice, InvoiceLineItem, AssignmentRule, AssignmentRuleUser
 from datetime import date, timedelta
 
 
@@ -24,6 +25,17 @@ class ItemSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 
+class UserSerializer(serializers.ModelSerializer):
+    """Serializer for User model with profile information."""
+    full_name = serializers.CharField(source='get_full_name', read_only=True)
+    department = serializers.CharField(source='profile.department', read_only=True)
+    
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'full_name', 'department', 'email', 'is_active']
+        read_only_fields = ['id', 'is_active']
+
+
 class InvoiceLineItemSerializer(serializers.ModelSerializer):
     item_code = serializers.CharField(source='item.item_code', read_only=True)
     item_description = serializers.CharField(source='item.description', read_only=True)
@@ -46,6 +58,9 @@ class InvoiceSerializer(serializers.ModelSerializer):
     company_id = serializers.CharField(source='company.company_id', read_only=True)
     line_items = InvoiceLineItemSerializer(many=True, read_only=True)
     
+    # Nested assigned user information
+    assigned_user = UserSerializer(source='assigned_to', read_only=True)
+    
     # Frontend-expected field names
     invoiceNumber = serializers.CharField(source='invoice_number', read_only=True)
     dueDate = serializers.DateField(source='due_date', read_only=True)
@@ -63,6 +78,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'po_number', 'gr_number',
             'vendor', 'vendor_id', 'vendor_name',
             'company', 'company_id', 'company_name',
+            'assigned_to', 'assigned_user',  # Include both for backward compatibility
             'currency', 'payment_terms',
             'billing_address',
             'sub_total', 'discount_amount', 'tax_amount',
@@ -122,4 +138,25 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
         for line_item_data in line_items_data:
             InvoiceLineItem.objects.create(invoice=invoice, **line_item_data)
         
-        return invoice 
+        return invoice
+
+
+class AssignmentRuleUserSerializer(serializers.ModelSerializer):
+    """Serializer for AssignmentRuleUser."""
+    user = UserSerializer(read_only=True)
+    
+    class Meta:
+        model = AssignmentRuleUser
+        fields = ['id', 'user', 'priority', 'created_at']
+
+
+class AssignmentRuleSerializer(serializers.ModelSerializer):
+    """Serializer for AssignmentRule."""
+    rule_users = AssignmentRuleUserSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = AssignmentRule
+        fields = [
+            'id', 'name', 'rule', 'function_assignees', 'user_ruleset', 
+            'is_active', 'priority', 'created_at', 'updated_at', 'rule_users'
+        ] 

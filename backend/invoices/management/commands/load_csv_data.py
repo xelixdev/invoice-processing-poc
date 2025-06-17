@@ -4,7 +4,8 @@ from decimal import Decimal
 from datetime import datetime
 from django.core.management.base import BaseCommand
 from django.conf import settings
-from invoices.models import Company, Vendor, Item, Invoice, InvoiceLineItem
+from django.contrib.auth.models import User
+from invoices.models import Company, Vendor, Item, Invoice, InvoiceLineItem, UserProfile, AssignmentRule, AssignmentRuleUser
 from purchase_orders.models import PurchaseOrder, PurchaseOrderLineItem
 from goods_received.models import GoodsReceived, GoodsReceivedLineItem
 
@@ -40,11 +41,13 @@ class Command(BaseCommand):
             # Always clear existing data first
             self.clear_all_data()
             
+            self.load_users(fixtures_path)
             self.load_companies_and_vendors(fixtures_path)
             self.load_items(fixtures_path)
             self.load_purchase_orders(fixtures_path)
             self.load_goods_received(fixtures_path)
             self.load_invoices(fixtures_path)
+            self.load_assignment_rules(fixtures_path)
 
             self.stdout.write(
                 self.style.SUCCESS('Successfully loaded all CSV data!')
@@ -62,6 +65,10 @@ class Command(BaseCommand):
         # Delete in reverse dependency order to avoid foreign key constraint errors
         deleted_counts = {}
         
+        # Delete assignment rules first (they reference users)
+        deleted_counts['AssignmentRuleUser'] = AssignmentRuleUser.objects.all().delete()[0]
+        deleted_counts['AssignmentRule'] = AssignmentRule.objects.all().delete()[0]
+        
         # Delete line items first
         deleted_counts['InvoiceLineItem'] = InvoiceLineItem.objects.all().delete()[0]
         deleted_counts['GoodsReceivedLineItem'] = GoodsReceivedLineItem.objects.all().delete()[0]
@@ -76,6 +83,11 @@ class Command(BaseCommand):
         deleted_counts['Item'] = Item.objects.all().delete()[0]
         deleted_counts['Vendor'] = Vendor.objects.all().delete()[0]
         deleted_counts['Company'] = Company.objects.all().delete()[0]
+        
+        # Delete non-staff/admin users and their profiles (preserve admin/staff accounts)
+        non_admin_users = User.objects.filter(is_staff=False, is_superuser=False)
+        deleted_counts['UserProfile'] = UserProfile.objects.filter(user__in=non_admin_users).delete()[0]
+        deleted_counts['User'] = non_admin_users.delete()[0]
         
         self.stdout.write('Cleared existing data:')
         for model, count in deleted_counts.items():
@@ -297,6 +309,14 @@ class Command(BaseCommand):
                     vendor = Vendor.objects.get(vendor_id=row['Vendor_ID'])
                     company = Company.objects.get(company_id=row['Company_ID'])
                     
+                    # Get assigned user if specified
+                    assigned_to = None
+                    if row.get('Assigned_To'):
+                        try:
+                            assigned_to = User.objects.get(username=row['Assigned_To'])
+                        except User.DoesNotExist:
+                            self.stdout.write(f'Warning: User {row["Assigned_To"]} not found for invoice {invoice_number}')
+                    
                     invoice, created = Invoice.objects.get_or_create(
                         invoice_number=invoice_number,
                         defaults={
@@ -306,6 +326,7 @@ class Command(BaseCommand):
                             'gr_number': row.get('GR_Number', ''),
                             'vendor': vendor,
                             'company': company,
+                            'assigned_to': assigned_to,
                             'currency': row['Currency'],
                             'payment_terms': row['Payment_Terms'],
                             'shipping': Decimal(row.get('Shipping', '0'))
@@ -338,4 +359,136 @@ class Command(BaseCommand):
                     self.stdout.write(f'Skipping Invoice {invoice_number}: {e}')
                     continue
 
-        self.stdout.write(f'Created {invoices_created} invoices with {line_items_created} line items') 
+        self.stdout.write(f'Created {invoices_created} invoices with {line_items_created} line items')
+
+    def load_users(self, fixtures_path):
+        """Load users from CSV file."""
+        csv_path = os.path.join(fixtures_path, 'users.csv')
+        if not os.path.exists(csv_path):
+            self.stdout.write('users.csv not found, skipping user creation...')
+            return
+
+        self.stdout.write('Loading users...')
+        
+        users_created = 0
+        profiles_created = 0
+
+        with open(csv_path, 'r') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                username = row['username']
+                email = row['email']
+                first_name = row['first_name']
+                last_name = row['last_name']
+                department = row['department']
+                is_staff = row['is_staff'].lower() in ['true', '1', 'yes']
+                is_active = row['is_active'].lower() in ['true', '1', 'yes']
+                
+                try:
+                    # Create user with default password
+                    user, created = User.objects.get_or_create(
+                        username=username,
+                        defaults={
+                            'email': email,
+                            'first_name': first_name,
+                            'last_name': last_name,
+                            'is_staff': is_staff,
+                            'is_active': is_active,
+                        }
+                    )
+                    
+                    if created:
+                        # Set default password (username for simplicity in POC)
+                        user.set_password(username)
+                        user.save()
+                        users_created += 1
+                    
+                    # Create or update user profile
+                    profile, profile_created = UserProfile.objects.get_or_create(
+                        user=user,
+                        defaults={'department': department}
+                    )
+                    
+                    if profile_created:
+                        profiles_created += 1
+                    elif profile.department != department:
+                        profile.department = department
+                        profile.save()
+                        
+                except Exception as e:
+                    self.stdout.write(f'Error creating user {username}: {e}')
+                    continue
+
+        self.stdout.write(f'Created {users_created} new users with {profiles_created} new profiles')
+
+    def load_assignment_rules(self, fixtures_path):
+        """Load assignment rules from CSV file."""
+        csv_path = os.path.join(fixtures_path, 'assignment_rules.csv')
+        if not os.path.exists(csv_path):
+            self.stdout.write('assignment_rules.csv not found, skipping assignment rules...')
+            return
+
+        self.stdout.write('Loading assignment rules...')
+        
+        rules_created = 0
+
+        with open(csv_path, 'r') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                name = row['name']
+                rule = row['rule']
+                function_assignees = row['function_assignees']
+                user_ruleset = row['user_ruleset']
+                priority = int(row['priority'])
+                is_active = row['is_active'].lower() in ['true', '1', 'yes']
+                
+                try:
+                    assignment_rule, created = AssignmentRule.objects.get_or_create(
+                        name=name,
+                        defaults={
+                            'rule': rule,
+                            'function_assignees': function_assignees,
+                            'user_ruleset': user_ruleset,
+                            'priority': priority,
+                            'is_active': is_active
+                        }
+                    )
+                    
+                    if created:
+                        rules_created += 1
+                        
+                        # For demonstration, add some users to IT rules
+                        if function_assignees == 'IT':
+                            it_users = User.objects.filter(profile__department='IT', is_active=True)
+                            for i, user in enumerate(it_users[:3], 1):  # First 3 IT users
+                                AssignmentRuleUser.objects.create(
+                                    assignment_rule=assignment_rule,
+                                    user=user,
+                                    priority=i
+                                )
+                        
+                        # Add users to Operations rules
+                        elif function_assignees == 'Operations':
+                            ops_users = User.objects.filter(profile__department='Operations', is_active=True)
+                            for i, user in enumerate(ops_users[:3], 1):  # First 3 Operations users
+                                AssignmentRuleUser.objects.create(
+                                    assignment_rule=assignment_rule,
+                                    user=user,
+                                    priority=i
+                                )
+                        
+                        # Add users to Finance rules  
+                        elif function_assignees == 'Finance':
+                            finance_users = User.objects.filter(profile__department='Finance', is_active=True)
+                            for i, user in enumerate(finance_users[:2], 1):  # First 2 Finance users
+                                AssignmentRuleUser.objects.create(
+                                    assignment_rule=assignment_rule,
+                                    user=user,
+                                    priority=i
+                                )
+                        
+                except Exception as e:
+                    self.stdout.write(f'Error creating assignment rule {name}: {e}')
+                    continue
+
+        self.stdout.write(f'Created {rules_created} assignment rules') 

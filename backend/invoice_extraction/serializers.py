@@ -114,6 +114,41 @@ class MatchingInfoSerializer(serializers.Serializer):
         fields = ['matched_po', 'match_confidence', 'match_type', 'data_comparison']
 
 
+class AssignmentRuleInfoSerializer(serializers.Serializer):
+    """Serializer for assignment rule information."""
+    
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    description = serializers.CharField()
+    department = serializers.CharField()
+    priority = serializers.IntegerField()
+    
+    class Meta:
+        fields = ['id', 'name', 'description', 'department', 'priority']
+
+
+class AssignedUserSerializer(serializers.Serializer):
+    """Serializer for assigned user information."""
+    
+    # User information
+    id = serializers.IntegerField()
+    username = serializers.CharField()
+    full_name = serializers.CharField()
+    department = serializers.CharField()
+    email = serializers.CharField()
+    
+    # Assignment details
+    rule = AssignmentRuleInfoSerializer()
+    confidence = serializers.FloatField(allow_null=True)
+    explanation = serializers.CharField()
+    
+    class Meta:
+        fields = [
+            'id', 'username', 'full_name', 'department', 'email',
+            'rule', 'confidence', 'explanation'
+        ]
+
+
 class InvoiceWithMatchingSerializer(serializers.Serializer):
     """Serializer for invoice data with embedded matching results."""
     
@@ -135,11 +170,15 @@ class InvoiceWithMatchingSerializer(serializers.Serializer):
     # Embedded matching information
     matching = MatchingInfoSerializer()
     
+    # Assignment information
+    assigned_user = AssignedUserSerializer(allow_null=True)
+    
     class Meta:
         fields = [
             'invoice_number', 'po_number', 'amount', 'subtotal', 'tax_amount',
             'currency_code', 'date', 'due_date', 'payment_term_days', 
-            'vendor', 'billing_address', 'payment_method', 'line_items', 'matching'
+            'vendor', 'billing_address', 'payment_method', 'line_items', 
+            'matching', 'assigned_user'
         ]
 
 

@@ -1,0 +1,7 @@
+name,rule,function_assignees,user_ruleset,priority,is_active
+Software Licenses,If an invoice is related to software licenses or software purchases,IT,round_robin,10,True
+Hardware Equipment,If an invoice contains computer hardware like laptops or desktop computers,IT,user_priority,20,True
+Office Furniture,If an invoice is for office furniture such as chairs desks or sofas,Operations,least_assigned,30,True
+Office Supplies,If an invoice is for general office supplies like paper or pens,Operations,round_robin,40,True
+High Value Invoices,If an invoice total is above $5000 regardless of category,Finance,user_priority,5,True
+Low Value Invoices,If an invoice total is below $1000 for quick processing,Operations,random,50,True 

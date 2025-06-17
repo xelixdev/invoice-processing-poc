@@ -1,6 +1,29 @@
 from django.db import models
 from django.core.validators import MinValueValidator
+from django.contrib.auth.models import User
 from decimal import Decimal
+
+
+class UserProfile(models.Model):
+    """User profile to store additional user information."""
+    DEPARTMENT_CHOICES = [
+        ('IT', 'Information Technology'),
+        ('Operations', 'Operations'),
+        ('Sales', 'Sales'),
+        ('Finance', 'Finance'),
+        ('HR', 'Human Resources'),
+        ('Procurement', 'Procurement'),
+        ('Warehouse', 'Warehouse'),
+    ]
+    
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    department = models.CharField(max_length=20, choices=DEPARTMENT_CHOICES, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.user.get_full_name()} - {self.department}"
 
 
 class Company(models.Model):
@@ -55,6 +78,9 @@ class Invoice(models.Model):
     
     vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='invoices')
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='invoices')
+    
+    # User assignment for workflow management
+    assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_invoices')
     
     currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, default='USD')
     payment_terms = models.CharField(max_length=50)
@@ -131,3 +157,127 @@ class InvoiceLineItem(models.Model):
         
         # Update invoice totals
         self.invoice.calculate_totals()
+
+
+class AssignmentRule(models.Model):
+    """Natural language rules for automatic invoice assignment."""
+    USER_RULESET_CHOICES = [
+        ('round_robin', 'Round Robin'),
+        ('user_priority', 'User Priority'),
+        ('random', 'Random'),
+        ('least_assigned', 'Least Assigned'),
+    ]
+    
+    FUNCTION_CHOICES = [
+        ('IT', 'Information Technology'),
+        ('Operations', 'Operations'),
+        ('Sales', 'Sales'),
+        ('Finance', 'Finance'),
+        ('HR', 'Human Resources'),
+        ('Procurement', 'Procurement'),
+        ('Warehouse', 'Warehouse'),
+    ]
+    
+    name = models.CharField(max_length=100, help_text="Short name for this rule")
+    rule = models.TextField(help_text="Natural language description of when this rule applies")
+    function_assignees = models.CharField(max_length=20, choices=FUNCTION_CHOICES, help_text="Department/function to assign to")
+    user_ruleset = models.CharField(max_length=20, choices=USER_RULESET_CHOICES, default='round_robin', help_text="Method for selecting user within the function")
+    is_active = models.BooleanField(default=True, help_text="Whether this rule is currently active")
+    priority = models.IntegerField(default=100, help_text="Rule priority (lower numbers = higher priority)")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['priority', 'created_at']
+    
+    def __str__(self):
+        return f"{self.name} ({self.function_assignees})"
+    
+    def get_next_user(self):
+        """Get the next user to assign based on the ruleset."""
+        eligible_users = self.rule_users.filter(user__is_active=True).order_by('priority', 'id')
+        
+        if not eligible_users.exists():
+            # Fallback to any active user in the department
+            eligible_users = User.objects.filter(
+                is_active=True,
+                profile__department=self.function_assignees
+            )
+            if not eligible_users.exists():
+                return None
+        
+        if self.user_ruleset == 'round_robin':
+            return self._get_round_robin_user(eligible_users)
+        elif self.user_ruleset == 'user_priority':
+            return eligible_users.first().user if hasattr(eligible_users.first(), 'user') else eligible_users.first()
+        elif self.user_ruleset == 'random':
+            return eligible_users.order_by('?').first().user if hasattr(eligible_users.first(), 'user') else eligible_users.first()
+        elif self.user_ruleset == 'least_assigned':
+            return self._get_least_assigned_user(eligible_users)
+        
+        return eligible_users.first().user if hasattr(eligible_users.first(), 'user') else eligible_users.first()
+    
+    def _get_round_robin_user(self, eligible_users):
+        """Implement round robin assignment."""
+        # For round robin, we'll use a simple counter approach
+        # In production, you might want to store last assigned user
+        from django.db.models import Count
+        
+        if self.rule_users.exists():
+            users_with_counts = []
+            for rule_user in eligible_users:
+                user = rule_user.user
+                invoice_count = user.assigned_invoices.count()
+                users_with_counts.append((user, invoice_count))
+            
+            # Sort by invoice count, then by priority
+            users_with_counts.sort(key=lambda x: (x[1], rule_user.priority))
+            return users_with_counts[0][0] if users_with_counts else None
+        else:
+            # Fallback to department users
+            users_with_counts = []
+            for user in eligible_users:
+                invoice_count = user.assigned_invoices.count()
+                users_with_counts.append((user, invoice_count))
+            
+            users_with_counts.sort(key=lambda x: x[1])
+            return users_with_counts[0][0] if users_with_counts else None
+    
+    def _get_least_assigned_user(self, eligible_users):
+        """Get user with least assigned invoices."""
+        if self.rule_users.exists():
+            users_with_counts = []
+            for rule_user in eligible_users:
+                user = rule_user.user
+                invoice_count = user.assigned_invoices.count()
+                users_with_counts.append((user, invoice_count, rule_user.priority))
+            
+            # Sort by invoice count, then by priority
+            users_with_counts.sort(key=lambda x: (x[1], x[2]))
+            return users_with_counts[0][0] if users_with_counts else None
+        else:
+            # Fallback to department users
+            users_with_counts = []
+            for user in eligible_users:
+                invoice_count = user.assigned_invoices.count()
+                users_with_counts.append((user, invoice_count))
+            
+            users_with_counts.sort(key=lambda x: x[1])
+            return users_with_counts[0][0] if users_with_counts else None
+
+
+class AssignmentRuleUser(models.Model):
+    """User priority ordering for assignment rules."""
+    assignment_rule = models.ForeignKey(AssignmentRule, on_delete=models.CASCADE, related_name='rule_users')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='assignment_rules')
+    priority = models.IntegerField(help_text="Priority within this rule (lower numbers = higher priority)")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ['assignment_rule', 'user']
+        ordering = ['priority', 'created_at']
+    
+    def __str__(self):
+        return f"{self.assignment_rule.name} - {self.user.get_full_name()} (Priority: {self.priority})"

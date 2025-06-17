@@ -18,6 +18,8 @@ from ai_engineering.image_processor import get_image_from_pdf
 from ai_engineering.document_matching import find_best_match, calculate_match_confidence
 from ai_engineering.data_comparison import perform_comprehensive_comparison
 from purchase_orders.models import PurchaseOrder
+from invoices.models import Invoice, InvoiceLineItem, Company, Vendor, Item
+from invoices.assignment_service import InvoiceAssignmentService
 
 from .models import InvoiceExtractionJob, ExtractedInvoice, ExtractedLineItem
 
@@ -682,33 +684,30 @@ class DataComparisonService:
 
 
 class ExtractAndMatchOrchestrator:
-    """
-    Orchestrator service that coordinates the complete extract-and-match workflow.
-    
-    This follows the single responsibility principle by delegating to specialized services:
-    - InvoiceExtractionService: Handles file processing and data extraction
-    - POMatchingService: Handles PO matching logic
-    - DataComparisonService: Handles data validation between invoice and PO
-    """
+    """Service for orchestrating the full extract-and-match workflow."""
     
     def __init__(self):
         self.extraction_service = InvoiceExtractionService()
         self.matching_service = POMatchingService()
         self.comparison_service = DataComparisonService()
+        self.assignment_service = InvoiceAssignmentService()
     
     def process_uploaded_file(self, uploaded_file: UploadedFile, match_threshold: int = 2) -> Dict[str, Any]:
         """
-        Process uploaded file through the complete extract-and-match workflow.
+        Process an uploaded file through the full workflow:
+        1. Create extraction job
+        2. Extract invoice data
+        3. Find matching POs
+        4. Compare data
+        5. Assign to users based on rules
+        6. Return results
         
         Args:
-            uploaded_file: Django UploadedFile instance
-            match_threshold: Maximum edit distance for fuzzy matching
+            uploaded_file: The uploaded invoice file
+            match_threshold: Maximum edit distance for PO matching
             
         Returns:
-            Dict containing complete processing results
-            
-        Raises:
-            Exception: If any step in the workflow fails
+            Dict containing processed results
         """
         # Step 1: Create extraction job
         job = self._create_extraction_job(uploaded_file)
@@ -729,8 +728,60 @@ class ExtractAndMatchOrchestrator:
             # Step 3: Find matching POs
             matching_results = self.matching_service.find_matching_pos(extracted_invoice_instances, match_threshold)
             
-            # Step 4: Perform data comparison for matched POs and build simplified response
-            invoices = self._build_simplified_response(matching_results)
+            # Step 4: Perform data comparison for matched POs
+            for result in matching_results:
+                if result['matched_po']:
+                    comparison_result = self.comparison_service.compare_invoice_to_po(
+                        result['extracted_invoice'],
+                        result['matched_po'],
+                        {}  # Original data not needed
+                    )
+                    result['data_comparison'] = comparison_result
+            
+            # Step 5: Create Invoice records and assign users
+            invoice_assignments = []
+            for result in matching_results:
+                extracted_invoice = result['extracted_invoice']
+                
+                # Create Invoice record
+                invoice = Invoice.objects.create(
+                    invoice_number=extracted_invoice.invoice_number,
+                    date=extracted_invoice.date,
+                    due_date=extracted_invoice.due_date,
+                    po_number=extracted_invoice.po_number,
+                    vendor=Vendor.objects.get_or_create(name=extracted_invoice.vendor)[0],
+                    company=Company.objects.first(),  # TODO: Determine company from context
+                    currency=extracted_invoice.currency_code,
+                    payment_terms=extracted_invoice.payment_term_days,
+                    billing_address=extracted_invoice.billing_address,
+                    total_due=extracted_invoice.amount
+                )
+                
+                # Create line items
+                for line_item in extracted_invoice.line_items.all():
+                    item = Item.objects.get_or_create(
+                        description=line_item.description,
+                        defaults={'item_code': f'AUTO-{line_item.id}'}
+                    )[0]
+                    
+                    InvoiceLineItem.objects.create(
+                        invoice=invoice,
+                        item=item,
+                        quantity=line_item.quantity,
+                        unit_price=line_item.unit_price,
+                        total=line_item.total
+                    )
+                
+                # Assign user based on rules
+                assigned_user, assignment_explanation = self.assignment_service.assign_invoice(invoice)
+                invoice_assignments.append({
+                    'invoice': invoice,
+                    'assigned_user': assigned_user,
+                    'assignment_explanation': assignment_explanation
+                })
+            
+            # Step 6: Build response with all results
+            invoices = self._build_simplified_response(matching_results, invoice_assignments)
             
             return {
                 'invoices': invoices
@@ -751,20 +802,28 @@ class ExtractAndMatchOrchestrator:
             status='PROCESSING'
         )
     
-    def _build_simplified_response(self, matching_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _build_simplified_response(
+        self, 
+        matching_results: List[Dict[str, Any]],
+        invoice_assignments: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """
-        Build a simplified response with just invoice data and matching results.
+        Build a simplified response with invoice data, matching results, and assignments.
         
         Args:
             matching_results: List of PO matching results
+            invoice_assignments: List of invoice assignment results
             
         Returns:
-            List of simplified invoice objects with embedded matching data
+            List of simplified invoice objects with embedded matching and assignment data
         """
         invoices = []
         
-        for result in matching_results:
+        for result, assignment in zip(matching_results, invoice_assignments):
             extracted_invoice = result['extracted_invoice']
+            invoice = assignment['invoice']
+            assigned_user = assignment['assigned_user']
+            assignment_explanation = assignment['assignment_explanation']
             
             # Build the core invoice data
             invoice_data = {
@@ -797,7 +856,7 @@ class ExtractAndMatchOrchestrator:
                 'matched_po': None,
                 'match_confidence': result['match_confidence'],
                 'match_type': result['match_type'],
-                'data_comparison': None
+                'data_comparison': result.get('data_comparison')
             }
             
             # Include matched PO data if available
@@ -813,16 +872,32 @@ class ExtractAndMatchOrchestrator:
                     'date': matched_po.date.isoformat() if matched_po.date else None,
                     'required_delivery_date': matched_po.required_delivery_date.isoformat() if matched_po.required_delivery_date else None
                 }
-                
-                # Perform data comparison
-                comparison_result = self.comparison_service.compare_invoice_to_po(
-                    extracted_invoice,
-                    matched_po,
-                    {}
-                )
-                matching_info['data_comparison'] = comparison_result
             
-            # Combine invoice data with matching info
+            # Add assignment information
+            if assigned_user:
+                invoice_data['assigned_user'] = {
+                    # User information
+                    'id': assigned_user.id,
+                    'username': assigned_user.username,
+                    'full_name': assigned_user.get_full_name(),
+                    'department': assigned_user.profile.department,
+                    'email': assigned_user.email,
+                    
+                    # Assignment details from Claude's analysis
+                    'rule': assignment_explanation['rule'] if assignment_explanation else {
+                        'id': 0,
+                        'name': 'Default Assignment',
+                        'description': 'Default department-based assignment',
+                        'department': assigned_user.profile.department,
+                        'priority': 999
+                    },
+                    'confidence': assignment_explanation['confidence'] if assignment_explanation else None,
+                    'explanation': assignment_explanation['explanation'] if assignment_explanation else f"Assigned based on matching rules for {assigned_user.profile.department} department"
+                }
+            else:
+                invoice_data['assigned_user'] = None
+            
+            # Combine all data
             invoice_data['matching'] = matching_info
             invoices.append(invoice_data)
         
