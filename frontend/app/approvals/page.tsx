@@ -1,21 +1,42 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Sidebar from '@/components/sidebar'
 import MainHeader from '@/components/main-header'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Check, X, Users, Clock, CheckCircle, Calendar, Pause, AlertTriangle, ChevronDown, Plus } from 'lucide-react'
+import { Check, X, Users, Clock, CheckCircle, Calendar, Pause, AlertTriangle, ChevronDown, Plus, Settings, User, UserX, RotateCcw } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Switch } from '@/components/ui/switch'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 
-type ViewType = 'pending' | 'on-hold' | 'overdue' | 'approved-today' | 'rejected' | 'approved-month'
+type ViewType = 'pending' | 'on-hold' | 'overdue' | 'approved-today' | 'rejected' | 'approved-month' | 'delegated'
 
 export default function ApprovalsPage() {
   const [activeView, setActiveView] = useState<ViewType>('pending')
   const [assignments, setAssignments] = useState<Record<string, typeof assigneeOptions[0]>>({})
+  const [userRole, setUserRole] = useState<'user' | 'admin'>('user')
+  const [delegatedInvoices, setDelegatedInvoices] = useState<Set<string>>(new Set())
+  const [delegatedDetails, setDelegatedDetails] = useState<Record<string, { delegatedTo: typeof assigneeOptions[0], dateDelegated: string, originalInvoice: any, reason: string, comment?: string }>>({})
+  const [animatingOut, setAnimatingOut] = useState<Set<string>>(new Set())
+  const [highlighting, setHighlighting] = useState<Set<string>>(new Set())
+  const [showDelegationModal, setShowDelegationModal] = useState<{ invoiceId: string, assignee: typeof assigneeOptions[0] } | null>(null)
+  const [selectedReason, setSelectedReason] = useState<string>('')
+  const [delegationComment, setDelegationComment] = useState<string>('')
+  
+  // Current user context
+  const currentUser = {
+    id: 'current-user-001',
+    name: 'John Doe',
+    initials: 'JD',
+    color: 'bg-blue-500'
+  }
   
   // User options for reassignment
   const assigneeOptions = [
@@ -28,10 +49,110 @@ export default function ApprovalsPage() {
     { initials: 'KB', name: 'Karen Brown', role: 'Legal Counsel', color: 'bg-indigo-500' }
   ]
 
+  // Delegation reasons
+  const delegationReasons = [
+    "Vacation coverage",
+    "Subject matter expertise needed",
+    "Workload balancing", 
+    "Higher approval authority required",
+    "Conflict of interest",
+    "Other..."
+  ]
+
+  // Initialize assignments for user mode 
+  const initializeAssignments = () => {
+    if (userRole === 'user') {
+      // In user mode, invoices start unassigned (+ icon state)
+      // Only assign when explicitly delegating
+      setAssignments({})
+    } else {
+      // In admin mode, keep existing assignments or clear them
+      setAssignments({})
+    }
+    // Reset delegated invoices when switching roles
+    setDelegatedInvoices(new Set())
+    setDelegatedDetails({})
+    setAnimatingOut(new Set())
+    setHighlighting(new Set())
+    setShowDelegationModal(null)
+    setSelectedReason('')
+    setDelegationComment('')
+  }
+
+  // Handle role change
+  const handleRoleChange = (isAdmin: boolean) => {
+    setUserRole(isAdmin ? 'admin' : 'user')
+    setTimeout(initializeAssignments, 0) // Initialize after state update
+  }
+
+  // Initialize assignments on component mount
+  useEffect(() => {
+    initializeAssignments()
+  }, [userRole])
+
   const handleReassignInvoice = (invoiceId: string, assignee: typeof assigneeOptions[0]) => {
-    console.log(`Reassigning invoice ${invoiceId} to ${assignee.name}`)
+    // In user mode, show delegation modal for reasoning
+    if (userRole === 'user' && assignee.name !== currentUser.name) {
+      setShowDelegationModal({ invoiceId, assignee })
+      setSelectedReason('')
+      setDelegationComment('')
+      return
+    }
+    
+    // For admin mode, proceed directly
+    console.log(`Assigning invoice ${invoiceId} to ${assignee.name}`)
     setAssignments(prev => ({ ...prev, [invoiceId]: assignee }))
-    // Here you would implement the actual reassignment logic
+  }
+
+  const handleDelegateWithReason = (reason: string, comment?: string) => {
+    if (!showDelegationModal) return
+    
+    const { invoiceId, assignee } = showDelegationModal
+    
+    console.log(`Delegating invoice ${invoiceId} to ${assignee.name} - Reason: ${reason}`)
+    
+    // First, update the assignment (this fills the pill immediately)
+    setAssignments(prev => ({ ...prev, [invoiceId]: assignee }))
+    
+    // Step 1: Start purple highlight immediately
+    setHighlighting(prev => new Set([...prev, invoiceId]))
+    
+    // Step 2: After 1.2s, remove highlight and start slide-out animation
+    setTimeout(() => {
+      setHighlighting(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(invoiceId)
+        return newSet
+      })
+      setAnimatingOut(prev => new Set([...prev, invoiceId]))
+    }, 1200)
+    
+    // Step 3: After slide-out animation completes (1.2s + 800ms), actually remove from view
+    setTimeout(() => {
+      // Find the original invoice data
+      const allInvoices = [...pendingApprovals, ...onHoldApprovals, ...overdueApprovals, ...approvedToday, ...rejectedApprovals, ...approvedThisMonth]
+      const originalInvoice = allInvoices.find(inv => inv.id === invoiceId)
+      
+      setDelegatedInvoices(prev => new Set([...prev, invoiceId]))
+      setDelegatedDetails(prev => ({
+        ...prev,
+        [invoiceId]: {
+          delegatedTo: assignee,
+          dateDelegated: new Date().toISOString().split('T')[0], // Today's date
+          originalInvoice: originalInvoice,
+          reason: reason,
+          comment: comment
+        }
+      }))
+      setAnimatingOut(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(invoiceId)
+        return newSet
+      })
+    }, 2000) // 1200ms highlight + 800ms slide animation
+    
+    // Close modal
+    setShowDelegationModal(null)
   }
   
   // Placeholder data for different views
@@ -323,23 +444,62 @@ export default function ApprovalsPage() {
   ]
 
   const getApprovalsList = () => {
+    let baseList = []
     switch (activeView) {
       case 'pending':
-        return pendingApprovals
+        baseList = pendingApprovals
+        break
       case 'on-hold':
-        return onHoldApprovals
+        baseList = onHoldApprovals
+        break
       case 'overdue':
-        return overdueApprovals
+        baseList = overdueApprovals
+        break
       case 'approved-today':
-        return approvedToday
+        baseList = approvedToday
+        break
       case 'rejected':
-        return rejectedApprovals
+        baseList = rejectedApprovals
+        break
       case 'approved-month':
-        return approvedThisMonth
+        baseList = approvedThisMonth
+        break
+      case 'delegated':
+        // Return delegated invoices with their original data
+        baseList = Object.values(delegatedDetails).map(detail => detail.originalInvoice).filter(Boolean)
+        break
       default:
-        return pendingApprovals
+        baseList = pendingApprovals
     }
+    
+    // In user mode, filter out delegated invoices (except when viewing delegated)
+    if (userRole === 'user' && activeView !== 'delegated') {
+      return baseList.filter(invoice => !delegatedInvoices.has(invoice.id))
+    }
+    
+    return baseList
   }
+
+  // Calculate if we need horizontal scroll based on column count
+  const getColumnCount = () => {
+    let baseColumns = 9 // Invoice#, Date, Supplier, Amount, Due, Status, Category, GL, Dept
+    
+    if (activeView === 'delegated') {
+      baseColumns += 4 // Delegated To, Date Delegated, Reason, Actions
+    } else {
+      baseColumns += 1 // Assign/Delegate column
+    }
+    
+    if (activeView === 'pending') baseColumns += 1 // Actions
+    if (activeView === 'approved-today' || activeView === 'approved-month') baseColumns += 1 // Approved Date
+    if (activeView === 'rejected') baseColumns += 1 // Rejected Date  
+    if (activeView === 'on-hold') baseColumns += 1 // Hold Reason
+    if (activeView === 'overdue') baseColumns += 1 // Days Overdue
+    
+    return baseColumns
+  }
+
+  const needsHorizontalScroll = getColumnCount() > 11 // Threshold for enabling scroll
 
   const getViewTitle = () => {
     switch (activeView) {
@@ -355,6 +515,8 @@ export default function ApprovalsPage() {
         return 'Rejected Invoices'
       case 'approved-month':
         return 'Approved This Month'
+      case 'delegated':
+        return 'Delegated Invoices'
       default:
         return 'Pending Approvals'
     }
@@ -374,21 +536,40 @@ export default function ApprovalsPage() {
         return 'Invoices that were rejected and need rework'
       case 'approved-month':
         return 'All invoices approved this month'
+      case 'delegated':
+        return 'Invoices you have delegated to other team members'
       default:
         return 'Invoices awaiting your approval'
     }
   }
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-screen overflow-hidden">
       <Sidebar />
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
         <MainHeader activePage="approvals" />
         
-        <main className="flex-1 overflow-auto bg-gray-50/50">
-          <div className="p-6">
-            <div className="mb-6">
-              <h1 className="text-2xl font-bold tracking-tight">Approvals</h1>
+        <main className="flex-1 overflow-auto bg-gray-50/50 min-w-0">
+          <div className="p-6 min-w-0">
+            <div className="mb-6 flex items-center justify-between">
+              <h1 className="text-2xl font-bold tracking-tight">
+                {userRole === 'user' ? 'My Approvals' : 'Team Approvals'}
+              </h1>
+              
+              {/* Role Switch */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <User className="h-4 w-4" />
+                  <span>User</span>
+                  <Switch
+                    checked={userRole === 'admin'}
+                    onCheckedChange={handleRoleChange}
+                    className="data-[state=checked]:bg-blue-600"
+                  />
+                  <Settings className="h-4 w-4" />
+                  <span>Admin</span>
+                </div>
+              </div>
             </div>
 
             {/* Priority Action Cards - Compact */}
@@ -405,7 +586,11 @@ export default function ApprovalsPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs font-medium text-gray-600">Pending Approval</p>
-                      <p className="text-xl font-bold text-gray-900 mt-1">{pendingApprovals.length}</p>
+                      <p className="text-xl font-bold text-gray-900 mt-1">
+                        {userRole === 'user' 
+                          ? pendingApprovals.filter(invoice => !delegatedInvoices.has(invoice.id)).length 
+                          : pendingApprovals.length}
+                      </p>
                     </div>
                     <div className={`p-2 rounded-full ${
                       activeView === 'pending' ? 'bg-gradient-to-br from-purple-400 to-purple-500' : 'bg-purple-100'
@@ -430,7 +615,11 @@ export default function ApprovalsPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs font-medium text-gray-600">Overdue</p>
-                      <p className="text-xl font-bold text-gray-900 mt-1">{overdueApprovals.length}</p>
+                      <p className="text-xl font-bold text-gray-900 mt-1">
+                        {userRole === 'user' 
+                          ? overdueApprovals.filter(invoice => !delegatedInvoices.has(invoice.id)).length 
+                          : overdueApprovals.length}
+                      </p>
                     </div>
                     <div className={`p-2 rounded-full ${
                       activeView === 'overdue' ? 'bg-gradient-to-br from-red-400 to-red-500' : 'bg-red-100'
@@ -455,7 +644,11 @@ export default function ApprovalsPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs font-medium text-gray-600">On Hold</p>
-                      <p className="text-xl font-bold text-gray-900 mt-1">{onHoldApprovals.length}</p>
+                      <p className="text-xl font-bold text-gray-900 mt-1">
+                        {userRole === 'user' 
+                          ? onHoldApprovals.filter(invoice => !delegatedInvoices.has(invoice.id)).length 
+                          : onHoldApprovals.length}
+                      </p>
                     </div>
                     <div className={`p-2 rounded-full ${
                       activeView === 'on-hold' ? 'bg-gradient-to-br from-orange-400 to-orange-500' : 'bg-orange-100'
@@ -508,6 +701,21 @@ export default function ApprovalsPage() {
                     <Calendar className="w-4 h-4 text-blue-600" />
                     <span className="text-sm font-medium">{approvedThisMonth.length} This Month</span>
                   </div>
+
+                  {/* Delegated Metric - Only show in user mode */}
+                  {userRole === 'user' && delegatedInvoices.size > 0 && (
+                    <div 
+                      className={`flex items-center gap-2 px-2.5 py-1.5 rounded-full cursor-pointer transition-all border ${
+                        activeView === 'delegated' 
+                          ? 'bg-orange-100 text-orange-800 border-orange-200' 
+                          : 'bg-orange-50 text-orange-700 border-orange-100 hover:bg-orange-100 hover:border-orange-200 hover:shadow-sm'
+                      }`}
+                      onClick={() => setActiveView('delegated')}
+                    >
+                      <UserX className="w-4 h-4 text-orange-600" />
+                      <span className="text-sm font-medium">{delegatedInvoices.size} Delegated</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-4">
@@ -538,45 +746,59 @@ export default function ApprovalsPage() {
             </div>
 
             {/* Approvals Table */}
-            <Card>
+            <Card className="overflow-hidden min-w-0">
               <CardHeader className="pb-4">
                 <CardTitle className="text-lg">{getViewTitle()}</CardTitle>
                 <CardDescription className="-mt-1">
                   {getViewDescription()}
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <Table>
+              <CardContent className="p-6 min-w-0">
+                <div className={needsHorizontalScroll ? 'overflow-x-auto' : ''}>
+                  <Table style={needsHorizontalScroll ? { minWidth: '1200px', width: '1200px' } : {}} className={needsHorizontalScroll ? '' : 'w-full'}>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Invoice Number</TableHead>
-                      <TableHead>Invoice Date</TableHead>
+                      <TableHead className="whitespace-nowrap">Invoice Number</TableHead>
+                      <TableHead className="whitespace-nowrap">Invoice Date</TableHead>
                       <TableHead>Supplier Name</TableHead>
-                      <TableHead>Total Amount</TableHead>
-                      <TableHead>Due Date</TableHead>
+                      <TableHead className="text-right whitespace-nowrap">Total Amount</TableHead>
+                      <TableHead className="whitespace-nowrap">Due Date</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Spend Category</TableHead>
-                      <TableHead>GL Code</TableHead>
+                      <TableHead className="whitespace-nowrap">GL Code</TableHead>
                       <TableHead>Department</TableHead>
-                      <TableHead>Assign</TableHead>
-                      {(activeView === 'approved-today' || activeView === 'approved-month') && <TableHead>Approved Date</TableHead>}
-                      {activeView === 'rejected' && <TableHead>Rejected Date</TableHead>}
-                      {activeView === 'on-hold' && <TableHead>Hold Reason</TableHead>}
-                      {activeView === 'overdue' && <TableHead>Days Overdue</TableHead>}
-                      {activeView === 'pending' && <TableHead>Actions</TableHead>}
+                      {activeView !== 'delegated' && <TableHead className="text-center whitespace-nowrap">{userRole === 'user' ? 'Delegate' : 'Assign'}</TableHead>}
+                      {activeView === 'delegated' && <TableHead className="whitespace-nowrap min-w-[140px]">Delegated To</TableHead>}
+                      {activeView === 'delegated' && <TableHead className="whitespace-nowrap">Date Delegated</TableHead>}
+                      {activeView === 'delegated' && <TableHead className="min-w-[150px]">Reason</TableHead>}
+                      {(activeView === 'approved-today' || activeView === 'approved-month') && <TableHead className="whitespace-nowrap">Approved Date</TableHead>}
+                      {activeView === 'rejected' && <TableHead className="whitespace-nowrap">Rejected Date</TableHead>}
+                      {activeView === 'on-hold' && <TableHead className="min-w-[150px]">Hold Reason</TableHead>}
+                      {activeView === 'overdue' && <TableHead className="whitespace-nowrap">Days Overdue</TableHead>}
+                      {activeView === 'pending' && <TableHead className="text-center whitespace-nowrap">Actions</TableHead>}
+                      {activeView === 'delegated' && <TableHead className="text-center whitespace-nowrap">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {getApprovalsList().map((approval) => (
-                      <TableRow key={approval.id}>
+                      <TableRow 
+                        key={approval.id}
+                        className={`transition-all ease-in-out ${
+                          highlighting.has(approval.id) 
+                            ? 'bg-purple-100/70 duration-200' 
+                            : animatingOut.has(approval.id)
+                            ? 'opacity-0 transform translate-x-8 duration-800'
+                            : 'opacity-100 transform translate-x-0 duration-200'
+                        }`}
+                      >
                         <TableCell className="font-medium">
                           <a href="#" className="text-blue-600 hover:underline">
                             {approval.invoiceNumber}
                           </a>
                         </TableCell>
                         <TableCell>{approval.invoiceDate}</TableCell>
-                        <TableCell>{approval.supplierName}</TableCell>
-                        <TableCell>${approval.totalAmount.toFixed(2)}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">{approval.supplierName}</TableCell>
+                        <TableCell className="text-right font-medium">${approval.totalAmount.toFixed(2)}</TableCell>
                         <TableCell>{approval.dueDate}</TableCell>
                         <TableCell>
                           <Badge 
@@ -601,27 +823,46 @@ export default function ApprovalsPage() {
                         <TableCell>{approval.spendCategory}</TableCell>
                         <TableCell>{approval.glCode}</TableCell>
                         <TableCell>{approval.department}</TableCell>
-                        <TableCell>
+                        {activeView !== 'delegated' && (
+                        <TableCell className="text-center">
                           <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button className={`w-8 h-8 rounded-full border flex items-center justify-center transition-colors ${
-                                assignments[approval.id] 
-                                  ? `border-solid ${assignments[approval.id].color.replace('bg-', 'border-')}` 
-                                  : 'border-dashed border-gray-300 hover:border-gray-400'
-                              }`}>
-                                {assignments[approval.id] ? (
-                                  <div className={`w-full h-full rounded-full ${assignments[approval.id].color} flex items-center justify-center`}>
-                                    <span className="text-xs font-medium text-white">
-                                      {assignments[approval.id].initials}
-                                    </span>
-                                  </div>
-                                ) : (
-                                  <Plus className="h-4 w-4 text-gray-400" />
-                                )}
-                              </button>
-                            </DropdownMenuTrigger>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <DropdownMenuTrigger asChild>
+                                    <button className={`w-8 h-8 rounded-full border flex items-center justify-center transition-colors ${
+                                      assignments[approval.id] 
+                                        ? `border-solid ${assignments[approval.id].color.replace('bg-', 'border-')}` 
+                                        : 'border-dashed border-gray-300 hover:border-gray-400'
+                                    }`}>
+                                      {assignments[approval.id] ? (
+                                        <div className={`w-full h-full rounded-full ${assignments[approval.id].color} flex items-center justify-center`}>
+                                          <span className="text-xs font-medium text-white">
+                                            {assignments[approval.id].initials}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <Plus className="h-4 w-4 text-gray-400" />
+                                      )}
+                                    </button>
+                                  </DropdownMenuTrigger>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" align="center">
+                                  <p>{userRole === 'user' ? 'Delegate this invoice to someone else' : 'Assign this invoice to a team member'}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                             <DropdownMenuContent align="end" className="w-56">
-                              {assigneeOptions.map((assignee) => (
+                              {userRole === 'user' && (
+                                <>
+                                  <div className="px-2 py-1.5 text-xs font-medium text-gray-500 border-b">
+                                    Delegate to:
+                                  </div>
+                                </>
+                              )}
+                              {assigneeOptions
+                                .filter(assignee => userRole === 'admin' || assignee.name !== currentUser.name)
+                                .map((assignee) => (
                                 <DropdownMenuItem
                                   key={assignee.initials}
                                   onClick={() => handleReassignInvoice(approval.id, assignee)}
@@ -643,41 +884,190 @@ export default function ApprovalsPage() {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
+                        )}
+                        
+                        {/* Delegated columns */}
+                        {activeView === 'delegated' && (
+                          <>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <div className={`w-6 h-6 rounded-full ${delegatedDetails[approval.id]?.delegatedTo?.color || 'bg-gray-400'} flex items-center justify-center`}>
+                                  <span className="text-xs font-medium text-white">
+                                    {delegatedDetails[approval.id]?.delegatedTo?.initials || '?'}
+                                  </span>
+                                </div>
+                                <span className="text-sm">{delegatedDetails[approval.id]?.delegatedTo?.name || 'Unknown'}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>{delegatedDetails[approval.id]?.dateDelegated || 'Unknown'}</TableCell>
+                            <TableCell className="max-w-[180px]">
+                              <div className="text-sm text-gray-600">
+                                <div className="truncate">
+                                  {delegatedDetails[approval.id]?.reason || 'No reason provided'}
+                                </div>
+                                {delegatedDetails[approval.id]?.reason === 'Other...' && delegatedDetails[approval.id]?.comment && (
+                                  <div className="text-xs text-gray-500 mt-1 truncate" title={delegatedDetails[approval.id].comment}>
+                                    {delegatedDetails[approval.id].comment}
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                          </>
+                        )}
+                        
                         {(activeView === 'approved-today' || activeView === 'approved-month') && <TableCell>{(approval as any).approvedDate}</TableCell>}
                         {activeView === 'rejected' && <TableCell>{(approval as any).rejectedDate}</TableCell>}
                         {activeView === 'on-hold' && <TableCell className="text-sm text-gray-600">{(approval as any).holdReason}</TableCell>}
                         {activeView === 'overdue' && <TableCell><Badge variant="destructive" className="bg-red-500">{(approval as any).daysPastDue} days</Badge></TableCell>}
                         {activeView === 'pending' && (
-                          <TableCell>
+                          <TableCell className="text-center">
                             <div className="flex gap-1">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                                title="Approve"
-                              >
-                                <Check className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                title="Reject"
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                    >
+                                      <Check className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" align="center">
+                                    <p>Approve this invoice</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" align="end">
+                                    <p>Reject this invoice</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                          </TableCell>
+                        )}
+                        {activeView === 'delegated' && (
+                          <TableCell className="text-center">
+                            <div className="flex gap-1">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                      onClick={() => {
+                                        // Remove from delegated and put back to user's queue
+                                        setDelegatedInvoices(prev => {
+                                          const newSet = new Set(prev)
+                                          newSet.delete(approval.id)
+                                          return newSet
+                                        })
+                                        setDelegatedDetails(prev => {
+                                          const newDetails = { ...prev }
+                                          delete newDetails[approval.id]
+                                          return newDetails
+                                        })
+                                        setAssignments(prev => {
+                                          const newAssignments = { ...prev }
+                                          delete newAssignments[approval.id] // Remove assignment to show + icon
+                                          return newAssignments
+                                        })
+                                        setActiveView('pending')
+                                      }}
+                                    >
+                                      <RotateCcw className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="left" align="center">
+                                    <p>Take back this invoice to your pending queue</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             </div>
                           </TableCell>
                         )}
                       </TableRow>
                     ))}
                   </TableBody>
-                </Table>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </div>
         </main>
       </div>
+
+      {/* Delegation Modal */}
+      <Dialog open={!!showDelegationModal} onOpenChange={() => setShowDelegationModal(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delegate Invoice</DialogTitle>
+            <DialogDescription>
+              Delegating invoice {showDelegationModal?.invoiceId} to{' '}
+              <span className="font-medium">{showDelegationModal?.assignee.name}</span>
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="reason">Reason for delegation</Label>
+              <Select value={selectedReason} onValueChange={setSelectedReason}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select a reason..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {delegationReasons.map((reason) => (
+                    <SelectItem key={reason} value={reason}>
+                      {reason}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedReason === 'Other...' && (
+              <div>
+                <Label htmlFor="comment">Additional details</Label>
+                <Textarea
+                  id="comment"
+                  value={delegationComment}
+                  onChange={(e) => setDelegationComment(e.target.value)}
+                  placeholder="Please provide more details..."
+                  className="mt-1"
+                />
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowDelegationModal(null)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => handleDelegateWithReason(selectedReason, delegationComment)}
+              disabled={!selectedReason}
+            >
+              Delegate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
