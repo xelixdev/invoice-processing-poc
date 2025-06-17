@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { mockApprovalRules, type ApprovalRule, type RuleStatus } from '@/lib/mock-approval-rules'
 import { MoreVertical, Edit, Trash2, Copy, GripVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -79,6 +79,11 @@ function SortableRow({ rule, children }: { rule: ApprovalRule; children: React.R
 
 export default function ApprovalRulesTable({ searchQuery, onEditRule }: ApprovalRulesTableProps) {
   const [rules, setRules] = useState<ApprovalRule[]>(mockApprovalRules)
+  const [isMounted, setIsMounted] = useState(false)
+  
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
   
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -150,6 +155,139 @@ export default function ApprovalRulesTable({ searchQuery, onEditRule }: Approval
         }))
       })
     }
+  }
+
+  if (!isMounted) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Priority
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Status
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Rule Name
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Description
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Invoices Processed
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Last Modified
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Created By
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Active
+              </th>
+              <th className="relative px-6 py-3">
+                <span className="sr-only">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {filteredRules.map((rule) => (
+              <tr key={rule.id} className="hover:bg-gray-50">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <div className="flex items-center">
+                    <div className="cursor-grab hover:bg-gray-100 rounded p-1 mr-2">
+                      <GripVertical className="h-4 w-4 text-gray-400" />
+                    </div>
+                    #{rule.priority}
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  {getStatusBadge(rule.status)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm font-medium text-gray-900">{rule.name}</div>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="text-sm text-gray-500 max-w-xs truncate">{rule.description}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {rule.invoicesProcessed.toLocaleString()}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {formatDate(rule.lastModified)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {rule.createdBy}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-center">
+                  {rule.status === 'draft' ? (
+                    <TooltipProvider delayDuration={500}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div>
+                            <Switch
+                              checked={rule.status === 'active'}
+                              onCheckedChange={() => handleToggleStatus(rule.id)}
+                              disabled={true}
+                              className="data-[state=checked]:bg-violet-600 scale-75"
+                            />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Draft rules must be completed before they can be activated</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : (
+                    <Switch
+                      checked={rule.status === 'active'}
+                      onCheckedChange={() => handleToggleStatus(rule.id)}
+                      disabled={false}
+                      className="data-[state=checked]:bg-violet-600 scale-75"
+                    />
+                  )}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <div className="flex items-center justify-end space-x-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      title="Edit rule"
+                      onClick={() => onEditRule?.(rule)}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <span className="sr-only">Open menu</span>
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem className="cursor-pointer">
+                          <Copy className="mr-2 h-4 w-4" />
+                          Duplicate
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="cursor-pointer text-red-600">
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    )
   }
 
   return (

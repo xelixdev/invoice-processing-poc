@@ -259,21 +259,6 @@ export default function RuleBuilderModal({ isOpen, onClose, editingRule }: RuleB
                 onPreviewUpdate={setNaturalLanguageDescription}
               />
               
-              {/* Show current description if workflow exists */}
-              {workflowNodes.length > 0 && naturalLanguageDescription && (
-                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <h4 className="font-medium text-blue-900 mb-2">Current Rule Description:</h4>
-                  <p className="text-blue-800">{naturalLanguageDescription}</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowNaturalLanguage(false)}
-                    className="mt-3"
-                  >
-                    Edit Visually
-                  </Button>
-                </div>
-              )}
             </div>
           ) : (
             /* Visual Builder Mode - Three Panel Layout */
@@ -333,6 +318,8 @@ export default function RuleBuilderModal({ isOpen, onClose, editingRule }: RuleB
                 <div className="absolute inset-0 p-6">
                   <div className="h-full bg-white rounded-lg border border-gray-200 overflow-hidden">
                     <WorkflowCanvas
+                      nodes={workflowNodes}
+                      edges={workflowEdges}
                       onNodesChange={handleWorkflowNodesChange}
                       onEdgesChange={handleWorkflowEdgesChange}
                       onNodeSelect={handleNodeSelect}

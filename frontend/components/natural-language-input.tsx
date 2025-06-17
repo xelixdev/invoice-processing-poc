@@ -13,7 +13,8 @@ import {
   AlertCircle, 
   Lightbulb,
   ArrowRight,
-  Edit3
+  Edit3,
+  X
 } from 'lucide-react'
 
 interface ParsedEntity {
@@ -55,16 +56,35 @@ export default function NaturalLanguageInput({ onRuleGenerated, onPreviewUpdate 
   const [parsedRule, setParsedRule] = useState<ParsedRule | null>(null)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const suggestionsRef = useRef<HTMLDivElement>(null)
 
   // Example patterns for suggestions
   const examplePatterns = [
-    "Route Marketing invoices over $10,000 to CFO",
-    "If amount > $5000 AND department = IT, notify IT Manager", 
-    "Auto-approve invoices under $500 from trusted vendors",
-    "Route all Legal invoices to Legal Team and Finance Manager",
-    "If vendor contains 'Acme' and amount > $1000, route to Procurement",
-    "Invoices between $1000 and $5000 require department head approval"
+    "Route Engineering invoices over $15,000 to CTO for approval",
+    "If amount > $75,000 AND department = Finance, send notification to CFO", 
+    "Auto-approve invoices under $1,000 from trusted vendors",
+    "Route all Legal invoices to Legal Counsel and notify Finance Manager",
+    "If vendor contains 'Acme Corp' and amount > $5,000, route to Legal Counsel",
+    "Invoices between $10,000 and $50,000 require department head approval",
+    "Route Marketing invoices over $25,000 to Marketing Director",
+    "If department = Human Resources AND amount > $5,000, notify Finance Manager",
+    "Auto-approve all Software category invoices under $2,500 for Engineering department"
   ]
+
+  // Handle click outside to close suggestions
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(event.target as Node) &&
+          textareaRef.current && !textareaRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false)
+      }
+    }
+
+    if (showSuggestions) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showSuggestions])
 
   // Mock entity extraction (in real implementation, this would call an LLM API)
   const parseNaturalLanguage = async (text: string): Promise<ParsedRule> => {
@@ -88,8 +108,8 @@ export default function NaturalLanguageInput({ onRuleGenerated, onPreviewUpdate 
       /between \$?(\d+(?:,\d{3})*(?:k|thousand)?) and \$?(\d+(?:,\d{3})*(?:k|thousand)?)/gi
     ]
 
-    // Extract departments
-    const departments = ['marketing', 'it', 'legal', 'finance', 'hr', 'procurement', 'operations']
+    // Extract departments (including patterns like "department = Finance")
+    const departments = ['marketing', 'engineering', 'legal', 'finance', 'human resources', 'hr', 'procurement']
     departments.forEach(dept => {
       if (lowerText.includes(dept)) {
         entities.push({
@@ -102,10 +122,39 @@ export default function NaturalLanguageInput({ onRuleGenerated, onPreviewUpdate 
       }
     })
 
+    // Handle explicit "department = X" patterns
+    const deptEqualMatch = text.match(/department\s*=\s*(\w+)/i)
+    if (deptEqualMatch) {
+      const deptValue = deptEqualMatch[1].trim()
+      if (!entities.find(e => e.type === 'department' && e.value.toLowerCase() === deptValue.toLowerCase())) {
+        entities.push({
+          type: 'department',
+          value: deptValue.charAt(0).toUpperCase() + deptValue.slice(1),
+          confidence: 0.95,
+          start: 0,
+          end: 0
+        })
+      }
+    }
+
+    // Extract categories
+    const categories = ['software', 'hardware', 'services', 'travel', 'office supplies']
+    categories.forEach(cat => {
+      if (lowerText.includes(cat)) {
+        entities.push({
+          type: 'field',
+          value: cat.charAt(0).toUpperCase() + cat.slice(1),
+          confidence: 0.9,
+          start: lowerText.indexOf(cat),
+          end: lowerText.indexOf(cat) + cat.length
+        })
+      }
+    })
+
     // Extract action patterns
     if (lowerText.includes('route to') || lowerText.includes('send to')) {
-      const routeMatch = text.match(/route to ([\w\s]+?)(?:\s|$|,|and)/i) || 
-                        text.match(/send to ([\w\s]+?)(?:\s|$|,|and)/i)
+      const routeMatch = text.match(/route to ([\w\s]+?)(?:\s|$|,|and|for)/i) || 
+                        text.match(/send to ([\w\s]+?)(?:\s|$|,|and|for)/i)
       if (routeMatch) {
         actions.push({
           type: 'route-to-user',
@@ -117,6 +166,44 @@ export default function NaturalLanguageInput({ onRuleGenerated, onPreviewUpdate 
           confidence: 0.95,
           start: 0,
           end: 0
+        })
+      }
+    }
+
+    // Handle patterns like "Route [Department] invoices to [User]" or "Route [Department] invoices over $X to [User]"
+    if (lowerText.includes('route') && !lowerText.includes('route to')) {
+      const routeDeptMatch = text.match(/route (?:all )?(\w+) invoices.*?to ([\w\s]+?)(?:\s|$|,|and|for)/i)
+      if (routeDeptMatch) {
+        const dept = routeDeptMatch[1].trim()
+        const target = routeDeptMatch[2].trim()
+        
+        // Add department condition if not already extracted
+        if (!entities.find(e => e.type === 'department')) {
+          if (departments.includes(dept.toLowerCase())) {
+            entities.push({
+              type: 'department',
+              value: dept.charAt(0).toUpperCase() + dept.slice(1),
+              confidence: 0.9,
+              start: 0,
+              end: 0
+            })
+          }
+        }
+        
+        actions.push({
+          type: 'route-to-user',
+          target: target
+        })
+      }
+    }
+
+    // Handle "require [user] approval" pattern
+    if (lowerText.includes('require') && lowerText.includes('approval')) {
+      const requireMatch = text.match(/require ([\w\s]+?) approval/i)
+      if (requireMatch) {
+        actions.push({
+          type: 'route-to-user',
+          target: requireMatch[1].trim()
         })
       }
     }
@@ -191,12 +278,24 @@ export default function NaturalLanguageInput({ onRuleGenerated, onPreviewUpdate 
     }
 
     // Extract department conditions
-    const deptEntity = entities.find(e => e.type === 'department')
-    if (deptEntity) {
+    entities.filter(e => e.type === 'department').forEach(deptEntity => {
+      // Avoid duplicate department conditions
+      if (!conditions.find(c => c.field === 'department' && c.value === deptEntity.value)) {
+        conditions.push({
+          field: 'department',
+          operator: '=',
+          value: deptEntity.value
+        })
+      }
+    })
+
+    // Extract category conditions
+    const catEntity = entities.find(e => e.type === 'field')
+    if (catEntity) {
       conditions.push({
-        field: 'department',
+        field: 'category',
         operator: '=',
-        value: deptEntity.value
+        value: catEntity.value
       })
     }
 
@@ -326,18 +425,35 @@ export default function NaturalLanguageInput({ onRuleGenerated, onPreviewUpdate 
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onFocus={() => setShowSuggestions(input.length === 0)}
-              placeholder="E.g., Route Marketing invoices over $10,000 to CFO for approval..."
-              className="min-h-[100px] resize-none"
+              placeholder="E.g., Route Engineering invoices over $15,000 to CTO for approval..."
+              className="min-h-[100px] resize-none pr-10"
             />
             
-            {showSuggestions && input.length === 0 && (
-              <div className="absolute top-full left-0 right-0 mt-2 p-3 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-                <div className="flex items-center gap-2 mb-2">
+            {input.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setInput('')
+                  setShowSuggestions(false)
+                  setParsedRule(null)
+                  textareaRef.current?.focus()
+                }}
+                className="absolute top-2 right-2 h-6 w-6 p-0 hover:bg-gray-100"
+                title="Clear text"
+              >
+                <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+              </Button>
+            )}
+            
+            {showSuggestions && (
+              <div ref={suggestionsRef} className="absolute top-full left-0 right-0 mt-2 p-4 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-80 overflow-y-auto">
+                <div className="flex items-center gap-2 mb-3">
                   <Lightbulb className="h-4 w-4 text-amber-500" />
                   <span className="text-sm font-medium">Try these examples:</span>
                 </div>
                 <div className="space-y-1">
-                  {examplePatterns.slice(0, 3).map((example, index) => (
+                  {examplePatterns.map((example, index) => (
                     <button
                       key={index}
                       onClick={() => handleTryExample(example)}
@@ -362,16 +478,14 @@ export default function NaturalLanguageInput({ onRuleGenerated, onPreviewUpdate 
                 {isProcessing ? 'Processing...' : 'Generate Rule'}
               </Button>
               
-              {!showSuggestions && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowSuggestions(true)}
-                >
-                  <Lightbulb className="h-4 w-4 mr-1" />
-                  Examples
-                </Button>
-              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowSuggestions(!showSuggestions)}
+              >
+                <Lightbulb className="h-4 w-4 mr-1" />
+                {showSuggestions ? 'Hide Examples' : 'Examples'}
+              </Button>
             </div>
             
             {input.length > 0 && (
@@ -459,21 +573,32 @@ export default function NaturalLanguageInput({ onRuleGenerated, onPreviewUpdate 
             <div className="flex items-center justify-between">
               <Button
                 variant="outline"
-                onClick={() => setParsedRule(null)}
+                onClick={() => textareaRef.current?.focus()}
                 className="flex items-center gap-2"
               >
                 <Edit3 className="h-4 w-4" />
                 Edit Description
               </Button>
 
-              <Button
-                onClick={handleConfirm}
-                className="bg-violet-600 hover:bg-violet-700 flex items-center gap-2"
-                disabled={parsedRule.confidence < 0.5}
-              >
-                <ArrowRight className="h-4 w-4" />
-                Generate Workflow
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setParsedRule(null)}
+                  className="flex items-center gap-2"
+                >
+                  <X className="h-4 w-4" />
+                  Discard
+                </Button>
+                
+                <Button
+                  onClick={handleConfirm}
+                  className="bg-violet-600 hover:bg-violet-700 flex items-center gap-2"
+                  disabled={parsedRule.confidence < 0.5}
+                >
+                  <ArrowRight className="h-4 w-4" />
+                  Generate Workflow
+                </Button>
+              </div>
             </div>
 
             {parsedRule.confidence < 0.7 && (

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState, DragEvent } from 'react'
+import { useCallback, useRef, useState, useEffect, DragEvent } from 'react'
 import ReactFlow, {
   Node,
   Edge,
@@ -20,6 +20,8 @@ import 'reactflow/dist/style.css'
 import { nodeTypes } from './workflow-nodes'
 
 interface WorkflowCanvasProps {
+  nodes?: Node[]
+  edges?: Edge[]
   onNodesChange?: (nodes: Node[]) => void
   onEdgesChange?: (edges: Edge[]) => void
   onNodeSelect?: (node: Node | null) => void
@@ -30,12 +32,37 @@ interface WorkflowCanvasProps {
 const initialNodes: Node[] = []
 const initialEdges: Edge[] = []
 
-function WorkflowCanvasInner({ onNodesChange, onEdgesChange, onNodeSelect, executionPath, currentExecutingNode }: WorkflowCanvasProps) {
+function WorkflowCanvasInner({ nodes: propNodes, edges: propEdges, onNodesChange, onEdgesChange, onNodeSelect, executionPath, currentExecutingNode }: WorkflowCanvasProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null)
-  const [nodes, setNodes, onNodesStateChange] = useNodesState(initialNodes)
-  const [edges, setEdges, onEdgesStateChange] = useEdgesState(initialEdges)
+  const [nodes, setNodes, onNodesStateChange] = useNodesState(propNodes || initialNodes)
+  const [edges, setEdges, onEdgesStateChange] = useEdgesState(propEdges || initialEdges)
+
+  // Debug: Log whenever nodes change
+  useEffect(() => {
+    console.log('WorkflowCanvas: Internal nodes state changed:', nodes)
+  }, [nodes])
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null)
   const [selectedNode, setSelectedNode] = useState<Node | null>(null)
+
+  // Sync with props when they change
+  useEffect(() => {
+    if (propNodes) {
+      console.log('WorkflowCanvas: Received propNodes:', propNodes)
+      setNodes(propNodes)
+      // Fit view when new nodes are added
+      if (propNodes.length > 0 && reactFlowInstance) {
+        setTimeout(() => {
+          reactFlowInstance.fitView({ padding: 50 })
+        }, 100)
+      }
+    }
+  }, [propNodes, setNodes, reactFlowInstance])
+
+  useEffect(() => {
+    if (propEdges) {
+      setEdges(propEdges)
+    }
+  }, [propEdges, setEdges])
 
   // Handle node connections
   const onConnect = useCallback(
@@ -72,7 +99,7 @@ function WorkflowCanvasInner({ onNodesChange, onEdgesChange, onNodeSelect, execu
   }
 
   // Helper function to find the closest node that can be connected
-  const findClosestConnectableNode = (newNode: Node, nodes: Node[], proximityThreshold = 150) => {
+  const findClosestConnectableNode = (newNode: Node, nodes: Node[], proximityThreshold = 200) => {
     let closestNode = null
     let minDistance = proximityThreshold
 
@@ -89,12 +116,10 @@ function WorkflowCanvasInner({ onNodesChange, onEdgesChange, onNodeSelect, execu
 
       if (!canConnect) continue
 
-      // Check if nodes are vertically aligned (for better auto-connection)
       const distance = getDistanceBetweenNodes(newNode, node)
-      const verticalDistance = Math.abs(newNode.position.y - node.position.y)
       
-      // Prefer vertical connections
-      if (distance < minDistance && verticalDistance > 50) {
+      // Remove restrictive vertical distance requirement and just use proximity
+      if (distance < minDistance) {
         // Check if there's already a connection
         const connectionExists = edges.some(edge => 
           (edge.source === node.id && edge.target === newNode.id) ||
@@ -171,7 +196,7 @@ function WorkflowCanvasInner({ onNodesChange, onEdgesChange, onNodeSelect, execu
         
         // Check for auto-connection after a brief delay to ensure node is added
         setTimeout(() => {
-          const closestNode = findClosestConnectableNode(newNode, nodes, 150)
+          const closestNode = findClosestConnectableNode(newNode, nodes, 200)
           if (closestNode) {
             // Determine connection direction based on node types
             let sourceId = ''
