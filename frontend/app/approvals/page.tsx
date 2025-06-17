@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Check, X, Users, Clock, CheckCircle, Calendar, Pause, AlertTriangle, ChevronDown, Plus, Settings, User, UserX, RotateCcw } from 'lucide-react'
+import { Check, X, Users, Clock, CheckCircle, Calendar, Pause, AlertTriangle, ChevronDown, Plus, Settings, User, UserX, RotateCcw, FileText } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Switch } from '@/components/ui/switch'
@@ -15,8 +15,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { useToast } from '@/hooks/use-toast'
+import { Toaster } from '@/components/ui/toaster'
 
-type ViewType = 'pending' | 'on-hold' | 'overdue' | 'approved-today' | 'rejected' | 'approved-month' | 'delegated'
+type ViewType = 'pending' | 'on-hold' | 'overdue' | 'approved-today' | 'rejected' | 'approved-month' | 'delegated' | 'all'
 
 export default function ApprovalsPage() {
   const [activeView, setActiveView] = useState<ViewType>('pending')
@@ -26,9 +28,14 @@ export default function ApprovalsPage() {
   const [delegatedDetails, setDelegatedDetails] = useState<Record<string, { delegatedTo: typeof assigneeOptions[0], dateDelegated: string, originalInvoice: any, reason: string, comment?: string }>>({})
   const [animatingOut, setAnimatingOut] = useState<Set<string>>(new Set())
   const [highlighting, setHighlighting] = useState<Set<string>>(new Set())
+  const [approvedInvoices, setApprovedInvoices] = useState<Set<string>>(new Set())
+  const [rejectedInvoices, setRejectedInvoices] = useState<Set<string>>(new Set())
   const [showDelegationModal, setShowDelegationModal] = useState<{ invoiceId: string, assignee: typeof assigneeOptions[0] } | null>(null)
   const [selectedReason, setSelectedReason] = useState<string>('')
   const [delegationComment, setDelegationComment] = useState<string>('')
+  const [actionTypes, setActionTypes] = useState<Record<string, 'approve' | 'reject' | 'delegate'>>({})
+  
+  const { toast } = useToast()
   
   // Current user context
   const currentUser = {
@@ -74,9 +81,12 @@ export default function ApprovalsPage() {
     setDelegatedDetails({})
     setAnimatingOut(new Set())
     setHighlighting(new Set())
+    setApprovedInvoices(new Set())
+    setRejectedInvoices(new Set())
     setShowDelegationModal(null)
     setSelectedReason('')
     setDelegationComment('')
+    setActionTypes({})
   }
 
   // Handle role change
@@ -114,7 +124,8 @@ export default function ApprovalsPage() {
     // First, update the assignment (this fills the pill immediately)
     setAssignments(prev => ({ ...prev, [invoiceId]: assignee }))
     
-    // Step 1: Start purple highlight immediately
+    // Step 1: Track action type and start purple highlight immediately
+    setActionTypes(prev => ({ ...prev, [invoiceId]: 'delegate' }))
     setHighlighting(prev => new Set([...prev, invoiceId]))
     
     // Step 2: After 1.2s, remove highlight and start slide-out animation
@@ -154,6 +165,86 @@ export default function ApprovalsPage() {
     // Close modal
     setShowDelegationModal(null)
   }
+
+  const handleApproveInvoice = (invoiceId: string, invoiceNumber: string) => {
+    console.log(`Approving invoice ${invoiceId}`)
+    
+    // Step 1: Show toast with 3-second auto-dismiss
+    const { dismiss } = toast({
+      title: "Invoice Approved",
+      description: `Invoice ${invoiceNumber} has been successfully approved.`,
+      variant: "default",
+    })
+    
+    // Auto-dismiss toast after 3 seconds
+    setTimeout(() => {
+      dismiss()
+    }, 3000)
+    
+    // Step 2: Track action type and start green highlight immediately
+    setActionTypes(prev => ({ ...prev, [invoiceId]: 'approve' }))
+    setHighlighting(prev => new Set([...prev, invoiceId]))
+    
+    // Step 3: After 1.2s, remove highlight and start slide-out animation
+    setTimeout(() => {
+      setHighlighting(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(invoiceId)
+        return newSet
+      })
+      setAnimatingOut(prev => new Set([...prev, invoiceId]))
+    }, 1200)
+    
+    // Step 4: After slide-out animation completes, remove from view
+    setTimeout(() => {
+      setApprovedInvoices(prev => new Set([...prev, invoiceId]))
+      setAnimatingOut(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(invoiceId)
+        return newSet
+      })
+    }, 2000) // 1200ms highlight + 800ms slide animation
+  }
+
+  const handleRejectInvoice = (invoiceId: string, invoiceNumber: string) => {
+    console.log(`Rejecting invoice ${invoiceId}`)
+    
+    // Step 1: Show toast with 3-second auto-dismiss
+    const { dismiss } = toast({
+      title: "Invoice Rejected",
+      description: `Invoice ${invoiceNumber} has been rejected and sent back for review.`,
+      variant: "default",
+    })
+    
+    // Auto-dismiss toast after 3 seconds
+    setTimeout(() => {
+      dismiss()
+    }, 3000)
+    
+    // Step 2: Track action type and start red highlight immediately
+    setActionTypes(prev => ({ ...prev, [invoiceId]: 'reject' }))
+    setHighlighting(prev => new Set([...prev, invoiceId]))
+    
+    // Step 3: After 1.2s, remove highlight and start slide-out animation
+    setTimeout(() => {
+      setHighlighting(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(invoiceId)
+        return newSet
+      })
+      setAnimatingOut(prev => new Set([...prev, invoiceId]))
+    }, 1200)
+    
+    // Step 4: After slide-out animation completes, remove from view
+    setTimeout(() => {
+      setRejectedInvoices(prev => new Set([...prev, invoiceId]))
+      setAnimatingOut(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(invoiceId)
+        return newSet
+      })
+    }, 2000) // 1200ms highlight + 800ms slide animation
+  }
   
   // Placeholder data for different views
   const pendingApprovals = [
@@ -164,7 +255,7 @@ export default function ApprovalsPage() {
       supplierName: 'Office Supplies Co.',
       totalAmount: 1250.00,
       dueDate: '2024-02-15',
-      status: 'Pending Approval',
+      status: 'Pending',
       spendCategory: 'Office Supplies',
       glCode: '5100',
       projectCode: 'PROJ-2024-001',
@@ -179,7 +270,7 @@ export default function ApprovalsPage() {
       supplierName: 'Tech Solutions Ltd.',
       totalAmount: 5600.00,
       dueDate: '2024-02-16',
-      status: 'Pending Approval',
+      status: 'Pending',
       spendCategory: 'IT Equipment',
       glCode: '5200',
       projectCode: 'PROJ-2024-002',
@@ -194,7 +285,7 @@ export default function ApprovalsPage() {
       supplierName: 'Professional Services Inc.',
       totalAmount: 3200.00,
       dueDate: '2024-02-20',
-      status: 'Pending Approval',
+      status: 'Pending',
       spendCategory: 'Consulting',
       glCode: '7100',
       projectCode: 'CONS-2024-003',
@@ -209,7 +300,7 @@ export default function ApprovalsPage() {
       supplierName: 'Facilities Management Corp.',
       totalAmount: 890.00,
       dueDate: '2024-02-21',
-      status: 'Pending Approval',
+      status: 'Pending',
       spendCategory: 'Facilities',
       glCode: '6200',
       projectCode: 'FAC-2024-001',
@@ -224,7 +315,7 @@ export default function ApprovalsPage() {
       supplierName: 'Legal Advisory Partners',
       totalAmount: 7500.00,
       dueDate: '2024-02-22',
-      status: 'Pending Approval',
+      status: 'Pending',
       spendCategory: 'Legal Services',
       glCode: '8100',
       projectCode: 'LEG-2024-001',
@@ -468,13 +559,34 @@ export default function ApprovalsPage() {
         // Return delegated invoices with their original data
         baseList = Object.values(delegatedDetails).map(detail => detail.originalInvoice).filter(Boolean)
         break
+      case 'all':
+        // Return all invoices from all categories, deduplicating by ID
+        const allInvoices = [...pendingApprovals, ...onHoldApprovals, ...overdueApprovals, ...approvedToday, ...rejectedApprovals, ...approvedThisMonth]
+        const uniqueInvoicesMap = new Map()
+        allInvoices.forEach(invoice => {
+          if (!uniqueInvoicesMap.has(invoice.id)) {
+            uniqueInvoicesMap.set(invoice.id, invoice)
+          }
+        })
+        baseList = Array.from(uniqueInvoicesMap.values())
+        break
       default:
         baseList = pendingApprovals
     }
     
-    // In user mode, filter out delegated invoices (except when viewing delegated)
+    // Filter out processed invoices based on view and mode
     if (userRole === 'user' && activeView !== 'delegated') {
-      return baseList.filter(invoice => !delegatedInvoices.has(invoice.id))
+      return baseList.filter(invoice => 
+        !delegatedInvoices.has(invoice.id) && 
+        !approvedInvoices.has(invoice.id) && 
+        !rejectedInvoices.has(invoice.id)
+      )
+    } else if (activeView === 'pending') {
+      // In pending view, filter out approved and rejected invoices for all users
+      return baseList.filter(invoice => 
+        !approvedInvoices.has(invoice.id) && 
+        !rejectedInvoices.has(invoice.id)
+      )
     }
     
     return baseList
@@ -501,6 +613,22 @@ export default function ApprovalsPage() {
 
   const needsHorizontalScroll = getColumnCount() > 11 // Threshold for enabling scroll
 
+  // Get highlight color based on the action being performed
+  const getHighlightColor = (invoiceId: string) => {
+    const actionType = actionTypes[invoiceId]
+    
+    switch (actionType) {
+      case 'approve':
+        return 'bg-green-50 hover:bg-green-50'
+      case 'reject':
+        return 'bg-red-50 hover:bg-red-50'
+      case 'delegate':
+        return 'bg-purple-50 hover:bg-purple-50'
+      default:
+        return 'bg-green-50 hover:bg-green-50' // Default fallback
+    }
+  }
+
   const getViewTitle = () => {
     switch (activeView) {
       case 'pending':
@@ -509,6 +637,8 @@ export default function ApprovalsPage() {
         return 'On Hold'
       case 'overdue':
         return 'Overdue Approvals'
+      case 'all':
+        return 'All Invoices'
       case 'approved-today':
         return 'Approved Today'
       case 'rejected':
@@ -530,6 +660,8 @@ export default function ApprovalsPage() {
         return 'Invoices temporarily on hold awaiting additional information'
       case 'overdue':
         return 'Urgent invoices that require immediate attention'
+      case 'all':
+        return 'Complete view of all invoices across all statuses'
       case 'approved-today':
         return 'Invoices you approved today'
       case 'rejected':
@@ -573,7 +705,7 @@ export default function ApprovalsPage() {
             </div>
 
             {/* Priority Action Cards - Compact */}
-            <div className="grid grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-4 gap-4 mb-4">
               <Card 
                 className={`cursor-pointer transition-all duration-200 border ${
                   activeView === 'pending' 
@@ -655,6 +787,33 @@ export default function ApprovalsPage() {
                     }`}>
                       <Pause className={`h-5 w-5 ${
                         activeView === 'on-hold' ? 'text-white' : 'text-orange-600'
+                      }`} />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card 
+                className={`cursor-pointer transition-all duration-200 border ${
+                  activeView === 'all' 
+                    ? 'border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/50 shadow shadow-blue-300/50' 
+                    : 'border-gray-200 hover:border-blue-300 hover:shadow-sm'
+                }`}
+                onClick={() => setActiveView('all')}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-600">All Invoices</p>
+                      <p className="text-xl font-bold text-gray-900 mt-1">
+                        {pendingApprovals.length + onHoldApprovals.length + overdueApprovals.length + approvedToday.length + rejectedApprovals.length + approvedThisMonth.length}
+                      </p>
+                    </div>
+                    <div className={`p-2 rounded-full ${
+                      activeView === 'all' ? 'bg-gradient-to-br from-blue-400 to-blue-500' : 'bg-blue-100'
+                    }`}>
+                      <FileText className={`h-5 w-5 ${
+                        activeView === 'all' ? 'text-white' : 'text-blue-600'
                       }`} />
                     </div>
                   </div>
@@ -784,11 +943,11 @@ export default function ApprovalsPage() {
                       <TableRow 
                         key={approval.id}
                         className={`transition-all ease-in-out ${
-                          highlighting.has(approval.id) 
-                            ? 'bg-purple-100/70 duration-200' 
+                          highlighting.has(approval.id)
+                            ? getHighlightColor(approval.id) + ' duration-200'
                             : animatingOut.has(approval.id)
                             ? 'opacity-0 transform translate-x-8 duration-800'
-                            : 'opacity-100 transform translate-x-0 duration-200'
+                            : 'opacity-100 transform translate-x-0 duration-200 hover:bg-gray-50'
                         }`}
                       >
                         <TableCell className="font-medium">
@@ -804,7 +963,7 @@ export default function ApprovalsPage() {
                           <Badge 
                             variant="secondary" 
                             className={
-                              approval.status === 'Pending Approval' 
+                              approval.status === 'Pending' 
                                 ? "bg-yellow-100 text-yellow-800" 
                                 : approval.status === 'Approved'
                                 ? "bg-green-100 text-green-800"
@@ -929,6 +1088,7 @@ export default function ApprovalsPage() {
                                       size="sm"
                                       variant="outline"
                                       className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                      onClick={() => handleApproveInvoice(approval.id, approval.invoiceNumber)}
                                     >
                                       <Check className="h-4 w-4" />
                                     </Button>
@@ -946,6 +1106,7 @@ export default function ApprovalsPage() {
                                       size="sm"
                                       variant="outline"
                                       className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      onClick={() => handleRejectInvoice(approval.id, approval.invoiceNumber)}
                                     >
                                       <X className="h-4 w-4" />
                                     </Button>
@@ -1068,6 +1229,7 @@ export default function ApprovalsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <Toaster />
     </div>
   )
 }
