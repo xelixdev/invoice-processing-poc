@@ -1,9 +1,33 @@
 'use client'
 
+import { useState } from 'react'
 import Sidebar from "@/components/sidebar"
 import MainHeader from "@/components/main-header"
+import ApprovalRulesTable from "@/components/approval-rules-table"
+import RuleBuilderModal from "@/components/rule-builder-modal"
+import { Search, Plus } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 
 export default function SettingsPage() {
+  const [searchQuery, setSearchQuery] = useState('')
+  const [isRuleBuilderOpen, setIsRuleBuilderOpen] = useState(false)
+  const [editingRule, setEditingRule] = useState(null)
+
+  const handleCreateRule = () => {
+    setEditingRule(null)
+    setIsRuleBuilderOpen(true)
+  }
+
+  const handleEditRule = (rule: any) => {
+    setEditingRule(rule)
+    setIsRuleBuilderOpen(true)
+  }
+
+  const handleCloseRuleBuilder = () => {
+    setIsRuleBuilderOpen(false)
+    setEditingRule(null)
+  }
   return (
     <div className="flex h-screen bg-background">
       <Sidebar activePage="settings" />
@@ -27,12 +51,41 @@ export default function SettingsPage() {
               <h1 className="text-2xl font-semibold mb-6">Approval Rules</h1>
             </div>
             
-            <div className="bg-white border border-gray-200 rounded-lg p-6">
-              <p className="text-gray-600">Approval Rules content will go here.</p>
+            <div className="space-y-4">
+              {/* Search and Create Button */}
+              <div className="flex items-center justify-between">
+                <div className="relative w-96">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="search"
+                    placeholder="Search rules..."
+                    className="pl-10 bg-white"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                <Button 
+                  onClick={handleCreateRule}
+                  className="bg-violet-600 hover:bg-violet-700 flex items-center gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create New Rule
+                </Button>
+              </div>
+
+              {/* Rules Table */}
+              <ApprovalRulesTable searchQuery={searchQuery} onEditRule={handleEditRule} />
             </div>
           </div>
         </main>
       </div>
+
+      {/* Rule Builder Modal */}
+      <RuleBuilderModal
+        isOpen={isRuleBuilderOpen}
+        onClose={handleCloseRuleBuilder}
+        editingRule={editingRule}
+      />
     </div>
   )
 }
