@@ -294,6 +294,7 @@ function WorkflowCanvasInner({ onNodesChange, onEdgesChange, onNodeSelect, execu
         onNodeClick={handleNodeClick}
         onPaneClick={handlePaneClick}
         nodeTypes={nodeTypes}
+        connectionRadius={50}
         attributionPosition="bottom-right"
       >
         <svg style={{ position: 'absolute', top: 0, left: 0 }}>

@@ -175,55 +175,60 @@ export default function RuleBuilderModal({ isOpen, onClose, editingRule }: RuleB
       <div className="bg-white rounded-lg shadow-xl w-full h-full max-w-[95vw] max-h-[95vh] flex flex-col">
         {/* Modal Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3 pl-2">
             <Input
               value={ruleName}
               onChange={(e) => {
                 setRuleName(e.target.value)
                 setHasUnsavedChanges(true)
               }}
-              className="text-lg font-semibold border-none shadow-none p-0 h-auto bg-transparent focus-visible:ring-0"
-              placeholder="Rule name..."
+              className="text-xl font-semibold border-none shadow-none p-0 h-auto bg-transparent focus-visible:ring-0 min-w-0"
+              placeholder="New Approval Rule"
+              style={{ fontSize: '1.25rem', lineHeight: '1.75rem' }}
             />
             {hasUnsavedChanges && (
-              <span className="text-sm text-orange-600">• Unsaved changes</span>
+              <div className="px-2 py-1 bg-orange-100 text-orange-700 text-xs font-medium rounded-full">
+                Unsaved
+              </div>
             )}
-            
-            {/* Mode Toggle */}
-            <div className="flex items-center bg-gray-100 rounded-lg p-1">
-              <Button
-                variant={showNaturalLanguage ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setShowNaturalLanguage(true)}
-                className="text-xs h-7"
-              >
-                Natural Language
-              </Button>
-              <Button
-                variant={!showNaturalLanguage ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setShowNaturalLanguage(false)}
-                className="text-xs h-7"
-              >
-                Visual Builder
-              </Button>
-            </div>
+          </div>
+          
+          {/* Mode Toggle - Centered */}
+          <div className="flex items-center bg-gray-100 rounded-lg p-1">
+            <Button
+              variant={showNaturalLanguage ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setShowNaturalLanguage(true)}
+              className="text-xs h-7"
+            >
+              Natural Language
+            </Button>
+            <Button
+              variant={!showNaturalLanguage ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setShowNaturalLanguage(false)}
+              className="text-xs h-7"
+            >
+              Visual Builder
+            </Button>
           </div>
           
           <div className="flex items-center space-x-2">
             <Button
               variant="outline"
+              size="sm"
               onClick={handleTest}
-              className="flex items-center gap-2"
+              className="flex items-center gap-1.5 text-sm h-8"
             >
-              <Play className="h-4 w-4" />
+              <Play className="h-3.5 w-3.5" />
               Test Rule
             </Button>
             <Button
+              size="sm"
               onClick={handleSave}
-              className="bg-violet-600 hover:bg-violet-700 flex items-center gap-2"
+              className="bg-violet-600 hover:bg-violet-700 flex items-center gap-1.5 text-sm h-8"
             >
-              <Save className="h-4 w-4" />
+              <Save className="h-3.5 w-3.5" />
               Save Rule
             </Button>
             <Button
