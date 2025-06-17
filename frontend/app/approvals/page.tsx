@@ -7,13 +7,32 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Check, X, Users, Clock, CheckCircle, Calendar, Pause, AlertTriangle } from 'lucide-react'
+import { Check, X, Users, Clock, CheckCircle, Calendar, Pause, AlertTriangle, ChevronDown, Plus } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 type ViewType = 'pending' | 'on-hold' | 'overdue' | 'approved-today' | 'rejected' | 'approved-month'
 
 export default function ApprovalsPage() {
   const [activeView, setActiveView] = useState<ViewType>('pending')
+  const [assignments, setAssignments] = useState<Record<string, typeof assigneeOptions[0]>>({})
+  
+  // User options for reassignment
+  const assigneeOptions = [
+    { initials: 'SC', name: 'Sarah Chen', role: 'AP Manager', color: 'bg-violet-500' },
+    { initials: 'MJ', name: 'Michael Johnson', role: 'AP Specialist', color: 'bg-blue-500' },
+    { initials: 'AR', name: 'Anna Rodriguez', role: 'Finance Director', color: 'bg-green-500' },
+    { initials: 'DK', name: 'David Kim', role: 'CFO', color: 'bg-amber-500' },
+    { initials: 'LP', name: 'Lisa Park', role: 'Senior Accountant', color: 'bg-purple-500' },
+    { initials: 'JW', name: 'John Wilson', role: 'Department Head', color: 'bg-red-500' },
+    { initials: 'KB', name: 'Karen Brown', role: 'Legal Counsel', color: 'bg-indigo-500' }
+  ]
+
+  const handleReassignInvoice = (invoiceId: string, assignee: typeof assigneeOptions[0]) => {
+    console.log(`Reassigning invoice ${invoiceId} to ${assignee.name}`)
+    setAssignments(prev => ({ ...prev, [invoiceId]: assignee }))
+    // Here you would implement the actual reassignment logic
+  }
   
   // Placeholder data for different views
   const pendingApprovals = [
@@ -539,6 +558,7 @@ export default function ApprovalsPage() {
                       <TableHead>Spend Category</TableHead>
                       <TableHead>GL Code</TableHead>
                       <TableHead>Department</TableHead>
+                      <TableHead>Assign</TableHead>
                       {(activeView === 'approved-today' || activeView === 'approved-month') && <TableHead>Approved Date</TableHead>}
                       {activeView === 'rejected' && <TableHead>Rejected Date</TableHead>}
                       {activeView === 'on-hold' && <TableHead>Hold Reason</TableHead>}
@@ -581,6 +601,48 @@ export default function ApprovalsPage() {
                         <TableCell>{approval.spendCategory}</TableCell>
                         <TableCell>{approval.glCode}</TableCell>
                         <TableCell>{approval.department}</TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className={`w-8 h-8 rounded-full border flex items-center justify-center transition-colors ${
+                                assignments[approval.id] 
+                                  ? `border-solid ${assignments[approval.id].color.replace('bg-', 'border-')}` 
+                                  : 'border-dashed border-gray-300 hover:border-gray-400'
+                              }`}>
+                                {assignments[approval.id] ? (
+                                  <div className={`w-full h-full rounded-full ${assignments[approval.id].color} flex items-center justify-center`}>
+                                    <span className="text-xs font-medium text-white">
+                                      {assignments[approval.id].initials}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <Plus className="h-4 w-4 text-gray-400" />
+                                )}
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56">
+                              {assigneeOptions.map((assignee) => (
+                                <DropdownMenuItem
+                                  key={assignee.initials}
+                                  onClick={() => handleReassignInvoice(approval.id, assignee)}
+                                  className="cursor-pointer"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className={`w-8 h-8 rounded-full ${assignee.color} flex items-center justify-center`}>
+                                      <span className="text-xs font-medium text-white">
+                                        {assignee.initials}
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span className="text-sm font-medium">{assignee.name}</span>
+                                      <span className="text-xs text-gray-500">{assignee.role}</span>
+                                    </div>
+                                  </div>
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
                         {(activeView === 'approved-today' || activeView === 'approved-month') && <TableCell>{(approval as any).approvedDate}</TableCell>}
                         {activeView === 'rejected' && <TableCell>{(approval as any).rejectedDate}</TableCell>}
                         {activeView === 'on-hold' && <TableCell className="text-sm text-gray-600">{(approval as any).holdReason}</TableCell>}
@@ -603,14 +665,6 @@ export default function ApprovalsPage() {
                                 title="Reject"
                               >
                                 <X className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                title="Reassign"
-                              >
-                                <Users className="h-4 w-4" />
                               </Button>
                             </div>
                           </TableCell>
