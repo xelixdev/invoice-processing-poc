@@ -37,26 +37,44 @@ function WorkflowCanvasInner({ nodes: propNodes, edges: propEdges, onNodesChange
   const [nodes, setNodes, onNodesStateChange] = useNodesState(propNodes || initialNodes)
   const [edges, setEdges, onEdgesStateChange] = useEdgesState(propEdges || initialEdges)
 
-  // Debug: Log whenever nodes change
-  useEffect(() => {
-    console.log('WorkflowCanvas: Internal nodes state changed:', nodes)
-  }, [nodes])
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null)
   const [selectedNode, setSelectedNode] = useState<Node | null>(null)
 
+  // Handle node deletion
+  const handleDeleteNode = useCallback(
+    (nodeId: string) => {
+      setNodes((nds) => nds.filter((node) => node.id !== nodeId))
+      setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId))
+      
+      // Clear selection if deleted node was selected
+      if (selectedNode?.id === nodeId) {
+        setSelectedNode(null)
+        onNodeSelect?.(null)
+      }
+    },
+    [setNodes, setEdges, selectedNode, onNodeSelect]
+  )
+
   // Sync with props when they change
   useEffect(() => {
-    if (propNodes) {
-      console.log('WorkflowCanvas: Received propNodes:', propNodes)
-      setNodes(propNodes)
+    if (propNodes && propNodes.length > 0) {
+      // Add delete handlers to nodes when they come from props
+      const nodesWithHandlers = propNodes.map(node => ({
+        ...node,
+        data: {
+          ...node.data,
+          onDelete: handleDeleteNode
+        }
+      }))
+      setNodes(nodesWithHandlers)
       // Fit view when new nodes are added
-      if (propNodes.length > 0 && reactFlowInstance) {
+      if (reactFlowInstance) {
         setTimeout(() => {
           reactFlowInstance.fitView({ padding: 50 })
         }, 100)
       }
     }
-  }, [propNodes, setNodes, reactFlowInstance])
+  }, [propNodes, setNodes, reactFlowInstance, handleDeleteNode])
 
   useEffect(() => {
     if (propEdges) {
@@ -69,7 +87,7 @@ function WorkflowCanvasInner({ nodes: propNodes, edges: propEdges, onNodesChange
     (params: Connection) => {
       const newEdge = {
         ...params,
-        type: 'bezier',
+        type: 'default',
         animated: true,
         style: { 
           stroke: 'url(#edge-gradient)',
@@ -215,7 +233,7 @@ function WorkflowCanvasInner({ nodes: propNodes, edges: propEdges, onNodesChange
               id: `${sourceId}-${targetId}`,
               source: sourceId,
               target: targetId,
-              type: 'bezier',
+              type: 'default',
               animated: true,
               style: { 
                 stroke: 'url(#edge-gradient)',
@@ -237,21 +255,6 @@ function WorkflowCanvasInner({ nodes: propNodes, edges: propEdges, onNodesChange
     [reactFlowInstance, setNodes, nodes, edges, setEdges]
   )
 
-  // Handle node deletion
-  const handleDeleteNode = useCallback(
-    (nodeId: string) => {
-      setNodes((nds) => nds.filter((node) => node.id !== nodeId))
-      setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId))
-      
-      // Clear selection if deleted node was selected
-      if (selectedNode?.id === nodeId) {
-        setSelectedNode(null)
-        onNodeSelect?.(null)
-      }
-    },
-    [setNodes, setEdges, selectedNode, onNodeSelect]
-  )
-
   // Handle node selection
   const handleNodeClick = useCallback(
     (event: React.MouseEvent, node: Node) => {
@@ -271,30 +274,8 @@ function WorkflowCanvasInner({ nodes: propNodes, edges: propEdges, onNodesChange
   const handleNodesChange = useCallback(
     (changes: any) => {
       onNodesStateChange(changes)
-      const updatedNodes = nodes.map((node) => {
-        const isInExecutionPath = executionPath?.includes(node.id)
-        const isCurrentlyExecuting = currentExecutingNode === node.id
-        
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            onDelete: handleDeleteNode,
-          },
-          style: {
-            ...node.style,
-            opacity: isInExecutionPath ? 1 : (executionPath && executionPath.length > 0 ? 0.5 : 1),
-            border: isCurrentlyExecuting ? '2px solid #3b82f6' : 
-                   isInExecutionPath ? '2px solid #10b981' : 
-                   node.selected ? '2px solid #8b5cf6' : undefined,
-            boxShadow: isCurrentlyExecuting ? '0 0 20px rgba(59, 130, 246, 0.5)' :
-                      isInExecutionPath ? '0 0 10px rgba(16, 185, 129, 0.3)' : undefined
-          }
-        }
-      })
-      onNodesChange?.(updatedNodes)
     },
-    [onNodesStateChange, nodes, handleDeleteNode, onNodesChange, executionPath, currentExecutingNode]
+    [onNodesStateChange]
   )
 
   const handleEdgesChange = useCallback(
