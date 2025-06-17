@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Check, X, Users, Clock, CheckCircle, Calendar, Pause, AlertTriangle } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 type ViewType = 'pending' | 'on-hold' | 'overdue' | 'approved-today' | 'rejected' | 'approved-month'
 
@@ -371,9 +372,8 @@ export default function ApprovalsPage() {
               <h1 className="text-2xl font-bold tracking-tight">Approvals</h1>
             </div>
 
-            {/* Modern Compact Stats Cards - 2x3 Grid */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              {/* Top Row */}
+            {/* Priority Action Cards - Compact */}
+            <div className="grid grid-cols-3 gap-4 mb-4">
               <Card 
                 className={`cursor-pointer transition-all duration-200 border ${
                   activeView === 'pending' 
@@ -382,42 +382,17 @@ export default function ApprovalsPage() {
                 }`}
                 onClick={() => setActiveView('pending')}
               >
-                <CardContent className="p-3">
+                <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-[11px] font-medium text-gray-600">Pending</p>
-                      <p className="text-lg font-bold text-gray-900">{pendingApprovals.length}</p>
+                      <p className="text-xs font-medium text-gray-600">Pending Approval</p>
+                      <p className="text-xl font-bold text-gray-900 mt-1">{pendingApprovals.length}</p>
                     </div>
                     <div className={`p-2 rounded-full ${
                       activeView === 'pending' ? 'bg-gradient-to-br from-purple-400 to-purple-500' : 'bg-purple-100'
                     }`}>
-                      <Clock className={`h-4 w-4 ${
+                      <Clock className={`h-5 w-5 ${
                         activeView === 'pending' ? 'text-white' : 'text-purple-600'
-                      }`} />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card 
-                className={`cursor-pointer transition-all duration-200 border ${
-                  activeView === 'on-hold' 
-                    ? 'border-orange-200 bg-gradient-to-br from-orange-50 to-orange-100/50 shadow shadow-orange-300/50' 
-                    : 'border-gray-200 hover:border-orange-300 hover:shadow-sm'
-                }`}
-                onClick={() => setActiveView('on-hold')}
-              >
-                <CardContent className="p-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[11px] font-medium text-gray-600">On Hold</p>
-                      <p className="text-lg font-bold text-gray-900">{onHoldApprovals.length}</p>
-                    </div>
-                    <div className={`p-2 rounded-full ${
-                      activeView === 'on-hold' ? 'bg-gradient-to-br from-orange-400 to-orange-500' : 'bg-orange-100'
-                    }`}>
-                      <Pause className={`h-4 w-4 ${
-                        activeView === 'on-hold' ? 'text-white' : 'text-orange-600'
                       }`} />
                     </div>
                   </div>
@@ -432,16 +407,16 @@ export default function ApprovalsPage() {
                 }`}
                 onClick={() => setActiveView('overdue')}
               >
-                <CardContent className="p-3">
+                <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-[11px] font-medium text-gray-600">Overdue</p>
-                      <p className="text-lg font-bold text-gray-900">{overdueApprovals.length}</p>
+                      <p className="text-xs font-medium text-gray-600">Overdue</p>
+                      <p className="text-xl font-bold text-gray-900 mt-1">{overdueApprovals.length}</p>
                     </div>
                     <div className={`p-2 rounded-full ${
                       activeView === 'overdue' ? 'bg-gradient-to-br from-red-400 to-red-500' : 'bg-red-100'
                     }`}>
-                      <AlertTriangle className={`h-4 w-4 ${
+                      <AlertTriangle className={`h-5 w-5 ${
                         activeView === 'overdue' ? 'text-white' : 'text-red-600'
                       }`} />
                     </div>
@@ -449,81 +424,98 @@ export default function ApprovalsPage() {
                 </CardContent>
               </Card>
 
-              {/* Bottom Row */}
               <Card 
                 className={`cursor-pointer transition-all duration-200 border ${
-                  activeView === 'approved-today' 
-                    ? 'border-green-200 bg-gradient-to-br from-green-50 to-green-100/50 shadow shadow-green-200/50' 
-                    : 'border-gray-200 hover:border-green-300 hover:shadow-sm'
+                  activeView === 'on-hold' 
+                    ? 'border-orange-200 bg-gradient-to-br from-orange-50 to-orange-100/50 shadow shadow-orange-300/50' 
+                    : 'border-gray-200 hover:border-orange-300 hover:shadow-sm'
                 }`}
-                onClick={() => setActiveView('approved-today')}
+                onClick={() => setActiveView('on-hold')}
               >
-                <CardContent className="p-3">
+                <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-[11px] font-medium text-gray-600">Approved Today</p>
-                      <p className="text-lg font-bold text-gray-900">{approvedToday.length}</p>
+                      <p className="text-xs font-medium text-gray-600">On Hold</p>
+                      <p className="text-xl font-bold text-gray-900 mt-1">{onHoldApprovals.length}</p>
                     </div>
                     <div className={`p-2 rounded-full ${
-                      activeView === 'approved-today' ? 'bg-gradient-to-br from-green-400 to-green-500' : 'bg-green-100'
+                      activeView === 'on-hold' ? 'bg-gradient-to-br from-orange-400 to-orange-500' : 'bg-orange-100'
                     }`}>
-                      <CheckCircle className={`h-4 w-4 ${
-                        activeView === 'approved-today' ? 'text-white' : 'text-green-600'
+                      <Pause className={`h-5 w-5 ${
+                        activeView === 'on-hold' ? 'text-white' : 'text-orange-600'
                       }`} />
                     </div>
                   </div>
                 </CardContent>
               </Card>
+            </div>
 
-              <Card 
-                className={`cursor-pointer transition-all duration-200 border ${
-                  activeView === 'rejected' 
-                    ? 'border-gray-300 bg-gradient-to-br from-gray-50 to-gray-100/50 shadow shadow-gray-300/50' 
-                    : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
-                }`}
-                onClick={() => setActiveView('rejected')}
-              >
-                <CardContent className="p-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[11px] font-medium text-gray-600">Rejected</p>
-                      <p className="text-lg font-bold text-gray-900">{rejectedApprovals.length}</p>
-                    </div>
-                    <div className={`p-2 rounded-full ${
-                      activeView === 'rejected' ? 'bg-gradient-to-br from-gray-400 to-gray-500' : 'bg-gray-100'
-                    }`}>
-                      <X className={`h-4 w-4 ${
-                        activeView === 'rejected' ? 'text-white' : 'text-gray-600'
-                      }`} />
-                    </div>
+            {/* Horizontal Summary Bar */}
+            <div className="bg-white border border-gray-200 rounded-lg px-4 py-2 mb-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div 
+                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-full cursor-pointer transition-all border ${
+                      activeView === 'approved-today' 
+                        ? 'bg-green-100 text-green-800 border-green-200' 
+                        : 'bg-white border-gray-200 hover:border-green-300 hover:shadow-sm'
+                    }`}
+                    onClick={() => setActiveView('approved-today')}
+                  >
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <span className="text-sm font-medium">{approvedToday.length} Today</span>
                   </div>
-                </CardContent>
-              </Card>
 
-              <Card 
-                className={`cursor-pointer transition-all duration-200 border ${
-                  activeView === 'approved-month' 
-                    ? 'border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/50 shadow shadow-blue-300/50' 
-                    : 'border-gray-200 hover:border-blue-300 hover:shadow-sm'
-                }`}
-                onClick={() => setActiveView('approved-month')}
-              >
-                <CardContent className="p-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[11px] font-medium text-gray-600">Total This Month</p>
-                      <p className="text-lg font-bold text-gray-900">{approvedThisMonth.length}</p>
-                    </div>
-                    <div className={`p-2 rounded-full ${
-                      activeView === 'approved-month' ? 'bg-gradient-to-br from-blue-400 to-blue-500' : 'bg-blue-100'
-                    }`}>
-                      <Calendar className={`h-4 w-4 ${
-                        activeView === 'approved-month' ? 'text-white' : 'text-blue-600'
-                      }`} />
-                    </div>
+                  <div 
+                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-full cursor-pointer transition-all border ${
+                      activeView === 'rejected' 
+                        ? 'bg-gray-100 text-gray-800 border-gray-300' 
+                        : 'bg-white border-gray-200 hover:border-gray-400 hover:shadow-sm'
+                    }`}
+                    onClick={() => setActiveView('rejected')}
+                  >
+                    <X className="w-4 h-4 text-gray-600" />
+                    <span className="text-sm font-medium">{rejectedApprovals.length} Rejected</span>
                   </div>
-                </CardContent>
-              </Card>
+
+                  <div 
+                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-full cursor-pointer transition-all border ${
+                      activeView === 'approved-month' 
+                        ? 'bg-blue-100 text-blue-800 border-blue-200' 
+                        : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-sm'
+                    }`}
+                    onClick={() => setActiveView('approved-month')}
+                  >
+                    <Calendar className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm font-medium">{approvedThisMonth.length} This Month</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-2 px-2.5 py-1.5 bg-gradient-to-r from-violet-100/70 to-purple-100/70 rounded-full cursor-help">
+                          <span className="w-2 h-2 bg-violet-500 rounded-full"></span>
+                          <span className="text-sm font-medium text-violet-800">
+                            {Math.round((approvedThisMonth.length / (pendingApprovals.length + approvedThisMonth.length + onHoldApprovals.length + overdueApprovals.length + rejectedApprovals.length)) * 100)}% Rate
+                          </span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="max-w-xs">
+                          Approval rate: Percentage of invoices approved out of all processed invoices this month 
+                          ({approvedThisMonth.length} approved out of {pendingApprovals.length + approvedThisMonth.length + onHoldApprovals.length + overdueApprovals.length + rejectedApprovals.length} total)
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  
+                  <div className="text-xs text-gray-500">
+                    Updated just now
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Approvals Table */}
