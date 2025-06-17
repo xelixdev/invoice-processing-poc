@@ -44,10 +44,13 @@ function WorkflowCanvasInner({ onNodesChange, onEdgesChange, onNodeSelect, execu
         ...params,
         type: 'bezier',
         animated: true,
-        style: { stroke: '#8b5cf6', strokeWidth: 2 },
+        style: { 
+          stroke: 'url(#edge-gradient)',
+          strokeWidth: 2 
+        },
         markerEnd: {
           type: 'arrowclosed',
-          color: '#8b5cf6',
+          color: '#f472b6',
         },
       }
       setEdges((eds) => addEdge(newEdge, eds))
@@ -189,10 +192,13 @@ function WorkflowCanvasInner({ onNodesChange, onEdgesChange, onNodeSelect, execu
               target: targetId,
               type: 'bezier',
               animated: true,
-              style: { stroke: '#8b5cf6', strokeWidth: 2 },
+              style: { 
+                stroke: 'url(#edge-gradient)',
+                strokeWidth: 2 
+              },
               markerEnd: {
                 type: 'arrowclosed',
-                color: '#8b5cf6',
+                color: '#a78bfa',
               },
             }
             
@@ -290,6 +296,14 @@ function WorkflowCanvasInner({ onNodesChange, onEdgesChange, onNodeSelect, execu
         nodeTypes={nodeTypes}
         attributionPosition="bottom-right"
       >
+        <svg style={{ position: 'absolute', top: 0, left: 0 }}>
+          <defs>
+            <linearGradient id="edge-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#a78bfa" />
+              <stop offset="100%" stopColor="#f472b6" />
+            </linearGradient>
+          </defs>
+        </svg>
         <Controls className="bg-white border border-gray-200 rounded-md" />
         <Background 
           variant={BackgroundVariant.Dots} 
