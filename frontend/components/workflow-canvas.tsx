@@ -55,26 +55,37 @@ function WorkflowCanvasInner({ nodes: propNodes, edges: propEdges, onNodesChange
     [setNodes, setEdges, selectedNode, onNodeSelect]
   )
 
-  // Sync with props when they change
+  // Track if we've loaded the initial workflow to prevent overriding manual edits
+  const [hasLoadedInitialWorkflow, setHasLoadedInitialWorkflow] = useState(false)
+  
+  // Sync with props when they change (only for initial load or explicit new workflows)
   useEffect(() => {
     if (propNodes && propNodes.length > 0) {
-      // Add delete handlers to nodes when they come from props
-      const nodesWithHandlers = propNodes.map(node => ({
-        ...node,
-        data: {
-          ...node.data,
-          onDelete: handleDeleteNode
+      // Only sync if we haven't loaded initial workflow yet, or if the node count significantly changed
+      // (suggesting a new workflow was generated, not just an update)
+      const significantChange = Math.abs(propNodes.length - nodes.length) > 1
+      
+      if (!hasLoadedInitialWorkflow || (hasLoadedInitialWorkflow && significantChange)) {
+        // Add delete handlers to nodes when they come from props
+        const nodesWithHandlers = propNodes.map(node => ({
+          ...node,
+          data: {
+            ...node.data,
+            onDelete: handleDeleteNode
+          }
+        }))
+        setNodes(nodesWithHandlers)
+        setHasLoadedInitialWorkflow(true)
+        
+        // Only fit view when loading a new workflow
+        if (reactFlowInstance) {
+          setTimeout(() => {
+            reactFlowInstance.fitView({ padding: 50 })
+          }, 100)
         }
-      }))
-      setNodes(nodesWithHandlers)
-      // Fit view when new nodes are added
-      if (reactFlowInstance) {
-        setTimeout(() => {
-          reactFlowInstance.fitView({ padding: 50 })
-        }, 100)
       }
     }
-  }, [propNodes, setNodes, reactFlowInstance, handleDeleteNode])
+  }, [propNodes, setNodes, reactFlowInstance, handleDeleteNode, nodes.length, hasLoadedInitialWorkflow])
 
   useEffect(() => {
     if (propEdges) {
@@ -138,16 +149,8 @@ function WorkflowCanvasInner({ nodes: propNodes, edges: propEdges, onNodesChange
       
       // Remove restrictive vertical distance requirement and just use proximity
       if (distance < minDistance) {
-        // Check if there's already a connection
-        const connectionExists = edges.some(edge => 
-          (edge.source === node.id && edge.target === newNode.id) ||
-          (edge.source === newNode.id && edge.target === node.id)
-        )
-        
-        if (!connectionExists) {
-          closestNode = node
-          minDistance = distance
-        }
+        closestNode = node
+        minDistance = distance
       }
     }
 
@@ -214,39 +217,50 @@ function WorkflowCanvasInner({ nodes: propNodes, edges: propEdges, onNodesChange
         
         // Check for auto-connection after a brief delay to ensure node is added
         setTimeout(() => {
-          const closestNode = findClosestConnectableNode(newNode, nodes, 200)
-          if (closestNode) {
-            // Determine connection direction based on node types
-            let sourceId = ''
-            let targetId = ''
-            
-            if (closestNode.type === 'trigger' || 
-                (closestNode.type === 'condition' && newNode.type === 'action')) {
-              sourceId = closestNode.id
-              targetId = newNodeId
-            } else {
-              sourceId = newNodeId
-              targetId = closestNode.id
+          setEdges((currentEdges) => {
+            const closestNode = findClosestConnectableNode(newNode, updatedNodes, 200)
+            if (closestNode) {
+              // Determine connection direction based on node types
+              let sourceId = ''
+              let targetId = ''
+              
+              if (closestNode.type === 'trigger' || 
+                  (closestNode.type === 'condition' && newNode.type === 'action')) {
+                sourceId = closestNode.id
+                targetId = newNodeId
+              } else {
+                sourceId = newNodeId
+                targetId = closestNode.id
+              }
+              
+              // Double-check that this connection doesn't already exist
+              const connectionExists = currentEdges.some(edge => 
+                (edge.source === sourceId && edge.target === targetId) ||
+                (edge.source === targetId && edge.target === sourceId)
+              )
+              
+              if (!connectionExists) {
+                const newEdge = {
+                  id: `edge-${sourceId}-${targetId}-${Date.now()}`,
+                  source: sourceId,
+                  target: targetId,
+                  type: 'default',
+                  animated: true,
+                  style: { 
+                    stroke: 'url(#edge-gradient)',
+                    strokeWidth: 2 
+                  },
+                  markerEnd: {
+                    type: 'arrowclosed',
+                    color: '#a78bfa',
+                  },
+                }
+                
+                return [...currentEdges, newEdge]
+              }
             }
-            
-            const newEdge = {
-              id: `${sourceId}-${targetId}`,
-              source: sourceId,
-              target: targetId,
-              type: 'default',
-              animated: true,
-              style: { 
-                stroke: 'url(#edge-gradient)',
-                strokeWidth: 2 
-              },
-              markerEnd: {
-                type: 'arrowclosed',
-                color: '#a78bfa',
-              },
-            }
-            
-            setEdges((eds) => [...eds, newEdge])
-          }
+            return currentEdges
+          })
         }, 50)
         
         return updatedNodes
@@ -274,8 +288,15 @@ function WorkflowCanvasInner({ nodes: propNodes, edges: propEdges, onNodesChange
   const handleNodesChange = useCallback(
     (changes: any) => {
       onNodesStateChange(changes)
+      
+      // Notify parent of changes after a delay to prevent render loops
+      if (onNodesChange && changes.length > 0) {
+        setTimeout(() => {
+          onNodesChange(nodes)
+        }, 10)
+      }
     },
-    [onNodesStateChange]
+    [onNodesStateChange, onNodesChange, nodes]
   )
 
   const handleEdgesChange = useCallback(
