@@ -60,7 +60,7 @@ export default function Sidebar({ activePage = "invoices" }: SidebarProps) {
         </Link>
         
         {/* Setting gear at the bottom */}
-        <div className="mt-auto mb-6">
+        <div className="mt-auto mb-12">
           <Link href="/settings" className={`flex h-10 w-10 items-center justify-center rounded-md ${
             activePage === "settings" ? "bg-purple-700" : ""
           }`} title="Settings">
