@@ -402,7 +402,10 @@ export default function NaturalLanguageInput({ onRuleGenerated, onPreviewUpdate 
   const handleTryExample = (example: string) => {
     setInput(example)
     setShowSuggestions(false)
-    textareaRef.current?.focus()
+    // Small delay to ensure the dropdown closes before focusing
+    setTimeout(() => {
+      textareaRef.current?.focus()
+    }, 50)
   }
 
   return (
@@ -424,7 +427,11 @@ export default function NaturalLanguageInput({ onRuleGenerated, onPreviewUpdate 
               ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onFocus={() => setShowSuggestions(input.length === 0)}
+              onFocus={() => {
+                if (input.length === 0) {
+                  setShowSuggestions(true)
+                }
+              }}
               placeholder="E.g., Route Engineering invoices over $15,000 to CTO for approval..."
               className="min-h-[100px] resize-none pr-10"
             />

@@ -31,6 +31,23 @@ export default function RuleBuilderModal({ isOpen, onClose, editingRule }: RuleB
   const [naturalLanguageDescription, setNaturalLanguageDescription] = useState('')
   const titleInputRef = useRef<HTMLInputElement>(null)
 
+  // Reset modal state when opening for a new rule
+  useEffect(() => {
+    if (isOpen && !editingRule) {
+      // Reset all state to defaults
+      setRuleName('New Approval Rule')
+      setHasUnsavedChanges(false)
+      setWorkflowNodes([])
+      setWorkflowEdges([])
+      setSelectedNode(null)
+      setIsTestModeOpen(false)
+      setExecutionPath([])
+      setCurrentExecutingNode('')
+      setShowNaturalLanguage(true)
+      setNaturalLanguageDescription('')
+    }
+  }, [isOpen, editingRule])
+
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

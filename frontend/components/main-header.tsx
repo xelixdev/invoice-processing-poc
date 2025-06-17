@@ -2,7 +2,7 @@ import Link from "next/link"
 import { Bell, User, HelpCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-type ActivePage = "statements" | "invoices" | "vendors" | "helpdesk"
+type ActivePage = "statements" | "invoices" | "approvals" | "vendors" | "helpdesk"
 
 interface MainHeaderProps {
   activePage: ActivePage
@@ -33,6 +33,16 @@ export default function MainHeader({ activePage, invoicesHref = "/" }: MainHeade
             } transition-colors`}
           >
             Invoices
+          </Link>
+          <Link 
+            href="/approvals" 
+            className={`text-sm font-medium px-3 py-1 rounded-full ${
+              activePage === "approvals" 
+                ? "text-primary bg-primary/10" 
+                : "text-muted-foreground hover:text-primary"
+            } transition-colors`}
+          >
+            Approvals
           </Link>
           <Link 
             href="#" 
