@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Check, X, Users, Clock, CheckCircle, Calendar, Pause, AlertTriangle, ChevronDown, Plus, Settings, User, UserX, RotateCcw, FileText, Inbox, PartyPopper, Sparkles } from 'lucide-react'
+import { Check, X, Users, Clock, CheckCircle, Calendar, Pause, AlertTriangle, ChevronDown, Plus, Settings, User, UserX, RotateCcw, FileText, Inbox, PartyPopper, Sparkles, Search, Filter } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Switch } from '@/components/ui/switch'
@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/use-toast'
 import { Toaster } from '@/components/ui/toaster'
 
@@ -983,13 +984,34 @@ export default function ApprovalsPage() {
 
             {/* Approvals Table */}
             <Card className="overflow-hidden min-w-0">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg">{getViewTitle()}</CardTitle>
-                <CardDescription className="-mt-1">
-                  {getViewDescription()}
-                </CardDescription>
+              <CardHeader className="pb-2">
+                <div className="flex items-end justify-between">
+                  <div className="space-y-0">
+                    <CardTitle className="text-lg">{getViewTitle()}</CardTitle>
+                    <CardDescription className="mt-0">
+                      {getViewDescription()}
+                    </CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="relative w-72">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        type="search" 
+                        placeholder="Search invoices..." 
+                        className="w-full pl-8 h-9 text-sm"
+                      />
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="h-9 px-3 text-sm border-purple-600 text-purple-600 hover:bg-purple-50"
+                    >
+                      <Filter className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent className="p-6 min-w-0">
+              <CardContent className="px-6 pb-6 pt-2 min-w-0">
                 <div className={needsHorizontalScroll ? 'overflow-x-auto' : ''}>
                   <Table style={needsHorizontalScroll ? { minWidth: '1200px', width: '1200px' } : {}} className={needsHorizontalScroll ? '' : 'w-full'}>
                   <TableHeader>
