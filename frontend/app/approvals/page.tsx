@@ -32,8 +32,13 @@ export default function ApprovalsPage() {
   const [approvedInvoices, setApprovedInvoices] = useState<Set<string>>(new Set())
   const [rejectedInvoices, setRejectedInvoices] = useState<Set<string>>(new Set())
   const [showDelegationModal, setShowDelegationModal] = useState<{ invoiceId: string, assignee: typeof assigneeOptions[0] } | null>(null)
+  const [showRejectionModal, setShowRejectionModal] = useState<{ invoiceId: string, invoiceNumber: string } | null>(null)
   const [selectedReason, setSelectedReason] = useState<string>('')
   const [delegationComment, setDelegationComment] = useState<string>('')
+  const [selectedRejectionReason, setSelectedRejectionReason] = useState<string>('')
+  const [rejectionComment, setRejectionComment] = useState<string>('')
+  const [onHoldInvoices, setOnHoldInvoices] = useState<Set<string>>(new Set())
+  const [rejectionDetails, setRejectionDetails] = useState<Record<string, { reason: string, comment?: string, dateRejected: string }>>({})
   const [actionTypes, setActionTypes] = useState<Record<string, 'approve' | 'reject' | 'delegate'>>({})
   
   const { toast } = useToast()
@@ -65,6 +70,23 @@ export default function ApprovalsPage() {
     "Higher approval authority required",
     "Conflict of interest",
     "Other..."
+  ]
+
+  // Rejection reasons
+  const rejectionReasons = [
+    "Missing documentation",
+    "Incorrect amount",
+    "Duplicate invoice",
+    "Budget not approved",
+    "Invalid purchase order",
+    "Needs additional approval",
+    "Other..."
+  ]
+
+  // Reasons that trigger "On Hold" instead of "Rejected"
+  const holdReasons = [
+    "Missing documentation",
+    "Needs additional approval"
   ]
 
   // Initialize assignments for user mode 
@@ -245,6 +267,89 @@ export default function ApprovalsPage() {
         return newSet
       })
     }, 2000) // 1200ms highlight + 800ms slide animation
+  }
+
+  const handleRejectWithReason = (invoiceId: string, invoiceNumber: string, reason: string, comment?: string) => {
+    console.log(`Rejecting invoice ${invoiceId} with reason: ${reason}`)
+    
+    // Check if reason should put invoice on hold instead of rejected
+    const shouldHold = holdReasons.includes(reason)
+    
+    if (shouldHold) {
+      // Put on hold
+      const { dismiss } = toast({
+        title: "Invoice On Hold",
+        description: `Invoice ${invoiceNumber} has been placed on hold: ${reason}`,
+        variant: "default",
+      })
+      
+      setTimeout(() => dismiss(), 3000)
+      
+      // Track as reject action for visual feedback, but will go to hold
+      setActionTypes(prev => ({ ...prev, [invoiceId]: 'reject' }))
+      setHighlighting(prev => new Set([...prev, invoiceId]))
+      
+      setTimeout(() => {
+        setHighlighting(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(invoiceId)
+          return newSet
+        })
+        setAnimatingOut(prev => new Set([...prev, invoiceId]))
+      }, 1200)
+      
+      setTimeout(() => {
+        setOnHoldInvoices(prev => new Set([...prev, invoiceId]))
+        setAnimatingOut(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(invoiceId)
+          return newSet
+        })
+      }, 2000)
+    } else {
+      // Normal rejection
+      const { dismiss } = toast({
+        title: "Invoice Rejected",
+        description: `Invoice ${invoiceNumber} has been rejected: ${reason}`,
+        variant: "default",
+      })
+      
+      setTimeout(() => dismiss(), 3000)
+      
+      setActionTypes(prev => ({ ...prev, [invoiceId]: 'reject' }))
+      setHighlighting(prev => new Set([...prev, invoiceId]))
+      
+      setTimeout(() => {
+        setHighlighting(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(invoiceId)
+          return newSet
+        })
+        setAnimatingOut(prev => new Set([...prev, invoiceId]))
+      }, 1200)
+      
+      setTimeout(() => {
+        setRejectedInvoices(prev => new Set([...prev, invoiceId]))
+        setRejectionDetails(prev => ({
+          ...prev,
+          [invoiceId]: {
+            reason,
+            comment,
+            dateRejected: new Date().toISOString().split('T')[0]
+          }
+        }))
+        setAnimatingOut(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(invoiceId)
+          return newSet
+        })
+      }, 2000)
+    }
+    
+    // Close modal and reset form
+    setShowRejectionModal(null)
+    setSelectedRejectionReason('')
+    setRejectionComment('')
   }
   
   // Placeholder data for different views
@@ -539,7 +644,8 @@ export default function ApprovalsPage() {
     let baseList = []
     switch (activeView) {
       case 'pending':
-        baseList = pendingApprovals
+        // Include both pending and overdue invoices - overdue items still need approval!
+        baseList = [...pendingApprovals, ...overdueApprovals]
         break
       case 'on-hold':
         baseList = onHoldApprovals
@@ -580,13 +686,15 @@ export default function ApprovalsPage() {
       return baseList.filter(invoice => 
         !delegatedInvoices.has(invoice.id) && 
         !approvedInvoices.has(invoice.id) && 
-        !rejectedInvoices.has(invoice.id)
+        !rejectedInvoices.has(invoice.id) && 
+        !onHoldInvoices.has(invoice.id)
       )
-    } else if (activeView === 'pending') {
-      // In pending view, filter out approved and rejected invoices for all users
+    } else if (activeView === 'pending' || activeView === 'overdue') {
+      // In pending/overdue view, filter out processed invoices for all users
       return baseList.filter(invoice => 
         !approvedInvoices.has(invoice.id) && 
-        !rejectedInvoices.has(invoice.id)
+        !rejectedInvoices.has(invoice.id) && 
+        !onHoldInvoices.has(invoice.id)
       )
     }
     
@@ -757,7 +865,7 @@ export default function ApprovalsPage() {
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-        <MainHeader activePage="approvals" />
+        <MainHeader activePage="approvals" sidebarContext="invoices" />
         
         <main className="flex-1 overflow-auto bg-gray-50/50 min-w-0">
           <div className="p-6 min-w-0">
@@ -798,8 +906,8 @@ export default function ApprovalsPage() {
                       <p className="text-xs font-medium text-gray-600">Pending Approval</p>
                       <p className="text-2xl font-bold text-gray-900 mt-0.5">
                         {userRole === 'user' 
-                          ? pendingApprovals.filter(invoice => !delegatedInvoices.has(invoice.id)).length 
-                          : pendingApprovals.length}
+                          ? [...pendingApprovals, ...overdueApprovals].filter(invoice => !delegatedInvoices.has(invoice.id)).length 
+                          : pendingApprovals.length + overdueApprovals.length}
                       </p>
                     </div>
                     <div className={`p-1.5 rounded-full ${
@@ -1030,6 +1138,7 @@ export default function ApprovalsPage() {
                       <TableHead>Supplier Name</TableHead>
                       <TableHead className="text-right whitespace-nowrap">Total Amount</TableHead>
                       <TableHead className="whitespace-nowrap">Due Date</TableHead>
+                      {activeView === 'overdue' && <TableHead className="whitespace-nowrap">Days Overdue</TableHead>}
                       <TableHead>Status</TableHead>
                       <TableHead>Spend Category</TableHead>
                       <TableHead className="whitespace-nowrap">GL Code</TableHead>
@@ -1040,9 +1149,9 @@ export default function ApprovalsPage() {
                       {activeView === 'delegated' && <TableHead className="min-w-[150px]">Reason</TableHead>}
                       {(activeView === 'approved-today' || activeView === 'approved-month') && <TableHead className="whitespace-nowrap">Approved Date</TableHead>}
                       {activeView === 'rejected' && <TableHead className="whitespace-nowrap">Rejected Date</TableHead>}
+                      {activeView === 'rejected' && <TableHead className="min-w-[150px]">Rejection Reason</TableHead>}
                       {activeView === 'on-hold' && <TableHead className="min-w-[150px]">Hold Reason</TableHead>}
-                      {activeView === 'overdue' && <TableHead className="whitespace-nowrap">Days Overdue</TableHead>}
-                      {activeView === 'pending' && <TableHead className="text-center whitespace-nowrap">Actions</TableHead>}
+                      {(activeView === 'pending' || activeView === 'overdue') && <TableHead className="text-center whitespace-nowrap">Actions</TableHead>}
                       {activeView === 'delegated' && <TableHead className="text-center whitespace-nowrap">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
@@ -1094,6 +1203,7 @@ export default function ApprovalsPage() {
                         <TableCell className="max-w-[200px] truncate py-2">{approval.supplierName}</TableCell>
                         <TableCell className="text-right font-medium py-2">${approval.totalAmount.toFixed(2)}</TableCell>
                         <TableCell className="py-2">{approval.dueDate}</TableCell>
+                        {activeView === 'overdue' && <TableCell className="py-2"><Badge variant="destructive" className="bg-red-500">{(approval as any).daysPastDue} days</Badge></TableCell>}
                         <TableCell className="py-2">
                           <Badge 
                             variant="secondary" 
@@ -1210,10 +1320,21 @@ export default function ApprovalsPage() {
                         )}
                         
                         {(activeView === 'approved-today' || activeView === 'approved-month') && <TableCell className="py-2">{(approval as any).approvedDate}</TableCell>}
-                        {activeView === 'rejected' && <TableCell className="py-2">{(approval as any).rejectedDate}</TableCell>}
+                        {activeView === 'rejected' && <TableCell className="py-2">{rejectionDetails[approval.id]?.dateRejected || (approval as any).rejectedDate}</TableCell>}
+                        {activeView === 'rejected' && (
+                          <TableCell className="text-sm text-gray-600 py-2 max-w-[180px]">
+                            <div className="truncate">
+                              {rejectionDetails[approval.id]?.reason || (approval as any).rejectionReason || 'No reason provided'}
+                            </div>
+                            {rejectionDetails[approval.id]?.comment && (
+                              <div className="text-xs text-gray-500 mt-1 truncate" title={rejectionDetails[approval.id].comment}>
+                                {rejectionDetails[approval.id].comment}
+                              </div>
+                            )}
+                          </TableCell>
+                        )}
                         {activeView === 'on-hold' && <TableCell className="text-sm text-gray-600 py-2">{(approval as any).holdReason}</TableCell>}
-                        {activeView === 'overdue' && <TableCell className="py-2"><Badge variant="destructive" className="bg-red-500">{(approval as any).daysPastDue} days</Badge></TableCell>}
-                        {activeView === 'pending' && (
+                        {(activeView === 'pending' || activeView === 'overdue') && (
                           <TableCell className="text-center py-2">
                             <div className="flex gap-1">
                               <TooltipProvider>
@@ -1234,23 +1355,67 @@ export default function ApprovalsPage() {
                                 </Tooltip>
                               </TooltipProvider>
                               
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                      onClick={() => handleRejectInvoice(approval.id, approval.invoiceNumber)}
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top" align="end">
-                                    <p>Reject this invoice</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
+                              {/* Split Button for Reject */}
+                              <div className="flex">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="text-red-600 hover:text-red-700 hover:bg-red-50 rounded-r-none border-r-0"
+                                        onClick={() => handleRejectInvoice(approval.id, approval.invoiceNumber)}
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" align="end">
+                                      <p>Reject this invoice</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                                
+                                <DropdownMenu>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="text-gray-500 hover:text-gray-600 hover:bg-gray-50 rounded-l-none px-1"
+                                          >
+                                            <ChevronDown className="h-3 w-3" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" align="end">
+                                        <p>Reject with reason</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                  <DropdownMenuContent align="end" className="w-56">
+                                    <div className="px-2 py-1.5 text-xs font-medium text-gray-500 border-b">
+                                      Reason for rejection:
+                                    </div>
+                                    {rejectionReasons.map((reason) => (
+                                      <DropdownMenuItem
+                                        key={reason}
+                                        onClick={() => {
+                                          if (reason === 'Other...') {
+                                            setShowRejectionModal({ invoiceId: approval.id, invoiceNumber: approval.invoiceNumber })
+                                          } else {
+                                            handleRejectWithReason(approval.id, approval.invoiceNumber, reason)
+                                          }
+                                        }}
+                                        className="cursor-pointer"
+                                      >
+                                        <span className="text-sm">{reason}</span>
+                                      </DropdownMenuItem>
+                                    ))}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
                             </div>
                           </TableCell>
                         )}
@@ -1365,6 +1530,61 @@ export default function ApprovalsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Rejection Modal - Only for "Other..." reason */}
+      <Dialog open={!!showRejectionModal} onOpenChange={() => setShowRejectionModal(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reject Invoice</DialogTitle>
+            <DialogDescription>
+              Please provide additional details for rejecting invoice {showRejectionModal?.invoiceNumber}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="rejectionComment">Reason for rejection</Label>
+              <Textarea
+                id="rejectionComment"
+                value={rejectionComment}
+                onChange={(e) => setRejectionComment(e.target.value)}
+                placeholder="Please provide details for the rejection..."
+                className="mt-1"
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowRejectionModal(null)
+                setRejectionComment('')
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                if (showRejectionModal) {
+                  handleRejectWithReason(
+                    showRejectionModal.invoiceId, 
+                    showRejectionModal.invoiceNumber, 
+                    'Other...',
+                    rejectionComment
+                  )
+                }
+              }}
+              disabled={!rejectionComment.trim()}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Reject
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Toaster />
     </div>
   )
