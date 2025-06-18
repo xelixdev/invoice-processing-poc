@@ -153,10 +153,13 @@ class AssignmentRuleUserSerializer(serializers.ModelSerializer):
 class AssignmentRuleSerializer(serializers.ModelSerializer):
     """Serializer for AssignmentRule."""
     rule_users = AssignmentRuleUserSerializer(many=True, read_only=True)
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    created_by_username = serializers.CharField(source='created_by.username', read_only=True)
     
     class Meta:
         model = AssignmentRule
         fields = [
             'id', 'name', 'rule', 'function_assignees', 'user_ruleset', 
-            'is_active', 'priority', 'created_at', 'updated_at', 'rule_users'
+            'is_active', 'priority', 'created_by', 'created_by_name', 'created_by_username',
+            'created_at', 'updated_at', 'rule_users'
         ] 

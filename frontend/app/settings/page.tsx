@@ -13,6 +13,7 @@ export default function SettingsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [isRuleBuilderOpen, setIsRuleBuilderOpen] = useState(false)
   const [editingRule, setEditingRule] = useState(null)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   const handleCreateRule = () => {
     setEditingRule(null)
@@ -27,6 +28,11 @@ export default function SettingsPage() {
   const handleCloseRuleBuilder = () => {
     setIsRuleBuilderOpen(false)
     setEditingRule(null)
+  }
+
+  const handleRuleSaved = () => {
+    // Trigger a refresh of the rules table
+    setRefreshTrigger(prev => prev + 1)
   }
   return (
     <div className="flex h-screen bg-background">
@@ -74,7 +80,7 @@ export default function SettingsPage() {
               </div>
 
               {/* Rules Table */}
-              <ApprovalRulesTable searchQuery={searchQuery} onEditRule={handleEditRule} />
+              <ApprovalRulesTable searchQuery={searchQuery} onEditRule={handleEditRule} refreshTrigger={refreshTrigger} />
             </div>
           </div>
         </main>
@@ -85,6 +91,7 @@ export default function SettingsPage() {
         isOpen={isRuleBuilderOpen}
         onClose={handleCloseRuleBuilder}
         editingRule={editingRule}
+        onRuleSaved={handleRuleSaved}
       />
     </div>
   )

@@ -70,7 +70,7 @@ class Invoice(models.Model):
         ('GBP', 'British Pound'),
     ]
 
-    invoice_number = models.CharField(max_length=50, unique=True)
+    invoice_number = models.CharField(max_length=50)
     date = models.DateField()
     due_date = models.DateField()
     po_number = models.CharField(max_length=50, blank=True)
@@ -184,6 +184,7 @@ class AssignmentRule(models.Model):
     user_ruleset = models.CharField(max_length=20, choices=USER_RULESET_CHOICES, default='round_robin', help_text="Method for selecting user within the function")
     is_active = models.BooleanField(default=True, help_text="Whether this rule is currently active")
     priority = models.IntegerField(default=100, help_text="Rule priority (lower numbers = higher priority)")
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_assignment_rules', null=True, blank=True, help_text="User who created this rule")
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

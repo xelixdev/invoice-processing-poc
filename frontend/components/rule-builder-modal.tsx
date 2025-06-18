@@ -11,15 +11,38 @@ import TestModeModal from './test-mode-modal'
 import NaturalLanguageInput from './natural-language-input'
 import { generateWorkflowFromRule, generateNaturalLanguageFromWorkflow } from '@/lib/workflow-generator'
 import { Node, Edge } from 'reactflow'
+import { ApprovalRule } from '@/lib/mock-approval-rules'
 
 interface RuleBuilderModalProps {
   isOpen: boolean
   onClose: () => void
   editingRule?: any // Will be properly typed later
+  onRuleSaved?: () => void // Callback to refresh the rules table
 }
 
-export default function RuleBuilderModal({ isOpen, onClose, editingRule }: RuleBuilderModalProps) {
-  const [ruleName, setRuleName] = useState(editingRule?.name || 'New Approval Rule')
+// Transform the ParsedRule from natural language input to backend format
+interface ParsedRule {
+  trigger: {
+    type: string
+    description: string
+  }
+  conditions: Array<{
+    field: string
+    operator: string
+    value: string
+    valueMax?: string
+  }>
+  actions: Array<{
+    type: string
+    target?: string
+    message?: string
+  }>
+  confidence: number
+  entities: any[]
+}
+
+export default function RuleBuilderModal({ isOpen, onClose, editingRule, onRuleSaved }: RuleBuilderModalProps) {
+  const [ruleName, setRuleName] = useState(editingRule?.name || '')
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [workflowNodes, setWorkflowNodes] = useState<Node[]>([])
   const [workflowEdges, setWorkflowEdges] = useState<Edge[]>([])
@@ -29,13 +52,15 @@ export default function RuleBuilderModal({ isOpen, onClose, editingRule }: RuleB
   const [currentExecutingNode, setCurrentExecutingNode] = useState<string>('')
   const [showNaturalLanguage, setShowNaturalLanguage] = useState(true)
   const [naturalLanguageDescription, setNaturalLanguageDescription] = useState('')
+  const [originalParsedRule, setOriginalParsedRule] = useState<ParsedRule | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
   const titleInputRef = useRef<HTMLInputElement>(null)
 
   // Reset modal state when opening for a new rule
   useEffect(() => {
     if (isOpen && !editingRule) {
       // Reset all state to defaults
-      setRuleName('New Approval Rule')
+      setRuleName('')
       setHasUnsavedChanges(false)
       setWorkflowNodes([])
       setWorkflowEdges([])
@@ -45,6 +70,8 @@ export default function RuleBuilderModal({ isOpen, onClose, editingRule }: RuleB
       setCurrentExecutingNode('')
       setShowNaturalLanguage(true)
       setNaturalLanguageDescription('')
+      setOriginalParsedRule(null)
+      setIsSaving(false)
     }
   }, [isOpen, editingRule])
 
@@ -72,11 +99,179 @@ export default function RuleBuilderModal({ isOpen, onClose, editingRule }: RuleB
     onClose()
   }
 
-  const handleSave = () => {
-    // Save logic will be implemented later
-    console.log('Saving rule:', ruleName)
-    setHasUnsavedChanges(false)
-    onClose()
+  const transformToBackendFormat = (parsedRule: ParsedRule, ruleName: string) => {
+    // Extract department from actions
+    let functionAssignees = 'Procurement' // default
+    let userRuleset = 'round_robin' // default
+    
+    // Find route-to-user action to determine department
+    const routeAction = parsedRule.actions.find(action => action.type === 'route-to-user')
+    if (routeAction?.target) {
+      const target = routeAction.target.toLowerCase()
+      // Map common targets to departments
+      if (target.includes('cto') || target.includes('engineering') || target.includes('it')) {
+        functionAssignees = 'IT'
+      } else if (target.includes('cfo') || target.includes('finance')) {
+        functionAssignees = 'Finance'
+      } else if (target.includes('legal')) {
+        functionAssignees = 'Legal'
+      } else if (target.includes('marketing')) {
+        functionAssignees = 'Sales'
+      } else if (target.includes('hr') || target.includes('human resources')) {
+        functionAssignees = 'HR'
+      } else if (target.includes('operations')) {
+        functionAssignees = 'Operations'
+      } else if (target.includes('warehouse')) {
+        functionAssignees = 'Warehouse'
+      }
+    }
+    
+    // Also check department conditions
+    const deptCondition = parsedRule.conditions.find(condition => condition.field === 'department')
+    if (deptCondition) {
+      const dept = deptCondition.value.toLowerCase()
+      if (dept.includes('it') || dept.includes('engineering')) {
+        functionAssignees = 'IT'
+      } else if (dept.includes('finance')) {
+        functionAssignees = 'Finance'
+      } else if (dept.includes('legal')) {
+        functionAssignees = 'Legal'
+      } else if (dept.includes('marketing') || dept.includes('sales')) {
+        functionAssignees = 'Sales'
+      } else if (dept.includes('hr') || dept.includes('human resources')) {
+        functionAssignees = 'HR'
+      } else if (dept.includes('operations')) {
+        functionAssignees = 'Operations'
+      } else if (dept.includes('warehouse')) {
+        functionAssignees = 'Warehouse'
+      }
+    }
+
+    // Build natural language rule description
+    let ruleDescription = ''
+    
+    // Add conditions
+    if (parsedRule.conditions.length > 0) {
+      const conditionTexts = parsedRule.conditions.map(condition => {
+        switch (condition.operator) {
+          case '>':
+            return `amount is greater than $${condition.value}`
+          case '<':
+            return `amount is less than $${condition.value}`
+          case '=':
+            return `${condition.field} equals "${condition.value}"`
+          case 'contains':
+            return `${condition.field} contains "${condition.value}"`
+          case 'between':
+            return `amount is between $${condition.value} and $${condition.valueMax}`
+          default:
+            return `${condition.field} ${condition.operator} ${condition.value}`
+        }
+      })
+      ruleDescription = `If ${conditionTexts.join(' and ')}`
+    } else {
+      ruleDescription = `For all invoices`
+    }
+    
+    // Add actions
+    if (parsedRule.actions.length > 0) {
+      const actionTexts = parsedRule.actions.map(action => {
+        switch (action.type) {
+          case 'route-to-user':
+            return `route to ${action.target}`
+          case 'send-notification':
+            return `notify ${action.target}`
+          case 'approve':
+            return 'automatically approve'
+          default:
+            return action.type
+        }
+      })
+      ruleDescription += `, then ${actionTexts.join(' and ')}`
+    }
+
+    return {
+      name: ruleName,
+      rule: ruleDescription,
+      function_assignees: functionAssignees,
+      user_ruleset: userRuleset,
+      priority: 100 // default priority
+    }
+  }
+
+  const handleSave = async () => {
+    if (!originalParsedRule && workflowNodes.length === 0) {
+      alert('Please create a rule before saving.')
+      return
+    }
+
+    if (!ruleName.trim()) {
+      alert('Please enter a rule name before saving.')
+      titleInputRef.current?.focus()
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      let ruleData
+      
+      if (originalParsedRule) {
+        // Use the natural language parsed rule
+        ruleData = transformToBackendFormat(originalParsedRule, ruleName)
+      } else {
+        // Transform visual workflow to backend format (simplified for now)
+        const routeNode = workflowNodes.find(node => node.type === 'action' && node.data?.actionType === 'route-to-user')
+        const conditionNodes = workflowNodes.filter(node => node.type === 'condition')
+        
+        // Build a simple rule description from the visual workflow
+        let ruleDescription = 'Visual workflow rule'
+        if (conditionNodes.length > 0) {
+          const conditions = conditionNodes.map(node => {
+            const { conditionType, operator, value } = node.data || {}
+            return `${conditionType} ${operator} ${value}`
+          }).join(' and ')
+          ruleDescription = `If ${conditions}`
+        }
+        
+        ruleData = {
+          name: ruleName,
+          rule: ruleDescription,
+          function_assignees: routeNode?.data?.department || 'Procurement',
+          user_ruleset: 'round_robin',
+          priority: 100
+        }
+      }
+
+      const response = await fetch('/api/assignment-rules', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(ruleData),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || `Failed to save rule: ${response.status}`)
+      }
+
+      const savedRule = await response.json()
+      console.log('Rule saved successfully:', savedRule)
+      
+      setHasUnsavedChanges(false)
+      
+      // Call the callback to refresh the rules table
+      if (onRuleSaved) {
+        onRuleSaved()
+      }
+      
+      onClose()
+    } catch (error) {
+      console.error('Error saving rule:', error)
+      alert(`Error saving rule: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleTest = () => {
@@ -114,8 +309,68 @@ export default function RuleBuilderModal({ isOpen, onClose, editingRule }: RuleB
     }
   }
 
-  const handleRuleGenerated = (rule: any) => {
-    const { nodes, edges } = generateWorkflowFromRule(rule)
+  const transformParsedRuleToApprovalRule = (parsedRule: ParsedRule): ApprovalRule => {
+    // Extract conditions from the parsed rule
+    const conditions: ApprovalRule['conditions'] = {}
+    
+    parsedRule.conditions.forEach(condition => {
+      switch (condition.field) {
+        case 'amount':
+          if (!conditions.amountRange) conditions.amountRange = {}
+          if (condition.operator === '>') {
+            conditions.amountRange.min = parseInt(condition.value)
+          } else if (condition.operator === '<') {
+            conditions.amountRange.max = parseInt(condition.value)
+          } else if (condition.operator === 'between' && condition.valueMax) {
+            conditions.amountRange.min = parseInt(condition.value)
+            conditions.amountRange.max = parseInt(condition.valueMax)
+          }
+          break
+        case 'department':
+          if (!conditions.department) conditions.department = []
+          conditions.department.push(condition.value)
+          break
+        case 'vendor':
+          if (!conditions.vendor) conditions.vendor = []
+          conditions.vendor.push(condition.value)
+          break
+        case 'category':
+          if (!conditions.category) conditions.category = []
+          conditions.category.push(condition.value)
+          break
+      }
+    })
+    
+    // Extract approvers from actions
+    const approvers: ApprovalRule['approvers'] = { primary: [] }
+    parsedRule.actions.forEach(action => {
+      if (action.type === 'route-to-user' && action.target) {
+        approvers.primary.push(action.target)
+      }
+    })
+    
+    return {
+      id: 'temp',
+      name: ruleName || 'Generated Rule',
+      description: `Rule generated from: "${parsedRule.trigger.description}"`,
+      priority: 100,
+      status: 'draft',
+      createdBy: 'Current User',
+      createdDate: new Date().toISOString().split('T')[0],
+      lastModified: new Date().toISOString().split('T')[0],
+      invoicesProcessed: 0,
+      conditions,
+      approvers
+    }
+  }
+
+  const handleRuleGenerated = (rule: ParsedRule) => {
+    // Store the original parsed rule for saving
+    setOriginalParsedRule(rule)
+    
+    // Transform ParsedRule to ApprovalRule format for workflow generation
+    const approvalRule = transformParsedRuleToApprovalRule(rule)
+    const { nodes, edges } = generateWorkflowFromRule(approvalRule)
     
     // Add delete handlers to nodes
     const nodesWithHandlers = nodes.map(node => ({
@@ -202,8 +457,8 @@ export default function RuleBuilderModal({ isOpen, onClose, editingRule }: RuleB
                   setRuleName(e.target.value)
                   setHasUnsavedChanges(true)
                 }}
-                className="text-xl font-semibold border-none shadow-none p-0 h-auto bg-transparent focus-visible:ring-0 focus:ring-0 focus:border-none focus:outline-none min-w-0"
-                placeholder="New Approval Rule"
+                className={`text-base ${!ruleName.trim() ? 'border-gray-300 focus:border-violet-400 focus:ring-violet-400' : 'border-violet-300 focus:border-violet-400 focus:ring-violet-400'}`}
+                placeholder="Enter Rule Name..."
                 style={{ fontSize: '1.25rem', lineHeight: '1.75rem' }}
               />
               <Edit3 
@@ -251,10 +506,11 @@ export default function RuleBuilderModal({ isOpen, onClose, editingRule }: RuleB
             <Button
               size="sm"
               onClick={handleSave}
+              disabled={isSaving}
               className="bg-violet-600 hover:bg-violet-700 flex items-center gap-1.5 text-sm h-8"
             >
               <Check className="h-3.5 w-3.5" />
-              Save Rule
+              {isSaving ? 'Saving...' : 'Save Rule'}
             </Button>
             <Button
               variant="ghost"
@@ -271,6 +527,30 @@ export default function RuleBuilderModal({ isOpen, onClose, editingRule }: RuleB
           {showNaturalLanguage ? (
             /* Natural Language Mode - Single Panel */
             <div className="flex-1 p-6 overflow-auto">
+              {/* Rule Name Section */}
+              <div className="mb-6 p-4 bg-gradient-to-r from-violet-50 to-blue-50 border border-violet-200 rounded-lg">
+                <label className="block text-sm font-medium text-gray-900 mb-2">
+                  Rule Name <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  value={ruleName}
+                  onChange={(e) => {
+                    setRuleName(e.target.value)
+                    setHasUnsavedChanges(true)
+                  }}
+                  placeholder="e.g., 'High Value IT Equipment', 'Marketing Expense Approval', 'Engineering Software Licenses'"
+                  className={`text-base ${!ruleName.trim() ? 'border-gray-300 focus:border-violet-400 focus:ring-violet-400' : 'border-violet-300 focus:border-violet-400 focus:ring-violet-400'}`}
+                />
+                <div className="flex justify-between items-center mt-1">
+                  <p className={`text-xs ${!ruleName.trim() ? 'text-gray-500' : 'text-gray-600'}`}>
+                    {!ruleName.trim() ? 'Rule name is required' : '💡 Choose a clear, descriptive name that explains what this rule handles.'}
+                  </p>
+                  <span className="text-xs text-gray-500">
+                    {ruleName.length}/100
+                  </span>
+                </div>
+              </div>
+
               <NaturalLanguageInput
                 onRuleGenerated={handleRuleGenerated}
                 onPreviewUpdate={setNaturalLanguageDescription}
@@ -356,6 +636,25 @@ export default function RuleBuilderModal({ isOpen, onClose, editingRule }: RuleB
                 
                 <ScrollArea className="h-full">
                   <div className="p-4">
+                    {/* Rule Name Section in Visual Mode */}
+                    <div className="mb-4 p-3 bg-gradient-to-r from-violet-50 to-blue-50 border border-violet-200 rounded-lg">
+                      <label className="block text-xs font-medium text-gray-900 mb-2">
+                        Rule Name <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        value={ruleName}
+                        onChange={(e) => {
+                          setRuleName(e.target.value)
+                          setHasUnsavedChanges(true)
+                        }}
+                        placeholder="Enter rule name"
+                        className={`text-sm ${!ruleName.trim() ? 'border-gray-300 focus:border-violet-400' : 'border-violet-300 focus:border-violet-400'}`}
+                      />
+                      {!ruleName.trim() && (
+                        <p className="text-xs text-gray-500 mt-1">Required</p>
+                      )}
+                    </div>
+
                     <NodePropertyEditor
                       selectedNode={selectedNode}
                       onPropertyChange={handlePropertyChange}
