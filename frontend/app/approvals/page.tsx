@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/use-toast'
 import { Toaster } from '@/components/ui/toaster'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Checkbox } from '@/components/ui/checkbox'
 
 type ViewType = 'pending' | 'on-hold' | 'overdue' | 'approved-today' | 'rejected' | 'approved-month' | 'delegated' | 'all'
 
@@ -72,6 +73,7 @@ export default function ApprovalsPage() {
       color: 'bg-green-500'
     }
   ])
+  const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set())
   
   const { toast } = useToast()
   
@@ -150,6 +152,40 @@ export default function ApprovalsPage() {
 
   const handleCloseInvoice = () => {
     setSelectedInvoiceId(null)
+  }
+
+  // Checkbox handling functions
+  const handleSelectInvoice = (invoiceId: string, checked: boolean) => {
+    const newSelected = new Set(selectedInvoices)
+    if (checked) {
+      newSelected.add(invoiceId)
+    } else {
+      newSelected.delete(invoiceId)
+    }
+    setSelectedInvoices(newSelected)
+  }
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allInvoiceIds = getApprovalsList().map(invoice => invoice.id)
+      setSelectedInvoices(new Set(allInvoiceIds))
+    } else {
+      setSelectedInvoices(new Set())
+    }
+  }
+
+  const isAllSelected = () => {
+    const currentInvoices = getApprovalsList()
+    return currentInvoices.length > 0 && currentInvoices.every(invoice => selectedInvoices.has(invoice.id))
+  }
+
+  const isSomeSelected = () => {
+    return selectedInvoices.size > 0 && !isAllSelected()
+  }
+
+  // Determine if current view supports bulk operations
+  const supportsBulkOperations = () => {
+    return ['pending', 'overdue', 'on-hold'].includes(activeView)
   }
 
   // Initialize assignments for user mode 
@@ -1181,6 +1217,16 @@ export default function ApprovalsPage() {
                   <Table style={needsHorizontalScroll ? { minWidth: '1200px', width: '1200px' } : {}} className={needsHorizontalScroll ? '' : 'w-full'}>
                   <TableHeader>
                     <TableRow>
+                      {supportsBulkOperations() && (
+                        <TableHead className="w-12">
+                          <Checkbox
+                            checked={isAllSelected()}
+                            onCheckedChange={handleSelectAll}
+                            className="data-[state=indeterminate]:bg-violet-600 data-[state=indeterminate]:border-violet-600"
+                            {...(isSomeSelected() ? { 'data-state': 'indeterminate' } : {})}
+                          />
+                        </TableHead>
+                      )}
                       <TableHead className="whitespace-nowrap">Invoice Number</TableHead>
                       <TableHead className="whitespace-nowrap">Invoice Date</TableHead>
                       <TableHead>Supplier Name</TableHead>
@@ -1206,7 +1252,7 @@ export default function ApprovalsPage() {
                   <TableBody>
                     {getApprovalsList().length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={100} className="h-64">
+                        <TableCell colSpan={supportsBulkOperations() ? 101 : 100} className="h-64">
                           <div className="flex flex-col items-center justify-center h-full text-center">
                             <div className="mb-4">
                               {getEmptyStateContent().icon}
@@ -1242,6 +1288,14 @@ export default function ApprovalsPage() {
                             : 'opacity-100 transform translate-x-0 duration-200 hover:bg-gray-50'
                         }`}
                       >
+                        {supportsBulkOperations() && (
+                          <TableCell className="py-2">
+                            <Checkbox
+                              checked={selectedInvoices.has(approval.id)}
+                              onCheckedChange={(checked) => handleSelectInvoice(approval.id, checked as boolean)}
+                            />
+                          </TableCell>
+                        )}
                         <TableCell className="font-medium py-2">
                           <button 
                             onClick={() => handleInvoiceClick(approval.id)}
@@ -1736,6 +1790,104 @@ export default function ApprovalsPage() {
       </Dialog>
 
       <Toaster />
+
+      {/* Bulk Actions Toolbar - Compact Floating Design */}
+      <div className={`fixed bottom-8 left-1/2 transform -translate-x-1/2 transition-all duration-300 ease-in-out ${
+        selectedInvoices.size > 0 ? 'translate-y-0 opacity-100' : 'translate-y-16 opacity-0 pointer-events-none'
+      }`}>
+        <div className="bg-white rounded-full shadow-xl border border-gray-200 px-4 py-2 flex items-center gap-3">
+          {/* Selection Count */}
+          <div className="flex items-center gap-2 pr-3 border-r border-gray-200">
+            <div className="w-7 h-7 bg-violet-100 rounded-full flex items-center justify-center">
+              <span className="text-xs font-semibold text-violet-600">{selectedInvoices.size}</span>
+            </div>
+            <span className="text-sm text-gray-700 font-medium">selected</span>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-2">
+            {(activeView === 'pending' || activeView === 'overdue') && (
+              <>
+                <Button
+                  size="sm"
+                  className="h-8 px-3 bg-green-600 hover:bg-green-700 text-white rounded-full text-xs"
+                  onClick={() => {
+                    toast({
+                      title: "Bulk Approval",
+                      description: `${selectedInvoices.size} invoices approved`,
+                      className: "bg-green-50 border-green-200 text-green-800",
+                    })
+                    setSelectedInvoices(new Set())
+                  }}
+                >
+                  <Check className="h-3 w-3 mr-1" />
+                  Approve
+                </Button>
+                
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 px-3 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-full text-xs"
+                  onClick={() => {
+                    toast({
+                      title: "Bulk Rejection",
+                      description: `${selectedInvoices.size} invoices rejected`,
+                      variant: "destructive",
+                    })
+                    setSelectedInvoices(new Set())
+                  }}
+                >
+                  <X className="h-3 w-3 mr-1" />
+                  Reject
+                </Button>
+              </>
+            )}
+            
+            {(activeView === 'pending' || activeView === 'overdue') && userRole === 'user' && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 px-3 text-gray-600 hover:text-gray-700 hover:bg-gray-50 rounded-full text-xs"
+                onClick={() => {
+                  toast({
+                    title: "Bulk Delegation",
+                    description: `${selectedInvoices.size} invoices delegated`,
+                  })
+                  setSelectedInvoices(new Set())
+                }}
+              >
+                <Forward className="h-3 w-3 mr-1" />
+                Delegate
+              </Button>
+            )}
+            
+            {activeView === 'on-hold' && (
+              <Button
+                size="sm"
+                className="h-8 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs"
+                onClick={() => {
+                  toast({
+                    title: "Released from Hold",
+                    description: `${selectedInvoices.size} invoices released`,
+                  })
+                  setSelectedInvoices(new Set())
+                }}
+              >
+                <ArrowRight className="h-3 w-3 mr-1" />
+                Release
+              </Button>
+            )}
+          </div>
+
+          {/* Close button */}
+          <button
+            onClick={() => setSelectedInvoices(new Set())}
+            className="ml-2 w-6 h-6 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+          >
+            <X className="h-3.5 w-3.5 text-gray-500" />
+          </button>
+        </div>
+      </div>
 
       {/* Invoice Preview Drawer */}
       <>
