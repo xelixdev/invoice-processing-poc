@@ -1219,12 +1219,19 @@ export default function ApprovalsPage() {
                     <TableRow>
                       {supportsBulkOperations() && (
                         <TableHead className="w-12">
-                          <Checkbox
-                            checked={isAllSelected()}
-                            onCheckedChange={handleSelectAll}
-                            className="data-[state=indeterminate]:bg-violet-600 data-[state=indeterminate]:border-violet-600"
-                            {...(isSomeSelected() ? { 'data-state': 'indeterminate' } : {})}
-                          />
+                          <div className="relative inline-flex">
+                            <Checkbox
+                              checked={isAllSelected()}
+                              onCheckedChange={handleSelectAll}
+                              className="data-[state=indeterminate]:bg-violet-600 data-[state=indeterminate]:border-violet-600"
+                              {...(isSomeSelected() ? { 'data-state': 'indeterminate' } : {})}
+                            />
+                            {isSomeSelected() && !isAllSelected() && (
+                              <div className="absolute left-0 top-0 w-full h-full flex items-center justify-center pointer-events-none">
+                                <div className="w-2 h-px bg-white"></div>
+                              </div>
+                            )}
+                          </div>
                         </TableHead>
                       )}
                       <TableHead className="whitespace-nowrap">Invoice Number</TableHead>
