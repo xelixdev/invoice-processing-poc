@@ -95,6 +95,7 @@ export default function InvoiceTable() {
             <TableHead>Match</TableHead>
             <TableHead>PO #</TableHead>
             <TableHead>GR #</TableHead>
+            <TableHead className="w-[140px]">Assigned To</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -136,6 +137,30 @@ export default function InvoiceTable() {
               </TableCell>
               <TableCell className="text-violet-600">{invoice.poNumber}</TableCell>
               <TableCell>{invoice.grNumber}</TableCell>
+              <TableCell>
+                {invoice.assigned_user ? (
+                  <div className="flex flex-col space-y-1">
+                    <span className="text-sm font-medium text-gray-900">
+                      {invoice.assigned_user.full_name || invoice.assigned_user.username}
+                    </span>
+                    {invoice.assigned_user.department && (
+                      <Badge 
+                        variant="secondary" 
+                        className="text-xs w-fit bg-blue-100 text-blue-700 hover:bg-blue-100"
+                      >
+                        {invoice.assigned_user.department}
+                      </Badge>
+                    )}
+                  </div>
+                ) : (
+                  <Badge 
+                    variant="outline" 
+                    className="text-xs bg-gray-50 text-gray-500 border-gray-300"
+                  >
+                    Unassigned
+                  </Badge>
+                )}
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>

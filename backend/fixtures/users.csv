@@ -1,0 +1,11 @@
+username,email,first_name,last_name,department,is_staff,is_active
+john.smith,john.smith@company.com,John,Smith,IT,False,True
+sarah.johnson,sarah.johnson@company.com,Sarah,Johnson,IT,False,True
+mike.brown,mike.brown@company.com,Mike,Brown,Operations,False,True
+lisa.davis,lisa.davis@company.com,Lisa,Davis,Operations,False,True
+tom.wilson,tom.wilson@company.com,Tom,Wilson,Operations,False,True
+amy.garcia,amy.garcia@company.com,Amy,Garcia,Sales,False,True
+kevin.martinez,kevin.martinez@company.com,Kevin,Martinez,Sales,False,True
+jessica.taylor,jessica.taylor@company.com,Jessica,Taylor,IT,False,True
+david.anderson,david.anderson@company.com,David,Anderson,Operations,False,True
+michelle.thomas,michelle.thomas@company.com,Michelle,Thomas,Sales,False,True 

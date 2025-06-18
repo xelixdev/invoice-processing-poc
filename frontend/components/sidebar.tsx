@@ -11,7 +11,11 @@ import {
   faGear
 } from '@fortawesome/free-solid-svg-icons'
 
-export default function Sidebar() {
+interface SidebarProps {
+  activePage?: "invoices" | "settings"
+}
+
+export default function Sidebar({ activePage = "invoices" }: SidebarProps) {
   return (
     <div className="w-16 min-w-16 max-w-16 flex-shrink-0 flex flex-col bg-[linear-gradient(rgb(11,11,69)_0%,rgb(59,15,115)_52.08%,rgb(33,8,64)_100%)] text-white sticky top-0 h-screen">
       <div className="h-16 flex items-center justify-center">
@@ -21,7 +25,9 @@ export default function Sidebar() {
       </div>
       <nav className="flex-1 flex flex-col items-center py-4 gap-6">
         {/* Invoice icon */}
-        <Link href="#" className="flex h-10 w-10 items-center justify-center rounded-md bg-purple-700" title="Invoice Processing">
+        <Link href="/" className={`flex h-10 w-10 items-center justify-center rounded-md ${
+          activePage === "invoices" ? "bg-purple-700" : ""
+        }`} title="Invoice Processing">
           <FontAwesomeIcon icon={faFileInvoice} className="h-5 w-5 text-white" />
         </Link>
         
@@ -54,8 +60,10 @@ export default function Sidebar() {
         </Link>
         
         {/* Setting gear at the bottom */}
-        <div className="mt-auto mb-6">
-          <Link href="#" className="flex h-10 w-10 items-center justify-center" title="Settings">
+        <div className="mt-auto mb-12">
+          <Link href="/settings" className={`flex h-10 w-10 items-center justify-center rounded-md ${
+            activePage === "settings" ? "bg-purple-700" : ""
+          }`} title="Settings">
             <FontAwesomeIcon icon={faGear} className="h-5 w-5 text-white" />
           </Link>
         </div>

@@ -1,14 +1,13 @@
 "use client"
 
 import React, { useState, useEffect, useRef } from "react"
-import { ArrowLeft, FileText, Edit, Plus, Download, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Maximize, X, Receipt, FileCheck, TrendingUp, AlertCircle, AlertTriangle, CheckCircle, Calendar as CalendarIcon, Copy, List, MoreVertical, MessageCircle, Save, XIcon, Clock, Info, Check, Send, UserCheck, CreditCard, Link as LinkIcon, Eye, Shield, FileImage, Package, Truck } from "lucide-react"
+import { ArrowLeft, FileText, Edit, Plus, Download, ChevronRight, ChevronDown, ChevronUp, Maximize, X, Receipt, FileCheck, TrendingUp, AlertCircle, AlertTriangle, CheckCircle, Calendar as CalendarIcon, MoreVertical, MessageCircle, Clock, Info, Check, UserCheck, CreditCard, Link as LinkIcon, Eye, Shield, FileImage, Package, Truck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogOverlay, DialogPortal } from "@/components/ui/dialog"
+import { Dialog, DialogTrigger, DialogTitle, DialogOverlay, DialogPortal } from "@/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetPortal, SheetClose } from "@/components/ui/sheet"
-import * as SheetPrimitive from "@radix-ui/react-dialog"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import Sidebar from "@/components/sidebar"
 import Link from "next/link"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -22,8 +21,8 @@ import { Input } from "@/components/ui/input"
 import { format } from "date-fns"
 import { LineItemSelector } from "@/components/line-item-selector"
 import { useInvoiceValidation, validationRules } from "@/hooks/use-invoice-validation"
-import { parseMatchingValidation, getFieldMatchStatus, getMatchingSummary } from "@/lib/validation/matching-parser"
-import { runCrossFieldValidations, calculateExpectedValues, crossFieldValidationRules } from "@/lib/validation/cross-field-validation"
+import { parseMatchingValidation, getFieldMatchStatus } from "@/lib/validation/matching-parser"
+import { runCrossFieldValidations, crossFieldValidationRules } from "@/lib/validation/cross-field-validation"
 
 interface InvoiceData {
   document_type: string;
@@ -148,7 +147,7 @@ const invoiceFieldValidation = {
       message: 'GL Account / Cost Center is required for non-PO invoices',
       validate: (value: any, formData?: any) => {
         // If PO-backed, field is not required
-        const isPOBacked = !!(formData?.po_number || linkedPO || matchingData?.matched_po)
+        const isPOBacked = !!(formData?.po_number)
         if (isPOBacked) return true
         
         // For non-PO invoices, field is required
@@ -163,7 +162,7 @@ const invoiceFieldValidation = {
       message: 'Spend Category is required for non-PO invoices',
       validate: (value: any, formData?: any) => {
         // If PO-backed, field is not required
-        const isPOBacked = !!(formData?.po_number || linkedPO || matchingData?.matched_po)
+        const isPOBacked = !!(formData?.po_number)
         if (isPOBacked) return true
         
         // For non-PO invoices, field is required
@@ -627,6 +626,10 @@ export default function InvoiceDetailsPage() {
   // State for matching validation
   const [matchingData, setMatchingData] = useState<any>(null)
   
+  // State for assignment information from extract-and-match API
+  const [assignedUser, setAssignedUser] = useState<any>(null)
+  const [isLoadingAssignment, setIsLoadingAssignment] = useState(false)
+  
   useEffect(() => {
     // Retrieve the extracted data from sessionStorage
     const storedData = sessionStorage.getItem("extractedInvoiceData")
@@ -730,6 +733,53 @@ export default function InvoiceDetailsPage() {
     
     setValidationIssues(newValidationIssues)
   }, [validation.validationState, matchingData, linkedPO, invoice])
+  
+  // Extract assignment information from matching data
+  useEffect(() => {
+    if (matchingData?.assignment_info) {
+      setIsLoadingAssignment(true)
+      
+      // Simulate loading delay for demo purposes
+      setTimeout(() => {
+        setAssignedUser(matchingData.assignment_info)
+        
+        // Set the current assignee to the AI-suggested person
+        setCurrentAssignee('AI')
+        
+        setIsLoadingAssignment(false)
+      }, 1500)
+    } else if (matchingData) {
+      // If no assignment info in matching data, set default assignment data for demo
+      setIsLoadingAssignment(true)
+      
+      setTimeout(() => {
+        // Create demo assignment data based on invoice content for demo
+        const demoAssignment = {
+          id: 16,
+          username: "lisa.davis",
+          full_name: "Lisa Davis", 
+          department: "Operations",
+          email: "lisa.davis@company.com",
+          rule: {
+            id: 3,
+            name: "Office Furniture",
+            description: "If an invoice is for office furniture such as chairs desks or sofas",
+            department: "Operations",
+            priority: 11
+          },
+          confidence: 0.95,
+          explanation: "This rule directly matches the invoice content. The invoice contains multiple office furniture items including chairs, desks, and a couch, which are explicitly mentioned in the rule description."
+        }
+        
+        setAssignedUser(demoAssignment)
+        
+        // Set the current assignee to the AI-suggested person
+        setCurrentAssignee('AI')
+        
+        setIsLoadingAssignment(false)
+      }, 1500)
+    }
+  }, [matchingData])
   
   // Remove this entire useEffect - validation is now handled dynamically in the main validation sync useEffect above
 
@@ -1875,17 +1925,88 @@ export default function InvoiceDetailsPage() {
                   className={`
                     flex items-center justify-center w-7 h-7 text-white rounded-full text-xs font-medium 
                     hover:ring-2 hover:ring-gray-300 transition-all cursor-pointer
-                    ${assigneeOptions.find(a => a.initials === currentAssignee)?.color || 'bg-violet-500'}
+                    ${currentAssignee === 'AI' 
+                      ? 'bg-violet-500' 
+                      : assigneeOptions.find(a => a.initials === currentAssignee)?.color || 'bg-violet-500'}
                   `}
                   title="Click to reassign"
                 >
-                  {currentAssignee}
+                  {currentAssignee === 'AI' 
+                    ? (assignedUser?.full_name?.split(' ').map((n: string) => n[0]).join('') || 'AI')
+                    : currentAssignee}
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuContent align="end" className="w-80">
+                {/* AI Assignment Section */}
+                {assignedUser && !isLoadingAssignment && (
+                  <>
+                    <div className="px-3 py-2 border-b bg-gradient-to-r from-violet-50 to-blue-50">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="p-1 bg-violet-100 rounded">
+                          <svg className="h-3 w-3 text-violet-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z"/>
+                          </svg>
+                        </div>
+                        <span className="text-xs font-medium text-violet-700">AI Assignment</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center w-6 h-6 bg-blue-500 text-white rounded-full text-xs font-medium">
+                          {assignedUser.full_name?.split(' ').map((n: string) => n[0]).join('') || 'LD'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{assignedUser.full_name}</p>
+                          <p className="text-xs text-gray-500">{assignedUser.department}</p>
+                        </div>
+                      </div>
+                      {assignedUser.rule && (
+                        <div className="mt-2 p-2 bg-white rounded border">
+                          <p className="text-xs font-medium text-gray-700 mb-1">Matched Rule: {assignedUser.rule.name}</p>
+                          <p className="text-[10px] text-gray-600 line-clamp-2">{assignedUser.explanation}</p>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+                
+                {/* Loading State */}
+                {isLoadingAssignment && (
+                  <div className="px-3 py-3 border-b bg-gradient-to-r from-violet-50 to-blue-50">
+                    <div className="flex items-center gap-2">
+                      <div className="h-4 w-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span className="text-xs text-violet-700">AI is analyzing assignment...</span>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="px-2 py-1.5 text-xs font-medium text-gray-500 border-b">
-                  Assign to:
+                  {assignedUser && !isLoadingAssignment ? 'Override assignment:' : 'Assign to:'}
                 </div>
+                
+                {/* AI Suggested User - Top of List */}
+                {assignedUser && !isLoadingAssignment && (
+                  <DropdownMenuItem
+                    key="AI"
+                    className="gap-3 py-2 bg-violet-50 hover:bg-violet-100"
+                    onClick={() => setCurrentAssignee('AI')}
+                  >
+                    <div className="flex items-center justify-center w-8 h-8 bg-violet-500 text-white rounded-full text-xs font-medium">
+                      {assignedUser.full_name?.split(' ').map((n: string) => n[0]).join('') || 'AI'}
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">{assignedUser.full_name}</p>
+                      <p className="text-xs text-violet-600">AI Suggested • {assignedUser.department}</p>
+                    </div>
+                    {currentAssignee === 'AI' && (
+                      <Check className="h-4 w-4 text-green-600 ml-auto" />
+                    )}
+                  </DropdownMenuItem>
+                )}
+                
+                {/* Separator if AI user exists */}
+                {assignedUser && !isLoadingAssignment && (
+                  <div className="border-t my-1"></div>
+                )}
+                
                 {assigneeOptions.map((assignee) => (
                   <DropdownMenuItem
                     key={assignee.initials}
@@ -3239,11 +3360,17 @@ export default function InvoiceDetailsPage() {
                       const canExpand = poLine || grLine || mockPOLines.length > 0 || mockGRLines.length > 0
                       
                       return (
-                        <div key={index} className="border-b">
+                        <div 
+                          key={index} 
+                          className={cn(
+                            "border-b group transition-all duration-200 mx-2",
+                            "hover:shadow-[0_0_0_2px_rgb(156,163,175)] hover:rounded-sm"
+                          )}
+                        >
                           {/* Main Invoice Row */}
                           <div 
                             className={cn(
-                              "px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer",
+                              "px-2 py-3 hover:bg-gray-50 transition-colors cursor-pointer",
                               hasMismatch && "bg-amber-25 border-l-4 border-amber-400"
                             )}
                             onClick={() => {
@@ -3389,7 +3516,7 @@ export default function InvoiceDetailsPage() {
                                         variant="ghost" 
                                         size="sm" 
                                         className="h-6 w-6 p-0 hover:bg-green-100"
-                                        onClick={handleSaveLineItem}
+                                        onClick={() => handleSaveLineItem(index)}
                                       >
                                         <Check className="h-3 w-3 text-green-600" />
                                       </Button>
@@ -3453,7 +3580,7 @@ export default function InvoiceDetailsPage() {
                           
                           {/* Expanded PO/GR Data */}
                           {isExpanded && canExpand && (
-                            <div className="bg-gray-50 border-t px-4 py-2">
+                            <div className="bg-gray-50 border-t px-2 py-2">
                               <div className="space-y-1">
                                 {/* PO Line Details or Add PO Placeholder */}
                                 {poLine ? (

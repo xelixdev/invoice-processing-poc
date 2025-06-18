@@ -20,7 +20,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.http import HttpResponse, JsonResponse
 from rest_framework.routers import DefaultRouter
-from invoices.views import CompanyViewSet, VendorViewSet, ItemViewSet, InvoiceViewSet, InvoiceLineItemViewSet
+from invoices.views import CompanyViewSet, VendorViewSet, ItemViewSet, InvoiceViewSet, InvoiceLineItemViewSet, AssignmentRuleViewSet
 from purchase_orders.views import PurchaseOrderViewSet, PurchaseOrderLineItemViewSet
 from goods_received.views import GoodsReceivedViewSet, GoodsReceivedLineItemViewSet
 from invoice_extraction.views import InvoiceExtractionJobViewSet, ExtractedInvoiceViewSet
@@ -33,6 +33,7 @@ router.register(r'vendors', VendorViewSet)
 router.register(r'items', ItemViewSet)
 router.register(r'invoices', InvoiceViewSet)
 router.register(r'invoice-line-items', InvoiceLineItemViewSet)
+router.register(r'assignment-rules', AssignmentRuleViewSet)
 router.register(r'purchase-orders', PurchaseOrderViewSet)
 router.register(r'purchase-order-line-items', PurchaseOrderLineItemViewSet)
 router.register(r'goods-received', GoodsReceivedViewSet)

@@ -1,14 +1,17 @@
 from django.shortcuts import render
-from rest_framework import viewsets, filters
+from rest_framework import viewsets, filters, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
-from .models import Company, Vendor, Item, Invoice, InvoiceLineItem
+from .models import Company, Vendor, Item, Invoice, InvoiceLineItem, AssignmentRule, AssignmentRuleUser
 from .serializers import (
     CompanySerializer, VendorSerializer, ItemSerializer,
-    InvoiceSerializer, InvoiceCreateSerializer, InvoiceLineItemSerializer
+    InvoiceSerializer, InvoiceCreateSerializer, InvoiceLineItemSerializer,
+    AssignmentRuleSerializer
 )
+from django.contrib.auth.models import User
+from .assignment_service import InvoiceAssignmentService
 
 
 class CompanyViewSet(viewsets.ModelViewSet):
@@ -94,6 +97,82 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         serializer = InvoiceLineItemSerializer(line_items, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['post'])
+    def assign_user(self, request, pk=None):
+        """Manually assign an invoice to a user."""
+        invoice = self.get_object()
+        username = request.data.get('username')
+        
+        if not username:
+            return Response(
+                {'error': 'Username is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            user = User.objects.get(username=username)
+            invoice.assigned_to = user
+            invoice.save()
+            
+            return Response({
+                'message': f'Invoice {invoice.invoice_number} assigned to {user.get_full_name()}',
+                'assigned_to': user.username
+            })
+        except User.DoesNotExist:
+            return Response(
+                {'error': f'User {username} not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    @action(detail=True, methods=['post'])
+    def auto_assign(self, request, pk=None):
+        """Auto-assign an invoice using assignment rules."""
+        invoice = self.get_object()
+        assignment_service = InvoiceAssignmentService()
+        
+        force_reassign = request.data.get('force_reassign', False)
+        assigned_user = assignment_service.assign_invoice(invoice, force_reassign)
+        
+        if assigned_user:
+            return Response({
+                'message': f'Invoice {invoice.invoice_number} auto-assigned to {assigned_user.get_full_name()}',
+                'assigned_to': assigned_user.username
+            })
+        else:
+            return Response({
+                'message': f'Could not auto-assign invoice {invoice.invoice_number}',
+                'assigned_to': None
+            }, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['post'])
+    def bulk_auto_assign(self, request):
+        """Auto-assign multiple invoices."""
+        assignment_service = InvoiceAssignmentService()
+        
+        invoice_numbers = request.data.get('invoice_numbers', [])
+        force_reassign = request.data.get('force_reassign', False)
+        
+        if not invoice_numbers:
+            # Assign all unassigned invoices
+            invoices = Invoice.objects.filter(assigned_to__isnull=True)
+        else:
+            invoices = Invoice.objects.filter(invoice_number__in=invoice_numbers)
+        
+        results = []
+        for invoice in invoices:
+            assigned_user = assignment_service.assign_invoice(invoice, force_reassign)
+            results.append({
+                'invoice_number': invoice.invoice_number,
+                'assigned_to': assigned_user.username if assigned_user else None,
+                'success': assigned_user is not None
+            })
+        
+        return Response({
+            'results': results,
+            'total_processed': len(results),
+            'successful_assignments': len([r for r in results if r['success']])
+        })
+
 
 class InvoiceLineItemViewSet(viewsets.ModelViewSet):
     """ViewSet for InvoiceLineItem model."""
@@ -104,3 +183,67 @@ class InvoiceLineItemViewSet(viewsets.ModelViewSet):
     search_fields = ['item__item_code', 'item__description']
     ordering_fields = ['quantity', 'unit_price', 'total', 'created_at']
     ordering = ['created_at']
+
+
+class AssignmentRuleViewSet(viewsets.ModelViewSet):
+    """API endpoint for managing assignment rules."""
+    queryset = AssignmentRule.objects.all()
+    serializer_class = AssignmentRuleSerializer
+    
+    @action(detail=False, methods=['post'])
+    def create_from_frontend(self, request):
+        """Create assignment rules from frontend data format."""
+        assignment_service = InvoiceAssignmentService()
+        
+        rules_data = request.data.get('rules', [])
+        created_rules = []
+        
+        for rule_data in rules_data:
+            try:
+                rule = assignment_service.create_rule_from_data(rule_data)
+                created_rules.append(rule)
+            except Exception as e:
+                return Response(
+                    {'error': f'Failed to create rule: {str(e)}'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        serializer = self.get_serializer(created_rules, many=True)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+    @action(detail=False, methods=['get'])
+    def frontend_format(self, request):
+        """Get all rules in frontend data format."""
+        assignment_service = InvoiceAssignmentService()
+        rules = self.get_queryset()
+        
+        frontend_data = []
+        for rule in rules:
+            frontend_data.append(assignment_service.get_rule_data_format(rule))
+        
+        return Response(frontend_data)
+    
+    @action(detail=True, methods=['post'])
+    def test_assignment(self, request, pk=None):
+        """Test rule assignment against invoices."""
+        rule = self.get_object()
+        assignment_service = InvoiceAssignmentService()
+        
+        # Get all invoices and see which ones match this rule
+        invoices = Invoice.objects.all()
+        matching_invoices = []
+        
+        for invoice in invoices:
+            if assignment_service._rule_matches_invoice(rule, invoice):
+                matching_invoices.append({
+                    'invoice_number': invoice.invoice_number,
+                    'vendor': invoice.vendor.name,
+                    'total_due': str(invoice.total_due),
+                    'assigned_to': invoice.assigned_to.username if invoice.assigned_to else None
+                })
+        
+        return Response({
+            'rule_name': rule.name,
+            'matching_invoices': matching_invoices,
+            'match_count': len(matching_invoices)
+        })

@@ -8,12 +8,34 @@ import { Badge } from "@/components/ui/badge"
 import Sidebar from "@/components/sidebar"
 import Link from "next/link"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import AssignmentInfoCard from "@/components/assignment-info-card"
+
+interface AssignmentRule {
+  id: number
+  name: string
+  description: string
+  department: string
+  priority: number
+}
+
+interface AssignedUser {
+  id: number
+  username: string
+  full_name: string
+  department: string
+  email: string
+  rule: AssignmentRule
+  confidence: number
+  explanation: string
+}
 
 export default function InvoiceDetailsPage({ params }: { params: { id: string } }) {
   const [zoomLevel, setZoomLevel] = useState(100)
   const [fileData, setFileData] = useState<string | null>(null)
   const [fileType, setFileType] = useState<string | null>(null)
   const [fileName, setFileName] = useState<string | null>(null)
+  const [assignedUser, setAssignedUser] = useState<AssignedUser | null>(null)
+  const [isLoadingAssignment, setIsLoadingAssignment] = useState(true)
 
   // Mock data - in production this would come from your API
   useEffect(() => {
@@ -29,6 +51,89 @@ export default function InvoiceDetailsPage({ params }: { params: { id: string } 
     // In production, this would be the actual file URL from your backend
     // For example: setFileData(`${API_URL}/media/invoice_uploads/${invoiceFile}`)
     setFileData('/sample-invoice.png')
+
+    // Simulate loading assignment data from the extract-and-match endpoint
+    // In production, fetch from API endpoint like /api/extract-and-match/${params.id}
+    setTimeout(() => {
+      // Different demo scenarios based on invoice ID
+      const invoiceId = parseInt(params.id)
+      
+      if (invoiceId === 1) {
+        // High confidence office furniture assignment
+        setAssignedUser({
+          id: 16,
+          username: "lisa.davis",
+          full_name: "Lisa Davis",
+          department: "Operations",
+          email: "lisa.davis@company.com",
+          rule: {
+            id: 3,
+            name: "Office Furniture",
+            description: "If an invoice is for office furniture such as chairs desks or sofas",
+            department: "Operations",
+            priority: 11
+          },
+          confidence: 0.95,
+          explanation: "This rule directly matches the invoice content. The invoice contains multiple office furniture items including chairs, desks, and a couch, which are explicitly mentioned in the rule description."
+        })
+      } else if (invoiceId === 2) {
+        // Medium confidence IT equipment assignment
+        setAssignedUser({
+          id: 13,
+          username: "john.smith",
+          full_name: "John Smith",
+          department: "IT",
+          email: "john.smith@company.com",
+          rule: {
+            id: 1,
+            name: "IT Equipment Purchases",
+            description: "All IT equipment and software purchases go to IT department",
+            department: "IT",
+            priority: 1
+          },
+          confidence: 0.78,
+          explanation: "The invoice contains technology-related items that could be IT equipment. However, some items are ambiguous and could also be classified as office supplies."
+        })
+      } else if (invoiceId === 3) {
+        // Low confidence scenario
+        setAssignedUser({
+          id: 15,
+          username: "mike.brown",
+          full_name: "Mike Brown", 
+          department: "Procurement",
+          email: "mike.brown@company.com",
+          rule: {
+            id: 13,
+            name: "Default Procurement",
+            description: "All unmatched invoices go to procurement for manual review",
+            department: "Procurement",
+            priority: 100
+          },
+          confidence: 0.45,
+          explanation: "No specific rules matched this invoice content clearly. Defaulting to procurement team for manual classification and assignment."
+        })
+      } else {
+        // Default high confidence scenario
+        setAssignedUser({
+          id: 16,
+          username: "lisa.davis", 
+          full_name: "Lisa Davis",
+          department: "Operations",
+          email: "lisa.davis@company.com",
+          rule: {
+            id: 3,
+            name: "Office Furniture",
+            description: "If an invoice is for office furniture such as chairs desks or sofas",
+            department: "Operations", 
+            priority: 11
+          },
+          confidence: 0.95,
+          explanation: "This rule directly matches the invoice content. The invoice contains multiple office furniture items including chairs, desks, and a couch, which are explicitly mentioned in the rule description."
+        })
+      }
+      
+      setIsLoadingAssignment(false)
+    }, 1500) // Simulate 1.5s loading time
   }, [params.id])
 
   return (
@@ -72,6 +177,12 @@ export default function InvoiceDetailsPage({ params }: { params: { id: string } 
             </div>
           </div>
         </div>
+
+        {/* Assignment Information */}
+        <AssignmentInfoCard 
+          assignedUser={assignedUser}
+          isLoading={isLoadingAssignment}
+        />
 
         <Tabs defaultValue="details" className="flex-1 flex flex-col">
           <div className="border-b px-6">
