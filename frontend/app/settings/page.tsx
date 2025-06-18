@@ -38,7 +38,7 @@ export default function SettingsPage() {
     <div className="flex h-screen bg-background">
       <Sidebar activePage="settings" />
       <div className="flex-1 flex flex-col">
-        <MainHeader activePage="invoices" invoicesHref="/settings" />
+        <MainHeader activePage="approval-rules" sidebarContext="settings" />
         <main className="flex-1 pt-3 px-6 pb-6 overflow-auto">
           <div>
             <div className="mb-8">
