@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Check, X, Users, Clock, CheckCircle, Calendar, Pause, AlertTriangle, ChevronDown, Plus, Settings, User, UserX, RotateCcw, FileText, Inbox, PartyPopper, Sparkles, Search, Filter, ArrowRight, Forward, Receipt, Eye, CreditCard, DollarSign } from 'lucide-react'
+import { Check, X, Users, Clock, CheckCircle, Calendar, Pause, AlertTriangle, ChevronDown, Plus, Settings, User, UserX, RotateCcw, FileText, Inbox, PartyPopper, Sparkles, Search, Filter, ArrowRight, Forward, Receipt, Eye, CreditCard, DollarSign, MessageSquare, Send } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Switch } from '@/components/ui/switch'
@@ -42,6 +42,36 @@ export default function ApprovalsPage() {
   const [rejectionDetails, setRejectionDetails] = useState<Record<string, { reason: string, comment?: string, dateRejected: string }>>({})
   const [actionTypes, setActionTypes] = useState<Record<string, 'approve' | 'reject' | 'delegate'>>({})
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null)
+  const [newComment, setNewComment] = useState<string>('')
+  const [comments] = useState([
+    {
+      id: 1,
+      author: 'Sarah Chen',
+      initials: 'SC',
+      role: 'AP Manager',
+      timestamp: '2 hours ago',
+      content: 'The vendor information looks correct, but I need to verify the tax calculation before approval.',
+      color: 'bg-violet-500'
+    },
+    {
+      id: 2,
+      author: 'Michael Johnson',
+      initials: 'MJ',
+      role: 'AP Specialist',
+      timestamp: '1 hour ago',
+      content: 'I\'ve checked the purchase order and everything matches. The delivery was confirmed last week.',
+      color: 'bg-blue-500'
+    },
+    {
+      id: 3,
+      author: 'Current User',
+      initials: 'JD',
+      role: 'Finance Director',
+      timestamp: 'Just now',
+      content: 'Tax calculation verified - 17.5% VAT is correct for this supplier. Ready for approval.',
+      color: 'bg-green-500'
+    }
+  ])
   
   const { toast } = useToast()
   
@@ -1708,23 +1738,24 @@ export default function ApprovalsPage() {
       <Toaster />
 
       {/* Invoice Preview Drawer */}
-      {selectedInvoiceId && (
-        <>
-          {/* Backdrop - no mask, just for closing */}
-          <div 
-            className="fixed inset-0 z-40"
-            onClick={handleCloseInvoice}
-          />
-          
-          {/* Drawer */}
-          <div className={`fixed top-0 right-0 h-full w-[600px] bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-out flex flex-col ${
-            selectedInvoiceId ? 'translate-x-0' : 'translate-x-full'
-          }`}>
+      <>
+        {/* Backdrop - no mask, just for closing */}
+        <div 
+          className={`fixed inset-0 z-40 transition-opacity duration-500 ease-in-out ${
+            selectedInvoiceId ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          }`}
+          onClick={handleCloseInvoice}
+        />
+        
+        {/* Drawer */}
+        <div className={`fixed top-0 right-0 h-full w-[600px] bg-white shadow-2xl z-50 transform transition-all duration-500 ease-in-out flex flex-col ${
+          selectedInvoiceId ? 'translate-x-0' : 'translate-x-full'
+        }`}>
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
               <div className="flex items-center gap-3">
                 <Receipt className="h-5 w-5 text-violet-600" />
-                <h2 className="text-lg font-semibold text-gray-900">Invoice Preview</h2>
+                <h2 className="text-lg font-semibold text-gray-900">Invoice #{sampleInvoiceData.invoiceNumber}</h2>
               </div>
               <Button 
                 variant="ghost" 
@@ -1738,24 +1769,100 @@ export default function ApprovalsPage() {
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto px-6 pt-6 pb-4 space-y-4 min-h-0">
-              {/* Hero Section - Compact */}
-              <div className="bg-gradient-to-br from-violet-50 to-white p-4 rounded-lg border border-violet-100">
-                <div>
-                  <div className="text-xs text-gray-600">Total Amount</div>
-                  <div className="text-2xl font-semibold text-gray-900">{sampleInvoiceData.totalAmount}</div>
-                  <div className="flex items-center gap-3 text-xs">
-                    <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-xs font-medium">
-                      <Clock className="h-3 w-3" />
-                      28 days left
+              {/* Hero Section - Action-Focused */}
+              <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                <div className="flex items-start justify-between">
+                  {/* Left side - Amount and Status */}
+                  <div className="flex-1">
+                    <div className="text-xs text-gray-600">Total Amount</div>
+                    <div className="text-2xl font-semibold text-gray-900 mb-2">{sampleInvoiceData.totalAmount}</div>
+                    
+                    {/* Status and Timeline */}
+                    <div className="flex items-center gap-3 mb-3">
+                      <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+                        Pending Approval
+                      </Badge>
+                      <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                        <Clock className="h-3 w-3 mr-1" />
+                        28 days left
+                      </Badge>
                     </div>
-                    <span className="text-gray-600">
+                    
+                    <div className="text-xs text-gray-600">
                       Due <span className="font-medium text-gray-900">{sampleInvoiceData.dueDate}</span>
-                    </span>
+                    </div>
+                  </div>
+                  
+                  {/* Right side - Quick Actions */}
+                  <div className="flex flex-col gap-2 ml-4">
+                    <Button 
+                      size="sm" 
+                      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 text-xs"
+                      onClick={() => {
+                        // Handle approve action
+                        toast({
+                          title: "Invoice Approved",
+                          description: `Invoice ${sampleInvoiceData.invoiceNumber} has been approved.`,
+                          className: "bg-green-50 border-green-200 text-green-800",
+                        })
+                      }}
+                    >
+                      <Check className="h-3 w-3 mr-1" />
+                      Approve
+                    </Button>
+                    
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      className="border-red-300 text-red-600 hover:bg-red-50 px-4 py-2 text-xs"
+                      onClick={() => {
+                        // Handle reject action
+                        toast({
+                          title: "Invoice Rejected",
+                          description: `Invoice ${sampleInvoiceData.invoiceNumber} has been rejected.`,
+                          variant: "destructive",
+                        })
+                      }}
+                    >
+                      <X className="h-3 w-3 mr-1" />
+                      Reject
+                    </Button>
+                    
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      className="border-gray-300 text-gray-600 hover:bg-gray-50 px-4 py-2 text-xs"
+                      onClick={() => {
+                        // Handle delegate action
+                        toast({
+                          title: "Invoice Delegated",
+                          description: `Invoice ${sampleInvoiceData.invoiceNumber} has been delegated.`,
+                        })
+                      }}
+                    >
+                      <Forward className="h-3 w-3 mr-1" />
+                      Delegate
+                    </Button>
                   </div>
                 </div>
               </div>
 
-              {/* Invoice Information */}
+              {/* Tabs */}
+              <Tabs defaultValue="details" className="w-full">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="details">Details</TabsTrigger>
+                  <TabsTrigger value="purchase-order">Purchase Order</TabsTrigger>
+                  <TabsTrigger value="goods-receipt">Goods Receipt</TabsTrigger>
+                  <TabsTrigger value="comments" className="relative">
+                    Comments
+                    <span className="ml-2 inline-flex items-center justify-center w-5 h-5 text-xs font-medium text-white bg-violet-500 rounded-full">
+                      {comments.length}
+                    </span>
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="details" className="mt-4 space-y-4">
+                  {/* Invoice Information */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <div className="w-5 h-5 bg-violet-100 rounded flex items-center justify-center">
@@ -1849,7 +1956,7 @@ export default function ApprovalsPage() {
               <div className="border-t border-gray-200"></div>
 
               {/* Line Items */}
-              <div className="space-y-3 pt-2">
+              <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <div className="w-5 h-5 bg-violet-100 rounded flex items-center justify-center">
                     <FileText className="h-3 w-3 text-violet-600" />
@@ -1875,10 +1982,96 @@ export default function ApprovalsPage() {
                   ))}
                 </div>
               </div>
+                </TabsContent>
+
+                <TabsContent value="purchase-order" className="mt-4">
+                  <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+                    <FileText className="h-12 w-12 mb-3 text-gray-400" />
+                    <h3 className="text-lg font-medium mb-2">Purchase Order</h3>
+                    <p className="text-sm text-center">Purchase order details and matching information will be displayed here.</p>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="goods-receipt" className="mt-4">
+                  <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+                    <CheckCircle className="h-12 w-12 mb-3 text-gray-400" />
+                    <h3 className="text-lg font-medium mb-2">Goods Receipt</h3>
+                    <p className="text-sm text-center">Goods receipt verification and delivery confirmation details will be shown here.</p>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="comments" className="mt-4 space-y-4">
+                  {/* Comment Input */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 mb-3">
+                      <MessageSquare className="h-4 w-4 text-gray-600" />
+                      <h3 className="text-sm font-medium text-gray-900">Add Comment</h3>
+                    </div>
+                    <div className="flex gap-3">
+                      <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs font-medium text-white">JD</span>
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <Textarea
+                          placeholder="Add a comment about this invoice..."
+                          value={newComment}
+                          onChange={(e) => setNewComment(e.target.value)}
+                          className="min-h-[80px] resize-none border-gray-200 focus:border-violet-300 focus:ring-violet-200"
+                        />
+                        <div className="flex justify-end">
+                          <Button 
+                            size="sm" 
+                            className="bg-violet-600 hover:bg-violet-700"
+                            disabled={!newComment.trim()}
+                            onClick={() => {
+                              if (newComment.trim()) {
+                                toast({
+                                  title: "Comment Added",
+                                  description: "Your comment has been added to the invoice.",
+                                })
+                                setNewComment('')
+                              }
+                            }}
+                          >
+                            <Send className="h-3 w-3 mr-2" />
+                            Post Comment
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Comments List */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
+                      <Users className="h-4 w-4 text-gray-600" />
+                      <h3 className="text-sm font-medium text-gray-900">Discussion ({comments.length})</h3>
+                    </div>
+                    
+                    {comments.map((comment) => (
+                      <div key={comment.id} className="flex gap-3">
+                        <div className={`w-8 h-8 rounded-full ${comment.color} flex items-center justify-center flex-shrink-0`}>
+                          <span className="text-xs font-medium text-white">{comment.initials}</span>
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-900">{comment.author}</span>
+                            <span className="text-xs text-gray-500">{comment.role}</span>
+                            <span className="text-xs text-gray-400">•</span>
+                            <span className="text-xs text-gray-500">{comment.timestamp}</span>
+                          </div>
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <p className="text-sm text-gray-800 leading-relaxed">{comment.content}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </TabsContent>
+              </Tabs>
             </div>
           </div>
-        </>
-      )}
+      </>
     </div>
   )
 }
