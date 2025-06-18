@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Check, X, Users, Clock, CheckCircle, Calendar, Pause, AlertTriangle, ChevronDown, Plus, Settings, User, UserX, RotateCcw, FileText, Inbox, PartyPopper, Sparkles, Search, Filter } from 'lucide-react'
+import { Check, X, Users, Clock, CheckCircle, Calendar, Pause, AlertTriangle, ChevronDown, Plus, Settings, User, UserX, RotateCcw, FileText, Inbox, PartyPopper, Sparkles, Search, Filter, ArrowRight, Forward } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Switch } from '@/components/ui/switch'
@@ -792,20 +792,20 @@ export default function ApprovalsPage() {
                 }`}
                 onClick={() => setActiveView('pending')}
               >
-                <CardContent className="p-4">
+                <CardContent className="p-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs font-medium text-gray-600">Pending Approval</p>
-                      <p className="text-xl font-bold text-gray-900 mt-1">
+                      <p className="text-2xl font-bold text-gray-900 mt-0.5">
                         {userRole === 'user' 
                           ? pendingApprovals.filter(invoice => !delegatedInvoices.has(invoice.id)).length 
                           : pendingApprovals.length}
                       </p>
                     </div>
-                    <div className={`p-2 rounded-full ${
+                    <div className={`p-1.5 rounded-full ${
                       activeView === 'pending' ? 'bg-gradient-to-br from-purple-400 to-purple-500' : 'bg-purple-100'
                     }`}>
-                      <Clock className={`h-5 w-5 ${
+                      <Clock className={`h-4 w-4 ${
                         activeView === 'pending' ? 'text-white' : 'text-purple-600'
                       }`} />
                     </div>
@@ -821,20 +821,20 @@ export default function ApprovalsPage() {
                 }`}
                 onClick={() => setActiveView('overdue')}
               >
-                <CardContent className="p-4">
+                <CardContent className="p-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs font-medium text-gray-600">Overdue</p>
-                      <p className="text-xl font-bold text-gray-900 mt-1">
+                      <p className="text-2xl font-bold text-gray-900 mt-0.5">
                         {userRole === 'user' 
                           ? overdueApprovals.filter(invoice => !delegatedInvoices.has(invoice.id)).length 
                           : overdueApprovals.length}
                       </p>
                     </div>
-                    <div className={`p-2 rounded-full ${
+                    <div className={`p-1.5 rounded-full ${
                       activeView === 'overdue' ? 'bg-gradient-to-br from-red-400 to-red-500' : 'bg-red-100'
                     }`}>
-                      <AlertTriangle className={`h-5 w-5 ${
+                      <AlertTriangle className={`h-4 w-4 ${
                         activeView === 'overdue' ? 'text-white' : 'text-red-600'
                       }`} />
                     </div>
@@ -850,20 +850,20 @@ export default function ApprovalsPage() {
                 }`}
                 onClick={() => setActiveView('on-hold')}
               >
-                <CardContent className="p-4">
+                <CardContent className="p-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs font-medium text-gray-600">On Hold</p>
-                      <p className="text-xl font-bold text-gray-900 mt-1">
+                      <p className="text-2xl font-bold text-gray-900 mt-0.5">
                         {userRole === 'user' 
                           ? onHoldApprovals.filter(invoice => !delegatedInvoices.has(invoice.id)).length 
                           : onHoldApprovals.length}
                       </p>
                     </div>
-                    <div className={`p-2 rounded-full ${
+                    <div className={`p-1.5 rounded-full ${
                       activeView === 'on-hold' ? 'bg-gradient-to-br from-orange-400 to-orange-500' : 'bg-orange-100'
                     }`}>
-                      <Pause className={`h-5 w-5 ${
+                      <Pause className={`h-4 w-4 ${
                         activeView === 'on-hold' ? 'text-white' : 'text-orange-600'
                       }`} />
                     </div>
@@ -879,18 +879,18 @@ export default function ApprovalsPage() {
                 }`}
                 onClick={() => setActiveView('all')}
               >
-                <CardContent className="p-4">
+                <CardContent className="p-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs font-medium text-gray-600">All Invoices</p>
-                      <p className="text-xl font-bold text-gray-900 mt-1">
+                      <p className="text-2xl font-bold text-gray-900 mt-0.5">
                         {pendingApprovals.length + onHoldApprovals.length + overdueApprovals.length + approvedToday.length + rejectedApprovals.length + approvedThisMonth.length}
                       </p>
                     </div>
-                    <div className={`p-2 rounded-full ${
+                    <div className={`p-1.5 rounded-full ${
                       activeView === 'all' ? 'bg-gradient-to-br from-blue-400 to-blue-500' : 'bg-blue-100'
                     }`}>
-                      <FileText className={`h-5 w-5 ${
+                      <FileText className={`h-4 w-4 ${
                         activeView === 'all' ? 'text-white' : 'text-blue-600'
                       }`} />
                     </div>
@@ -903,56 +903,65 @@ export default function ApprovalsPage() {
             <div className="bg-white border border-gray-200 rounded-lg px-4 py-2 mb-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div 
-                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-full cursor-pointer transition-all border ${
-                      activeView === 'approved-today' 
-                        ? 'bg-green-100 text-green-800 border-green-200' 
-                        : 'bg-white border-gray-200 hover:border-green-300 hover:shadow-sm'
-                    }`}
-                    onClick={() => setActiveView('approved-today')}
-                  >
-                    <CheckCircle className="w-4 h-4 text-green-600" />
-                    <span className="text-sm font-medium">{approvedToday.length} Today</span>
-                  </div>
-
-                  <div 
-                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-full cursor-pointer transition-all border ${
-                      activeView === 'rejected' 
-                        ? 'bg-gray-100 text-gray-800 border-gray-300' 
-                        : 'bg-white border-gray-200 hover:border-gray-400 hover:shadow-sm'
-                    }`}
-                    onClick={() => setActiveView('rejected')}
-                  >
-                    <X className="w-4 h-4 text-gray-600" />
-                    <span className="text-sm font-medium">{rejectedApprovals.length} Rejected</span>
-                  </div>
-
-                  <div 
-                    className={`flex items-center gap-2 px-2.5 py-1.5 rounded-full cursor-pointer transition-all border ${
-                      activeView === 'approved-month' 
-                        ? 'bg-blue-100 text-blue-800 border-blue-200' 
-                        : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-sm'
-                    }`}
-                    onClick={() => setActiveView('approved-month')}
-                  >
-                    <Calendar className="w-4 h-4 text-blue-600" />
-                    <span className="text-sm font-medium">{approvedThisMonth.length} This Month</span>
-                  </div>
-
-                  {/* Delegated Metric - Only show in user mode */}
-                  {userRole === 'user' && delegatedInvoices.size > 0 && (
+                  {/* Temporal Group - Approved Metrics */}
+                  <div className="flex items-center gap-2">
                     <div 
                       className={`flex items-center gap-2 px-2.5 py-1.5 rounded-full cursor-pointer transition-all border ${
-                        activeView === 'delegated' 
-                          ? 'bg-orange-100 text-orange-800 border-orange-200' 
-                          : 'bg-orange-50 text-orange-700 border-orange-100 hover:bg-orange-100 hover:border-orange-200 hover:shadow-sm'
+                        activeView === 'approved-today' 
+                          ? 'bg-green-100 text-green-800 border-green-200' 
+                          : 'bg-white border-gray-200 hover:border-green-300 hover:shadow-sm'
                       }`}
-                      onClick={() => setActiveView('delegated')}
+                      onClick={() => setActiveView('approved-today')}
                     >
-                      <UserX className="w-4 h-4 text-orange-600" />
-                      <span className="text-sm font-medium">{delegatedInvoices.size} Delegated</span>
+                      <CheckCircle className="w-4 h-4 text-green-600" />
+                      <span className="text-sm font-medium">{approvedToday.length} Today</span>
                     </div>
-                  )}
+
+                    <div 
+                      className={`flex items-center gap-2 px-2.5 py-1.5 rounded-full cursor-pointer transition-all border ${
+                        activeView === 'approved-month' 
+                          ? 'bg-blue-100 text-blue-800 border-blue-200' 
+                          : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-sm'
+                      }`}
+                      onClick={() => setActiveView('approved-month')}
+                    >
+                      <CheckCircle className="w-4 h-4 text-blue-600" />
+                      <span className="text-sm font-medium">{approvedThisMonth.length} This Month</span>
+                    </div>
+                  </div>
+
+                  {/* Visual Separator */}
+                  <div className="h-6 w-px bg-gray-300"></div>
+
+                  {/* Status Group */}
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className={`flex items-center gap-2 px-2.5 py-1.5 rounded-full cursor-pointer transition-all border ${
+                        activeView === 'rejected' 
+                          ? 'bg-gray-100 text-gray-800 border-gray-300' 
+                          : 'bg-white border-gray-200 hover:border-gray-400 hover:shadow-sm'
+                      }`}
+                      onClick={() => setActiveView('rejected')}
+                    >
+                      <X className="w-4 h-4 text-gray-600" />
+                      <span className="text-sm font-medium">{rejectedApprovals.length} Rejected</span>
+                    </div>
+
+                    {/* Delegated Metric - Only show in user mode */}
+                    {userRole === 'user' && delegatedInvoices.size > 0 && (
+                      <div 
+                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-full cursor-pointer transition-all border ${
+                          activeView === 'delegated' 
+                            ? 'bg-gray-100 text-gray-800 border-gray-300' 
+                            : 'bg-white border-gray-200 hover:border-gray-400 hover:shadow-sm'
+                        }`}
+                        onClick={() => setActiveView('delegated')}
+                      >
+                        <Forward className="w-4 h-4 text-gray-600" />
+                        <span className="text-sm font-medium">{delegatedInvoices.size} Delegated</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-4">
@@ -993,7 +1002,7 @@ export default function ApprovalsPage() {
                     </CardDescription>
                   </div>
                   <div className="flex gap-2">
-                    <div className="relative w-72">
+                    <div className="relative w-56">
                       <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                       <Input 
                         type="search" 
@@ -1076,16 +1085,16 @@ export default function ApprovalsPage() {
                             : 'opacity-100 transform translate-x-0 duration-200 hover:bg-gray-50'
                         }`}
                       >
-                        <TableCell className="font-medium">
+                        <TableCell className="font-medium py-2">
                           <a href="#" className="text-blue-600 hover:underline">
                             {approval.invoiceNumber}
                           </a>
                         </TableCell>
-                        <TableCell>{approval.invoiceDate}</TableCell>
-                        <TableCell className="max-w-[200px] truncate">{approval.supplierName}</TableCell>
-                        <TableCell className="text-right font-medium">${approval.totalAmount.toFixed(2)}</TableCell>
-                        <TableCell>{approval.dueDate}</TableCell>
-                        <TableCell>
+                        <TableCell className="py-2">{approval.invoiceDate}</TableCell>
+                        <TableCell className="max-w-[200px] truncate py-2">{approval.supplierName}</TableCell>
+                        <TableCell className="text-right font-medium py-2">${approval.totalAmount.toFixed(2)}</TableCell>
+                        <TableCell className="py-2">{approval.dueDate}</TableCell>
+                        <TableCell className="py-2">
                           <Badge 
                             variant="secondary" 
                             className={
@@ -1105,11 +1114,11 @@ export default function ApprovalsPage() {
                             {approval.status}
                           </Badge>
                         </TableCell>
-                        <TableCell>{approval.spendCategory}</TableCell>
-                        <TableCell>{approval.glCode}</TableCell>
-                        <TableCell>{approval.department}</TableCell>
+                        <TableCell className="py-2">{approval.spendCategory}</TableCell>
+                        <TableCell className="py-2">{approval.glCode}</TableCell>
+                        <TableCell className="py-2">{approval.department}</TableCell>
                         {activeView !== 'delegated' && (
-                        <TableCell className="text-center">
+                        <TableCell className="text-center py-2">
                           <DropdownMenu>
                             <TooltipProvider>
                               <Tooltip>
@@ -1174,7 +1183,7 @@ export default function ApprovalsPage() {
                         {/* Delegated columns */}
                         {activeView === 'delegated' && (
                           <>
-                            <TableCell>
+                            <TableCell className="py-2">
                               <div className="flex items-center gap-2">
                                 <div className={`w-6 h-6 rounded-full ${delegatedDetails[approval.id]?.delegatedTo?.color || 'bg-gray-400'} flex items-center justify-center`}>
                                   <span className="text-xs font-medium text-white">
@@ -1184,8 +1193,8 @@ export default function ApprovalsPage() {
                                 <span className="text-sm">{delegatedDetails[approval.id]?.delegatedTo?.name || 'Unknown'}</span>
                               </div>
                             </TableCell>
-                            <TableCell>{delegatedDetails[approval.id]?.dateDelegated || 'Unknown'}</TableCell>
-                            <TableCell className="max-w-[180px]">
+                            <TableCell className="py-2">{delegatedDetails[approval.id]?.dateDelegated || 'Unknown'}</TableCell>
+                            <TableCell className="max-w-[180px] py-2">
                               <div className="text-sm text-gray-600">
                                 <div className="truncate">
                                   {delegatedDetails[approval.id]?.reason || 'No reason provided'}
@@ -1200,12 +1209,12 @@ export default function ApprovalsPage() {
                           </>
                         )}
                         
-                        {(activeView === 'approved-today' || activeView === 'approved-month') && <TableCell>{(approval as any).approvedDate}</TableCell>}
-                        {activeView === 'rejected' && <TableCell>{(approval as any).rejectedDate}</TableCell>}
-                        {activeView === 'on-hold' && <TableCell className="text-sm text-gray-600">{(approval as any).holdReason}</TableCell>}
-                        {activeView === 'overdue' && <TableCell><Badge variant="destructive" className="bg-red-500">{(approval as any).daysPastDue} days</Badge></TableCell>}
+                        {(activeView === 'approved-today' || activeView === 'approved-month') && <TableCell className="py-2">{(approval as any).approvedDate}</TableCell>}
+                        {activeView === 'rejected' && <TableCell className="py-2">{(approval as any).rejectedDate}</TableCell>}
+                        {activeView === 'on-hold' && <TableCell className="text-sm text-gray-600 py-2">{(approval as any).holdReason}</TableCell>}
+                        {activeView === 'overdue' && <TableCell className="py-2"><Badge variant="destructive" className="bg-red-500">{(approval as any).daysPastDue} days</Badge></TableCell>}
                         {activeView === 'pending' && (
-                          <TableCell className="text-center">
+                          <TableCell className="text-center py-2">
                             <div className="flex gap-1">
                               <TooltipProvider>
                                 <Tooltip>
@@ -1246,7 +1255,7 @@ export default function ApprovalsPage() {
                           </TableCell>
                         )}
                         {activeView === 'delegated' && (
-                          <TableCell className="text-center">
+                          <TableCell className="text-center py-2">
                             <div className="flex gap-1">
                               <TooltipProvider>
                                 <Tooltip>
