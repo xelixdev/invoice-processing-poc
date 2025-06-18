@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Check, X, Users, Clock, CheckCircle, Calendar, Pause, AlertTriangle, ChevronDown, Plus, Settings, User, UserX, RotateCcw, FileText } from 'lucide-react'
+import { Check, X, Users, Clock, CheckCircle, Calendar, Pause, AlertTriangle, ChevronDown, Plus, Settings, User, UserX, RotateCcw, FileText, Inbox, PartyPopper, Sparkles } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Switch } from '@/components/ui/switch'
@@ -675,6 +675,83 @@ export default function ApprovalsPage() {
     }
   }
 
+  const getEmptyStateContent = () => {
+    switch (activeView) {
+      case 'pending':
+        return {
+          icon: <Sparkles className="h-12 w-12 text-purple-400" />,
+          title: "You're all caught up!",
+          description: "No pending approvals at the moment. New invoices will appear here when they need your attention.",
+          actionLabel: "View All Invoices",
+          actionView: 'all' as ViewType
+        }
+      case 'overdue':
+        return {
+          icon: <CheckCircle className="h-12 w-12 text-green-400" />,
+          title: "No overdue invoices!",
+          description: "Great job keeping up with approvals. All invoices are being processed on time.",
+          actionLabel: "Check Pending",
+          actionView: 'pending' as ViewType
+        }
+      case 'on-hold':
+        return {
+          icon: <Inbox className="h-12 w-12 text-orange-400" />,
+          title: "No invoices on hold",
+          description: "All invoices have the information needed to proceed with approval.",
+          actionLabel: "View Pending",
+          actionView: 'pending' as ViewType
+        }
+      case 'approved-today':
+        return {
+          icon: <Calendar className="h-12 w-12 text-blue-400" />,
+          title: "No approvals yet today",
+          description: "You haven't approved any invoices today. Check your pending items to get started.",
+          actionLabel: "View Pending",
+          actionView: 'pending' as ViewType
+        }
+      case 'rejected':
+        return {
+          icon: <CheckCircle className="h-12 w-12 text-gray-400" />,
+          title: "No rejected invoices",
+          description: "All submitted invoices are in good standing with no issues found.",
+          actionLabel: "View All",
+          actionView: 'all' as ViewType
+        }
+      case 'approved-month':
+        return {
+          icon: <Calendar className="h-12 w-12 text-blue-400" />,
+          title: "No approvals this month",
+          description: "You haven't approved any invoices this month yet.",
+          actionLabel: "Check Pending",
+          actionView: 'pending' as ViewType
+        }
+      case 'delegated':
+        return {
+          icon: <Users className="h-12 w-12 text-orange-400" />,
+          title: "No delegated invoices",
+          description: "You haven't delegated any invoices to other team members.",
+          actionLabel: "View Pending",
+          actionView: 'pending' as ViewType
+        }
+      case 'all':
+        return {
+          icon: <Inbox className="h-12 w-12 text-blue-400" />,
+          title: "No invoices found",
+          description: "There are no invoices in the system at this time.",
+          actionLabel: null,
+          actionView: null
+        }
+      default:
+        return {
+          icon: <Inbox className="h-12 w-12 text-gray-400" />,
+          title: "No invoices",
+          description: "No invoices to display.",
+          actionLabel: null,
+          actionView: null
+        }
+    }
+  }
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
@@ -939,7 +1016,34 @@ export default function ApprovalsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {getApprovalsList().map((approval) => (
+                    {getApprovalsList().length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={100} className="h-64">
+                          <div className="flex flex-col items-center justify-center h-full text-center">
+                            <div className="mb-4">
+                              {getEmptyStateContent().icon}
+                            </div>
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                              {getEmptyStateContent().title}
+                            </h3>
+                            <p className="text-sm text-gray-600 mb-6 max-w-md">
+                              {getEmptyStateContent().description}
+                            </p>
+                            {getEmptyStateContent().actionLabel && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setActiveView(getEmptyStateContent().actionView!)}
+                                className="gap-2"
+                              >
+                                {getEmptyStateContent().actionLabel}
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      getApprovalsList().map((approval) => (
                       <TableRow 
                         key={approval.id}
                         className={`transition-all ease-in-out ${
@@ -1161,7 +1265,8 @@ export default function ApprovalsPage() {
                           </TableCell>
                         )}
                       </TableRow>
-                    ))}
+                    ))
+                    )}
                   </TableBody>
                   </Table>
                 </div>
