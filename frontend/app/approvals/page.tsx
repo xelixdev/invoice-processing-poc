@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Check, X, Users, Clock, CheckCircle, Calendar, Pause, AlertTriangle, ChevronDown, Plus, Settings, User, UserX, RotateCcw, FileText, Inbox, PartyPopper, Sparkles, Search, Filter, ArrowRight, Forward } from 'lucide-react'
+import { Check, X, Users, Clock, CheckCircle, Calendar, Pause, AlertTriangle, ChevronDown, Plus, Settings, User, UserX, RotateCcw, FileText, Inbox, PartyPopper, Sparkles, Search, Filter, ArrowRight, Forward, Receipt, Eye, CreditCard, DollarSign } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Switch } from '@/components/ui/switch'
@@ -18,6 +18,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/use-toast'
 import { Toaster } from '@/components/ui/toaster'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 
 type ViewType = 'pending' | 'on-hold' | 'overdue' | 'approved-today' | 'rejected' | 'approved-month' | 'delegated' | 'all'
 
@@ -40,6 +41,7 @@ export default function ApprovalsPage() {
   const [onHoldInvoices, setOnHoldInvoices] = useState<Set<string>>(new Set())
   const [rejectionDetails, setRejectionDetails] = useState<Record<string, { reason: string, comment?: string, dateRejected: string }>>({})
   const [actionTypes, setActionTypes] = useState<Record<string, 'approve' | 'reject' | 'delegate'>>({})
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null)
   
   const { toast } = useToast()
   
@@ -88,6 +90,37 @@ export default function ApprovalsPage() {
     "Missing documentation",
     "Needs additional approval"
   ]
+
+  // Sample invoice data (same for all invoices for prototype)
+  const sampleInvoiceData = {
+    invoiceNumber: 'INV-2024-001',
+    vendor: 'V078 - WOODPECKER SCHOOL & OFFICE SUPPLIES',
+    invoiceDate: 'January 15, 2024',
+    dueDate: 'February 14, 2024',
+    totalAmount: '€4,086.10',
+    currency: 'EUR',
+    subtotal: '€3,552.00',
+    taxRate: '17.5%',
+    taxAmount: '€534.10',
+    paymentMethod: 'Bank Transfer',
+    paymentTerms: '30 days',
+    billingAddress: 'Wooding Peckering LLC, 123 High Street, Peacton, Richmond, VA, USA',
+    lineItems: [
+      { id: 1, description: 'Office Paper A4 - 500 sheets', quantity: 25, unitPrice: 12.50, amount: 312.50 },
+      { id: 2, description: 'Blue Ink Pens - Pack of 12', quantity: 15, unitPrice: 8.75, amount: 131.25 },
+      { id: 3, description: 'Stapler Heavy Duty', quantity: 5, unitPrice: 24.00, amount: 120.00 },
+      { id: 4, description: 'Desk Organizer Set', quantity: 8, unitPrice: 45.50, amount: 364.00 },
+      { id: 5, description: 'Whiteboard Markers - Set of 8', quantity: 12, unitPrice: 15.25, amount: 183.00 }
+    ]
+  }
+
+  const handleInvoiceClick = (invoiceId: string) => {
+    setSelectedInvoiceId(invoiceId)
+  }
+
+  const handleCloseInvoice = () => {
+    setSelectedInvoiceId(null)
+  }
 
   // Initialize assignments for user mode 
   const initializeAssignments = () => {
@@ -1180,9 +1213,12 @@ export default function ApprovalsPage() {
                         }`}
                       >
                         <TableCell className="font-medium py-2">
-                          <a href="#" className="text-blue-600 hover:underline">
+                          <button 
+                            onClick={() => handleInvoiceClick(approval.id)}
+                            className="text-blue-600 hover:underline focus:outline-none"
+                          >
                             {approval.invoiceNumber}
-                          </a>
+                          </button>
                         </TableCell>
                         <TableCell className="py-2">{approval.invoiceDate}</TableCell>
                         <TableCell className="max-w-[200px] truncate py-2">{approval.supplierName}</TableCell>
@@ -1670,6 +1706,179 @@ export default function ApprovalsPage() {
       </Dialog>
 
       <Toaster />
+
+      {/* Invoice Preview Drawer */}
+      {selectedInvoiceId && (
+        <>
+          {/* Backdrop - no mask, just for closing */}
+          <div 
+            className="fixed inset-0 z-40"
+            onClick={handleCloseInvoice}
+          />
+          
+          {/* Drawer */}
+          <div className={`fixed top-0 right-0 h-full w-[600px] bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-out flex flex-col ${
+            selectedInvoiceId ? 'translate-x-0' : 'translate-x-full'
+          }`}>
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <Receipt className="h-5 w-5 text-violet-600" />
+                <h2 className="text-lg font-semibold text-gray-900">Invoice Preview</h2>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={handleCloseInvoice}
+                className="h-8 w-8 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto px-6 pt-6 pb-4 space-y-4 min-h-0">
+              {/* Hero Section - Compact */}
+              <div className="bg-gradient-to-br from-violet-50 to-white p-4 rounded-lg border border-violet-100">
+                <div>
+                  <div className="text-xs text-gray-600">Total Amount</div>
+                  <div className="text-2xl font-semibold text-gray-900">{sampleInvoiceData.totalAmount}</div>
+                  <div className="flex items-center gap-3 text-xs">
+                    <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-xs font-medium">
+                      <Clock className="h-3 w-3" />
+                      28 days left
+                    </div>
+                    <span className="text-gray-600">
+                      Due <span className="font-medium text-gray-900">{sampleInvoiceData.dueDate}</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Invoice Information */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 bg-violet-100 rounded flex items-center justify-center">
+                    <Receipt className="h-3 w-3 text-violet-600" />
+                  </div>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Invoice Information</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                  <div>
+                    <div className="text-xs text-gray-500">Invoice Number</div>
+                    <div className="font-medium">{sampleInvoiceData.invoiceNumber}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500">Invoice Date</div>
+                    <div className="font-medium">{sampleInvoiceData.invoiceDate}</div>
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-xs text-gray-500">Vendor</div>
+                    <div className="inline-block px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium truncate max-w-full">
+                      {sampleInvoiceData.vendor}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Separator */}
+              <div className="border-t border-gray-200"></div>
+
+              {/* Financial Details */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 bg-violet-100 rounded flex items-center justify-center">
+                    <DollarSign className="h-3 w-3 text-violet-600" />
+                  </div>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Financial Details</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                  <div>
+                    <div className="text-xs text-gray-500">Subtotal</div>
+                    <div className="font-medium">{sampleInvoiceData.subtotal}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500">Currency</div>
+                    <div className="font-medium">{sampleInvoiceData.currency}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500">Tax Amount</div>
+                    <div className="font-medium">{sampleInvoiceData.taxAmount}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500">Tax Rate</div>
+                    <div className="font-medium">{sampleInvoiceData.taxRate}</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                  <div>
+                    <div className="text-xs text-gray-500">Total Amount</div>
+                    <div className="font-medium">{sampleInvoiceData.totalAmount}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Separator */}
+              <div className="border-t border-gray-200"></div>
+
+              {/* Payment Information */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 bg-violet-100 rounded flex items-center justify-center">
+                    <CreditCard className="h-3 w-3 text-violet-600" />
+                  </div>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Payment Information</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                  <div>
+                    <div className="text-xs text-gray-500">Payment Method</div>
+                    <div className="font-medium">{sampleInvoiceData.paymentMethod}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500">Payment Terms</div>
+                    <div className="font-medium">{sampleInvoiceData.paymentTerms}</div>
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-xs text-gray-500">Billing Address</div>
+                    <div className="font-medium">{sampleInvoiceData.billingAddress}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Separator */}
+              <div className="border-t border-gray-200"></div>
+
+              {/* Line Items */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 bg-violet-100 rounded flex items-center justify-center">
+                    <FileText className="h-3 w-3 text-violet-600" />
+                  </div>
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Line Items</h3>
+                </div>
+                <div className="space-y-2">
+                  {sampleInvoiceData.lineItems.map((item) => (
+                    <div key={item.id} className="border border-gray-200 rounded-lg p-3">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="text-sm font-medium text-gray-900 flex-1 pr-2">
+                          {item.description}
+                        </div>
+                        <div className="text-sm font-semibold text-gray-900">
+                          €{item.amount.toFixed(2)}
+                        </div>
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>Qty: {item.quantity}</span>
+                        <span>Unit Price: €{item.unitPrice.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
