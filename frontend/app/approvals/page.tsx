@@ -869,25 +869,10 @@ export default function ApprovalsPage() {
         
         <main className="flex-1 overflow-auto bg-gray-50/50 min-w-0">
           <div className="p-6 min-w-0">
-            <div className="mb-6 flex items-center justify-between">
+            <div className="mb-6">
               <h1 className="text-2xl font-bold tracking-tight">
                 {userRole === 'user' ? 'My Approvals' : 'Team Approvals'}
               </h1>
-              
-              {/* Role Switch */}
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <User className="h-4 w-4" />
-                  <span>User</span>
-                  <Switch
-                    checked={userRole === 'admin'}
-                    onCheckedChange={handleRoleChange}
-                    className="data-[state=checked]:bg-blue-600"
-                  />
-                  <Settings className="h-4 w-4" />
-                  <span>Admin</span>
-                </div>
-              </div>
             </div>
 
             {/* Priority Action Cards - Compact */}
@@ -1469,6 +1454,105 @@ export default function ApprovalsPage() {
               </CardContent>
             </Card>
           </div>
+          {/* Bottom Left Role Switch - Better Options */}
+          {/* Option 2: Segmented Control Style (Currently Active) */}
+          <div className="fixed bottom-6 left-20 z-10">
+            <div className="bg-gray-100 rounded-full p-0.5 shadow-lg flex items-center">
+              <button
+                onClick={() => setUserRole('user')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  userRole === 'user' 
+                    ? 'bg-white text-blue-600 shadow-sm' 
+                    : 'text-gray-600 hover:text-blue-600'
+                }`}
+              >
+                <User className="h-3 w-3" />
+                User
+              </button>
+              <button
+                onClick={() => setUserRole('admin')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  userRole === 'admin' 
+                    ? 'bg-white text-violet-600 shadow-sm' 
+                    : 'text-gray-600 hover:text-violet-600'
+                }`}
+              >
+                <Settings className="h-3 w-3" />
+                Admin
+              </button>
+            </div>
+          </div>
+
+          {/* Option 1: Toggle Buttons (uncomment to revert) */}
+          {/* <div className="fixed bottom-6 left-20 z-10">
+            <div className="bg-white border border-gray-200 rounded-full p-1 shadow-lg flex items-center gap-1">
+              <button
+                onClick={() => setUserRole('user')}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  userRole === 'user' 
+                    ? 'bg-blue-500 text-white shadow-sm' 
+                    : 'text-gray-500 hover:text-blue-500 hover:bg-blue-50'
+                }`}
+              >
+                <User className="h-3 w-3" />
+                <span>User</span>
+              </button>
+              <button
+                onClick={() => setUserRole('admin')}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  userRole === 'admin' 
+                    ? 'bg-violet-500 text-white shadow-sm' 
+                    : 'text-gray-500 hover:text-violet-500 hover:bg-violet-50'
+                }`}
+              >
+                <Settings className="h-3 w-3" />
+                <span>Admin</span>
+              </button>
+            </div>
+          </div> */}
+
+          {/* Option 3: Single Badge with Active State (uncomment to try) */}
+          {/* <button 
+            onClick={() => setUserRole(userRole === 'user' ? 'admin' : 'user')}
+            className="fixed bottom-6 left-20 z-10 bg-white border border-gray-200 rounded-full px-3 py-2 shadow-lg flex items-center gap-2 hover:shadow-xl transition-all text-xs font-medium"
+          >
+            <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
+              userRole === 'user' ? 'bg-blue-100 text-blue-600' : 'bg-violet-100 text-violet-600'
+            }`}>
+              {userRole === 'user' ? <User className="h-3 w-3" /> : <Settings className="h-3 w-3" />}
+            </div>
+            <span className={userRole === 'user' ? 'text-blue-600' : 'text-violet-600'}>
+              {userRole === 'user' ? 'User Mode' : 'Admin Mode'}
+            </span>
+          </button> */}
+
+          {/* Option 4: Tabs Style (uncomment to try) */}
+          {/* <div className="fixed bottom-6 left-20 z-10">
+            <div className="bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden flex">
+              <button
+                onClick={() => setUserRole('user')}
+                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-all border-r ${
+                  userRole === 'user' 
+                    ? 'bg-blue-50 text-blue-600 border-blue-200' 
+                    : 'text-gray-500 hover:text-blue-500 hover:bg-blue-50 border-gray-200'
+                }`}
+              >
+                <User className="h-3 w-3" />
+                User
+              </button>
+              <button
+                onClick={() => setUserRole('admin')}
+                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-all ${
+                  userRole === 'admin' 
+                    ? 'bg-violet-50 text-violet-600' 
+                    : 'text-gray-500 hover:text-violet-500 hover:bg-violet-50'
+                }`}
+              >
+                <Settings className="h-3 w-3" />
+                Admin
+              </button>
+            </div>
+          </div> */}
         </main>
       </div>
 
