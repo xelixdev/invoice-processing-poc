@@ -33,15 +33,15 @@ interface SmartValidationBadgesProps {
 const getBadgeStyles = (type: ValidationBadge['type']) => {
   switch (type) {
     case 'success':
-      return 'bg-emerald-50 text-emerald-700 border-emerald-200/50 hover:bg-emerald-100 hover:border-emerald-300'
+      return 'bg-emerald-100/50 text-emerald-800 hover:bg-emerald-100/70'
     case 'warning':
-      return 'bg-amber-50 text-amber-700 border-amber-200/50 hover:bg-amber-100 hover:border-amber-300'
+      return 'bg-amber-100/50 text-amber-800 hover:bg-amber-100/70'
     case 'info':
-      return 'bg-blue-50 text-blue-700 border-blue-200/50 hover:bg-blue-100 hover:border-blue-300'
+      return 'bg-blue-100/50 text-blue-800 hover:bg-blue-100/70'
     case 'error':
-      return 'bg-red-50 text-red-700 border-red-200/50 hover:bg-red-100 hover:border-red-300'
+      return 'bg-red-100/50 text-red-800 hover:bg-red-100/70'
     default:
-      return 'bg-slate-50 text-slate-700 border-slate-200/50 hover:bg-slate-100 hover:border-slate-300'
+      return 'bg-slate-100/50 text-slate-800 hover:bg-slate-100/70'
   }
 }
 
@@ -69,16 +69,14 @@ export default function SmartValidationBadges({ badges, onBadgeClick }: SmartVal
           {orderedBadges.map((badge) => (
             <Tooltip key={badge.id}>
               <TooltipTrigger asChild>
-                <button
+                <div
                   className={`
                     inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium
-                    transition-all duration-200 border
+                    transition-all duration-200
                     ${getBadgeStyles(badge.type)}
                     ${badge.clickable ? 'cursor-pointer hover:shadow-sm' : 'cursor-default'}
-                    focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:ring-offset-1
                   `}
                   onClick={() => badge.clickable && onBadgeClick?.(badge)}
-                  disabled={!badge.clickable}
                 >
                   <span className="w-3 h-3 flex-shrink-0">
                     {badge.icon}
@@ -86,7 +84,7 @@ export default function SmartValidationBadges({ badges, onBadgeClick }: SmartVal
                   <span className="truncate max-w-[140px]">
                     {badge.label}
                   </span>
-                </button>
+                </div>
               </TooltipTrigger>
               <TooltipContent 
                 side="bottom" 
