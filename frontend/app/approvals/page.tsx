@@ -2055,7 +2055,7 @@ export default function ApprovalsPage() {
                 <div className="border-t border-gray-100">
                   <button
                     onClick={() => setSmartSuggestionsExpanded(!smartSuggestionsExpanded)}
-                    className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100"
+                    className="w-full px-4 py-2.5 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors border-b border-gray-100"
                   >
                     <div className="flex items-center gap-2">
                       <Sparkles className="w-3.5 h-3.5 text-violet-600" />
@@ -2224,11 +2224,29 @@ export default function ApprovalsPage() {
 
               {/* Tabs */}
               <Tabs defaultValue="details" className="w-full">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="details">Details</TabsTrigger>
-                  <TabsTrigger value="purchase-order">Purchase Order</TabsTrigger>
-                  <TabsTrigger value="goods-receipt">Goods Receipt</TabsTrigger>
-                  <TabsTrigger value="comments" className="relative">
+                <TabsList className="h-auto p-0 bg-transparent border-b border-gray-200 rounded-none w-full justify-start">
+                  <TabsTrigger 
+                    value="details" 
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-violet-600 data-[state=active]:bg-transparent data-[state=active]:text-violet-600 data-[state=active]:shadow-none px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700"
+                  >
+                    Details
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="purchase-order" 
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-violet-600 data-[state=active]:bg-transparent data-[state=active]:text-violet-600 data-[state=active]:shadow-none px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700"
+                  >
+                    Purchase Order
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="goods-receipt" 
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-violet-600 data-[state=active]:bg-transparent data-[state=active]:text-violet-600 data-[state=active]:shadow-none px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700"
+                  >
+                    Goods Receipt
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="comments" 
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-violet-600 data-[state=active]:bg-transparent data-[state=active]:text-violet-600 data-[state=active]:shadow-none px-4 py-3 text-sm font-medium text-gray-500 hover:text-gray-700 relative"
+                  >
                     Comments
                     <span className="ml-2 inline-flex items-center justify-center w-4 h-4 text-xs font-medium text-violet-600 bg-white border border-violet-300 rounded-full">
                       {comments.length}
