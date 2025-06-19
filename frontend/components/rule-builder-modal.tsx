@@ -449,23 +449,6 @@ export default function RuleBuilderModal({ isOpen, onClose, editingRule, onRuleS
         {/* Modal Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <div className="flex items-center space-x-3 pl-2">
-            <div className="flex items-center space-x-2 group">
-              <Input
-                ref={titleInputRef}
-                value={ruleName}
-                onChange={(e) => {
-                  setRuleName(e.target.value)
-                  setHasUnsavedChanges(true)
-                }}
-                className={`text-base ${!ruleName.trim() ? 'border-gray-300 focus:border-violet-400 focus:ring-violet-400' : 'border-violet-300 focus:border-violet-400 focus:ring-violet-400'}`}
-                placeholder="Enter Rule Name..."
-                style={{ fontSize: '1.25rem', lineHeight: '1.75rem' }}
-              />
-              <Edit3 
-                className="h-4 w-4 text-gray-300 group-hover:text-gray-400 transition-colors cursor-pointer" 
-                onClick={() => titleInputRef.current?.focus()}
-              />
-            </div>
             {hasUnsavedChanges && (
               <div className="px-2 py-1 bg-orange-100 text-orange-700 text-xs font-medium rounded-full">
                 Unsaved
@@ -636,25 +619,6 @@ export default function RuleBuilderModal({ isOpen, onClose, editingRule, onRuleS
                 
                 <ScrollArea className="h-full">
                   <div className="p-4">
-                    {/* Rule Name Section in Visual Mode */}
-                    <div className="mb-4 p-3 bg-gradient-to-r from-violet-50 to-blue-50 border border-violet-200 rounded-lg">
-                      <label className="block text-xs font-medium text-gray-900 mb-2">
-                        Rule Name <span className="text-red-500">*</span>
-                      </label>
-                      <Input
-                        value={ruleName}
-                        onChange={(e) => {
-                          setRuleName(e.target.value)
-                          setHasUnsavedChanges(true)
-                        }}
-                        placeholder="Enter rule name"
-                        className={`text-sm ${!ruleName.trim() ? 'border-gray-300 focus:border-violet-400' : 'border-violet-300 focus:border-violet-400'}`}
-                      />
-                      {!ruleName.trim() && (
-                        <p className="text-xs text-gray-500 mt-1">Required</p>
-                      )}
-                    </div>
-
                     <NodePropertyEditor
                       selectedNode={selectedNode}
                       onPropertyChange={handlePropertyChange}

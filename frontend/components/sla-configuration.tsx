@@ -254,8 +254,7 @@ export default function SLAConfiguration() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">SLA Configuration</h1>
-          <p className="text-gray-600 mt-1">Configure escalation rules using natural language or structured forms</p>
+          <p className="text-gray-600">Configure escalation rules using natural language or structured forms</p>
         </div>
         <div className="flex gap-2">
           <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
