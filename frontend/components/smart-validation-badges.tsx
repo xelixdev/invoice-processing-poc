@@ -35,7 +35,7 @@ const getBadgeStyles = (type: ValidationBadge['type']) => {
     case 'success':
       return 'bg-emerald-100/50 text-emerald-800 hover:bg-emerald-100/70'
     case 'warning':
-      return 'bg-amber-100/50 text-amber-800 hover:bg-amber-100/70'
+      return 'bg-amber-200/50 text-amber-800 hover:bg-amber-200/70'
     case 'info':
       return 'bg-blue-100/50 text-blue-800 hover:bg-blue-100/70'
     case 'error':
@@ -70,7 +70,7 @@ export default function SmartValidationBadges({ badges, onBadgeClick }: SmartVal
               <TooltipTrigger asChild>
                 <div
                   className={`
-                    inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium
+                    inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium
                     transition-all duration-200
                     ${getBadgeStyles(badge.type)}
                     ${badge.clickable ? 'cursor-pointer hover:shadow-sm' : 'cursor-default'}
