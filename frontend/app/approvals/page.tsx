@@ -20,6 +20,10 @@ import { useToast } from '@/hooks/use-toast'
 import { Toaster } from '@/components/ui/toaster'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Checkbox } from '@/components/ui/checkbox'
+import SmartValidationBadges, { generateValidationBadges } from '@/components/smart-validation-badges'
+import PredictiveActions, { generatePredictiveActions } from '@/components/predictive-actions'
+import { AIInvoiceAnalyzer } from '@/lib/ai-invoice-insights'
+import EmailComposer from '@/components/email-composer'
 
 type ViewType = 'pending' | 'on-hold' | 'overdue' | 'approved-today' | 'rejected' | 'approved-month' | 'delegated' | 'all'
 
@@ -74,6 +78,8 @@ export default function ApprovalsPage() {
     }
   ])
   const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set())
+  const [showEmailComposer, setShowEmailComposer] = useState(false)
+  const [smartSuggestionsExpanded, setSmartSuggestionsExpanded] = useState(false)
   
   const { toast } = useToast()
   
@@ -137,12 +143,49 @@ export default function ApprovalsPage() {
     paymentMethod: 'Bank Transfer',
     paymentTerms: '30 days',
     billingAddress: 'Wooding Peckering LLC, 123 High Street, Peacton, Richmond, VA, USA',
+    // Enhanced fields for AI insights
+    department: 'Marketing',
+    businessUnit: 'North America',
+    projectCode: 'MKT-Q1-2024',
+    glCode: '5000-SUPPLIES',
+    category: 'Office Supplies',
+    requestedBy: 'Sarah Chen',
+    approvalLimit: 10000,
+    vendorId: 'office-supplies-inc',
+    purchaseOrderNumber: 'PO-2024-0456',
+    contractReference: 'MSA-2023-WOODPECKER',
+    urgency: 'medium',
+    lastVendorInvoiceDate: '2023-12-15',
+    vendorPaymentHistory: {
+      totalInvoices: 24,
+      averageAmount: 3250,
+      onTimeRate: 0.96,
+      lastPaymentDate: '2023-12-20'
+    },
+    budgetInfo: {
+      departmentBudget: 150000,
+      spentToDate: 89500,
+      categoryBudget: 25000,
+      categorySpent: 18200
+    },
+    attachments: [
+      { name: 'invoice.pdf', type: 'invoice', size: '245KB', uploadDate: '2024-01-15' },
+      { name: 'receipt.pdf', type: 'receipt', size: '180KB', uploadDate: '2024-01-16' },
+      { name: 'po_confirmation.pdf', type: 'purchase_order', size: '120KB', uploadDate: '2024-01-10' }
+    ],
+    riskFactors: {
+      duplicateCheck: false,
+      amountThreshold: false,
+      newVendor: false,
+      missingDocuments: false,
+      budgetExceedance: false
+    },
     lineItems: [
-      { id: 1, description: 'Office Paper A4 - 500 sheets', quantity: 25, unitPrice: 12.50, amount: 312.50 },
-      { id: 2, description: 'Blue Ink Pens - Pack of 12', quantity: 15, unitPrice: 8.75, amount: 131.25 },
-      { id: 3, description: 'Stapler Heavy Duty', quantity: 5, unitPrice: 24.00, amount: 120.00 },
-      { id: 4, description: 'Desk Organizer Set', quantity: 8, unitPrice: 45.50, amount: 364.00 },
-      { id: 5, description: 'Whiteboard Markers - Set of 8', quantity: 12, unitPrice: 15.25, amount: 183.00 }
+      { id: 1, description: 'Office Paper A4 - 500 sheets', quantity: 25, unitPrice: 12.50, amount: 312.50, glCode: '5000-SUPPLIES', category: 'Paper Products' },
+      { id: 2, description: 'Blue Ink Pens - Pack of 12', quantity: 15, unitPrice: 8.75, amount: 131.25, glCode: '5000-SUPPLIES', category: 'Writing Materials' },
+      { id: 3, description: 'Stapler Heavy Duty', quantity: 5, unitPrice: 24.00, amount: 120.00, glCode: '5000-SUPPLIES', category: 'Office Equipment' },
+      { id: 4, description: 'Desk Organizer Set', quantity: 8, unitPrice: 45.50, amount: 364.00, glCode: '5000-SUPPLIES', category: 'Office Equipment' },
+      { id: 5, description: 'Whiteboard Markers - Set of 8', quantity: 12, unitPrice: 15.25, amount: 183.00, glCode: '5000-SUPPLIES', category: 'Writing Materials' }
     ]
   }
 
@@ -1928,83 +1971,256 @@ export default function ApprovalsPage() {
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto px-6 pt-6 pb-4 space-y-4 min-h-0">
-              {/* Hero Section - Action-Focused */}
-              <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                <div className="flex items-start justify-between">
-                  {/* Left side - Amount and Status */}
-                  <div className="flex-1">
-                    <div className="text-xs text-gray-600">Total Amount</div>
-                    <div className="text-2xl font-semibold text-gray-900 mb-2">{sampleInvoiceData.totalAmount}</div>
-                    
-                    {/* Status and Timeline */}
-                    <div className="flex items-center gap-3 mb-3">
-                      <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
-                        Pending Approval
-                      </Badge>
-                      <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
-                        <Clock className="h-3 w-3 mr-1" />
-                        28 days left
-                      </Badge>
+              {/* Enhanced Hero Section with AI Integration */}
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                {/* Main Hero Content */}
+                <div className="p-4">
+                  <div className="flex items-start justify-between">
+                    {/* Left side - Amount and Status */}
+                    <div className="flex-1">
+                      <div className="text-xs text-gray-600">Total Amount</div>
+                      <div className="text-2xl font-semibold text-gray-900 mb-2">{sampleInvoiceData.totalAmount}</div>
+                      
+                      {/* Status and Timeline */}
+                      <div className="flex items-center gap-3 mb-3">
+                        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+                          Pending Approval
+                        </Badge>
+                        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                          <Clock className="h-3 w-3 mr-1" />
+                          28 days left
+                        </Badge>
+                      </div>
+                      
+                      <div className="text-xs text-gray-600">
+                        Due <span className="font-medium text-gray-900">{sampleInvoiceData.dueDate}</span>
+                      </div>
                     </div>
                     
-                    <div className="text-xs text-gray-600">
-                      Due <span className="font-medium text-gray-900">{sampleInvoiceData.dueDate}</span>
+                    {/* Right side - Quick Actions (Legacy) */}
+                    <div className="flex flex-col gap-2 ml-4">
+                      <Button 
+                        size="sm" 
+                        className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 text-xs"
+                        onClick={() => {
+                          // Handle approve action
+                          toast({
+                            title: "Invoice Approved",
+                            description: `Invoice ${sampleInvoiceData.invoiceNumber} has been approved.`,
+                            className: "bg-green-50 border-green-200 text-green-800",
+                          })
+                        }}
+                      >
+                        <Check className="h-3 w-3 mr-1" />
+                        Approve
+                      </Button>
+                      
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        className="border-red-300 text-red-600 hover:bg-red-50 px-4 py-2 text-xs"
+                        onClick={() => {
+                          // Handle reject action
+                          toast({
+                            title: "Invoice Rejected",
+                            description: `Invoice ${sampleInvoiceData.invoiceNumber} has been rejected.`,
+                            variant: "destructive",
+                          })
+                        }}
+                      >
+                        <X className="h-3 w-3 mr-1" />
+                        Reject
+                      </Button>
+                      
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        className="border-gray-300 text-gray-600 hover:bg-gray-50 px-4 py-2 text-xs"
+                        onClick={() => {
+                          // Handle delegate action
+                          toast({
+                            title: "Invoice Delegated",
+                            description: `Invoice ${sampleInvoiceData.invoiceNumber} has been delegated.`,
+                          })
+                        }}
+                      >
+                        <Forward className="h-3 w-3 mr-1" />
+                        Delegate
+                      </Button>
                     </div>
-                  </div>
-                  
-                  {/* Right side - Quick Actions */}
-                  <div className="flex flex-col gap-2 ml-4">
-                    <Button 
-                      size="sm" 
-                      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 text-xs"
-                      onClick={() => {
-                        // Handle approve action
-                        toast({
-                          title: "Invoice Approved",
-                          description: `Invoice ${sampleInvoiceData.invoiceNumber} has been approved.`,
-                          className: "bg-green-50 border-green-200 text-green-800",
-                        })
-                      }}
-                    >
-                      <Check className="h-3 w-3 mr-1" />
-                      Approve
-                    </Button>
-                    
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      className="border-red-300 text-red-600 hover:bg-red-50 px-4 py-2 text-xs"
-                      onClick={() => {
-                        // Handle reject action
-                        toast({
-                          title: "Invoice Rejected",
-                          description: `Invoice ${sampleInvoiceData.invoiceNumber} has been rejected.`,
-                          variant: "destructive",
-                        })
-                      }}
-                    >
-                      <X className="h-3 w-3 mr-1" />
-                      Reject
-                    </Button>
-                    
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      className="border-gray-300 text-gray-600 hover:bg-gray-50 px-4 py-2 text-xs"
-                      onClick={() => {
-                        // Handle delegate action
-                        toast({
-                          title: "Invoice Delegated",
-                          description: `Invoice ${sampleInvoiceData.invoiceNumber} has been delegated.`,
-                        })
-                      }}
-                    >
-                      <Forward className="h-3 w-3 mr-1" />
-                      Delegate
-                    </Button>
                   </div>
                 </div>
+
+                {/* Smart Suggestions Section */}
+                <div className="border-t border-gray-100">
+                  <button
+                    onClick={() => setSmartSuggestionsExpanded(!smartSuggestionsExpanded)}
+                    className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-3.5 h-3.5 text-violet-600" />
+                      <span className="text-xs font-medium text-slate-700">Smart Suggestions</span>
+                      <span className="text-xs text-slate-500">(AI-powered)</span>
+                      
+                      {/* Count bubble */}
+                      <div className="inline-flex items-center justify-center w-4 h-4 text-xs font-medium text-white bg-violet-500 rounded-full ml-2">
+                        {(() => {
+                          const badges = generateValidationBadges(
+                            {
+                              ...sampleInvoiceData,
+                              totalAmount: 4086.10,
+                              supplierName: 'WOODPECKER SCHOOL & OFFICE SUPPLIES',
+                              department: 'Marketing',
+                              attachments: ['invoice.pdf', 'receipt.pdf']
+                            },
+                            { 
+                              amount: 4000, 
+                              poNumber: 'PO-2024-0456',
+                              items: sampleInvoiceData.lineItems 
+                            },
+                            { 
+                              status: 'received', 
+                              receivedDate: '2024-01-20',
+                              items: sampleInvoiceData.lineItems 
+                            }
+                          )
+                          const actions = generatePredictiveActions(
+                            {
+                              ...sampleInvoiceData,
+                              totalAmount: 4086.10,
+                              supplierName: 'WOODPECKER SCHOOL & OFFICE SUPPLIES',
+                              department: 'Marketing',
+                              dueDate: '2024-02-14',
+                              attachments: ['invoice.pdf', 'receipt.pdf']
+                            },
+                            badges,
+                            { id: 'current-user', name: 'John Doe', approvalLimit: 10000 }
+                          )
+                          return badges.length + actions.length
+                        })()}
+                      </div>
+                    </div>
+                    <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${
+                      smartSuggestionsExpanded ? 'rotate-180' : ''
+                    }`} />
+                  </button>
+                  
+                  {smartSuggestionsExpanded && (
+                    <div className="px-4 py-3 space-y-3">
+                      {/* AI Validation */}
+                      <SmartValidationBadges 
+                        badges={generateValidationBadges(
+                          {
+                            ...sampleInvoiceData,
+                            totalAmount: 4086.10,
+                            supplierName: 'WOODPECKER SCHOOL & OFFICE SUPPLIES',
+                            department: 'Marketing',
+                            attachments: ['invoice.pdf', 'receipt.pdf']
+                          },
+                          { 
+                            amount: 4000, 
+                            poNumber: 'PO-2024-0456',
+                            items: sampleInvoiceData.lineItems 
+                          },
+                          { 
+                            status: 'received', 
+                            receivedDate: '2024-01-20',
+                            items: sampleInvoiceData.lineItems 
+                          }
+                        )}
+                        onBadgeClick={(badge) => {
+                          toast({
+                            title: badge.label,
+                            description: badge.description,
+                            className: badge.type === 'error' ? "bg-red-50 border-red-200 text-red-800" :
+                                      badge.type === 'warning' ? "bg-amber-50 border-amber-200 text-amber-800" :
+                                      badge.type === 'success' ? "bg-green-50 border-green-200 text-green-800" :
+                                      "bg-blue-50 border-blue-200 text-blue-800"
+                          })
+                        }}
+                      />
+                      
+                      {/* AI Recommendations */}
+                      <PredictiveActions 
+                        actions={generatePredictiveActions(
+                          {
+                            ...sampleInvoiceData,
+                            totalAmount: 4086.10,
+                            supplierName: 'WOODPECKER SCHOOL & OFFICE SUPPLIES',
+                            department: 'Marketing',
+                            dueDate: '2024-02-14',
+                            attachments: ['invoice.pdf', 'receipt.pdf']
+                          },
+                          generateValidationBadges(
+                            {
+                              ...sampleInvoiceData,
+                              totalAmount: 4086.10,
+                              supplierName: 'WOODPECKER SCHOOL & OFFICE SUPPLIES',
+                              department: 'Marketing',
+                              attachments: ['invoice.pdf', 'receipt.pdf']
+                            },
+                            { 
+                              amount: 4000, 
+                              poNumber: 'PO-2024-0456',
+                              items: sampleInvoiceData.lineItems 
+                            },
+                            { 
+                              status: 'received', 
+                              receivedDate: '2024-01-20',
+                              items: sampleInvoiceData.lineItems 
+                            }
+                          ),
+                          { id: 'current-user', name: 'John Doe', approvalLimit: 10000 },
+                          () => {
+                            // Approve action
+                            toast({
+                              title: "Invoice Approved via AI Recommendation",
+                              description: `Invoice ${sampleInvoiceData.invoiceNumber} has been approved based on AI analysis.`,
+                              className: "bg-green-50 border-green-200 text-green-800",
+                            })
+                            setSelectedInvoiceId(null)
+                          },
+                          () => {
+                            // Reject action
+                            toast({
+                              title: "Invoice Rejected",
+                              description: `Invoice ${sampleInvoiceData.invoiceNumber} has been rejected.`,
+                              variant: "destructive",
+                            })
+                            setSelectedInvoiceId(null)
+                          },
+                          (userId) => {
+                            // Delegate action
+                            toast({
+                              title: "Invoice Delegated",
+                              description: `Invoice ${sampleInvoiceData.invoiceNumber} has been delegated based on AI recommendation.`,
+                              className: "bg-blue-50 border-blue-200 text-blue-800",
+                            })
+                            setSelectedInvoiceId(null)
+                          },
+                          () => {
+                            // Hold action
+                            toast({
+                              title: "Invoice On Hold",
+                              description: `Invoice ${sampleInvoiceData.invoiceNumber} has been placed on hold for review.`,
+                              className: "bg-amber-50 border-amber-200 text-amber-800",
+                            })
+                            setSelectedInvoiceId(null)
+                          },
+                          () => {
+                            // Contact vendor action - open email composer
+                            setShowEmailComposer(true)
+                          }
+                        )}
+                        onActionClick={(action) => {
+                          console.log('AI Action executed:', action.label)
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
+
 
               {/* Tabs */}
               <Tabs defaultValue="details" className="w-full">
@@ -2014,7 +2230,7 @@ export default function ApprovalsPage() {
                   <TabsTrigger value="goods-receipt">Goods Receipt</TabsTrigger>
                   <TabsTrigger value="comments" className="relative">
                     Comments
-                    <span className="ml-2 inline-flex items-center justify-center w-5 h-5 text-xs font-medium text-white bg-violet-500 rounded-full">
+                    <span className="ml-2 inline-flex items-center justify-center w-4 h-4 text-xs font-medium text-white bg-violet-500 rounded-full">
                       {comments.length}
                     </span>
                   </TabsTrigger>
@@ -2231,6 +2447,39 @@ export default function ApprovalsPage() {
             </div>
           </div>
       </>
+
+      {/* Email Composer for Contact Vendor Action */}
+      <EmailComposer
+        isOpen={showEmailComposer}
+        onClose={() => setShowEmailComposer(false)}
+        onSend={(emailData) => {
+          // Handle email sending
+          toast({
+            title: "Email Sent Successfully",
+            description: `Vendor inquiry sent to ${emailData.to}. Recommendation marked as completed.`,
+            className: "bg-green-50 border-green-200 text-green-800",
+          })
+          
+          // Close the email composer and invoice drawer
+          setShowEmailComposer(false)
+          setSelectedInvoiceId(null)
+        }}
+        invoiceData={{
+          invoiceNumber: sampleInvoiceData.invoiceNumber,
+          vendor: sampleInvoiceData.vendor,
+          amount: 4086.10,
+          poNumber: sampleInvoiceData.purchaseOrderNumber,
+          discrepancies: [
+            "Amount variance: Invoice shows €4,086.10 vs PO amount of €4,000.00 (+2.2%)",
+            "Line item: Desk Organizer Set quantity (8 vs 5 on PO)"
+          ]
+        }}
+        vendorContact={{
+          email: "orders@woodpecker-supplies.com",
+          name: "Vendor Contact",
+          phone: "+1 (555) 123-4567"
+        }}
+      />
     </div>
   )
 }
