@@ -2059,13 +2059,8 @@ export default function ApprovalsPage() {
                   >
                     <div className="flex items-center gap-2">
                       <Sparkles className="w-3.5 h-3.5 text-violet-600" />
-                      <span className="text-xs font-medium text-slate-700">Smart Suggestions</span>
+                      <span className="text-xs font-medium text-slate-700">2 Smart Suggestions</span>
                       <span className="text-xs text-slate-500">(AI-powered)</span>
-                      
-                      {/* Count bubble */}
-                      <div className="inline-flex items-center justify-center w-4 h-4 text-xs font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-full">
-                        2
-                      </div>
                     </div>
                     <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${
                       smartSuggestionsExpanded ? 'rotate-180' : ''
