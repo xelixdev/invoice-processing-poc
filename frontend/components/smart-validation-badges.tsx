@@ -59,9 +59,8 @@ export default function SmartValidationBadges({ badges, onBadgeClick }: SmartVal
   return (
     <div>
       <div className="flex items-center gap-2 mb-2">
-        <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
-        <span className="text-xs font-medium text-slate-700">AI Validation</span>
-        <span className="text-xs text-slate-500">({badges.length})</span>
+        <span className="text-xs font-medium text-slate-700">Validation</span>
+        <span className="text-xs text-slate-500">(2)</span>
       </div>
       
       <TooltipProvider>
@@ -121,8 +120,7 @@ export function generateValidationBadges(invoice: any, purchaseOrder?: any, good
         category: 'financial',
         label: 'PO Match Confirmed',
         description: `Invoice amount matches PO within 5% tolerance (${percentDiff.toFixed(1)}% difference)`,
-        icon: <CheckCircle className="w-3 h-3" />,
-        clickable: true
+        icon: <CheckCircle className="w-3 h-3" />
       })
     } else {
       badges.push({
@@ -131,8 +129,7 @@ export function generateValidationBadges(invoice: any, purchaseOrder?: any, good
         category: 'financial',
         label: `Amount Variance (${amountDiff > 0 ? '+' : ''}${percentDiff.toFixed(0)}%)`,
         description: `Invoice amount differs from PO by ${percentDiff.toFixed(1)}% (${amountDiff > 0 ? '+' : ''}$${Math.abs(amountDiff).toLocaleString()})`,
-        icon: <AlertTriangle className="w-3 h-3" />,
-        clickable: true
+        icon: <AlertTriangle className="w-3 h-3" />
       })
     }
   }
@@ -145,8 +142,7 @@ export function generateValidationBadges(invoice: any, purchaseOrder?: any, good
     category: 'financial',
     label: `Budget Impact (${budgetRemaining.toFixed(0)}% remaining)`,
     description: `Approving this invoice will leave ${budgetRemaining.toFixed(0)}% of department budget remaining`,
-    icon: <BarChart3 className="w-3 h-3" />,
-    clickable: true
+    icon: <BarChart3 className="w-3 h-3" />
   })
 
   // Approval Limit Badge
@@ -167,8 +163,7 @@ export function generateValidationBadges(invoice: any, purchaseOrder?: any, good
       category: 'financial',
       label: 'Exceeds Approval Limit',
       description: `Invoice amount ($${invoice.totalAmount.toLocaleString()}) exceeds your approval limit ($${approvalLimit.toLocaleString()})`,
-      icon: <AlertCircle className="w-3 h-3" />,
-      clickable: true
+      icon: <AlertCircle className="w-3 h-3" />
     })
   }
 
@@ -189,8 +184,7 @@ export function generateValidationBadges(invoice: any, purchaseOrder?: any, good
       category: 'process',
       label: 'Pending Receipt',
       description: 'Awaiting delivery confirmation from receiving department',
-      icon: <Clock className="w-3 h-3" />,
-      clickable: true
+      icon: <Clock className="w-3 h-3" />
     })
   }
 
@@ -212,13 +206,12 @@ export function generateValidationBadges(invoice: any, purchaseOrder?: any, good
       category: 'process',
       label: 'Missing Documentation',
       description: 'Some required documents may be missing',
-      icon: <AlertTriangle className="w-3 h-3" />,
-      clickable: true
+      icon: <AlertTriangle className="w-3 h-3" />
     })
   }
 
   // Risk Assessment Badges
-  const vendorRisk = 0.25 // Mock vendor risk calculation (deterministic)
+  const vendorRisk = 0.55 // Mock vendor risk calculation (deterministic)
   if (vendorRisk < 0.3) {
     badges.push({
       id: 'trusted-vendor',
@@ -230,13 +223,12 @@ export function generateValidationBadges(invoice: any, purchaseOrder?: any, good
     })
   } else if (vendorRisk < 0.7) {
     badges.push({
-      id: 'new-vendor',
+      id: 'vendor-address-mismatch',
       type: 'warning',
       category: 'risk',
-      label: 'New Vendor - Review Required',
-      description: 'Limited history with this vendor, additional review recommended',
-      icon: <Eye className="w-3 h-3" />,
-      clickable: true
+      label: 'Vendor Address Changed',
+      description: 'Vendor address differs from our records. Verification recommended before payment.',
+      icon: <AlertTriangle className="w-3 h-3" />
     })
   } else {
     badges.push({
@@ -245,8 +237,7 @@ export function generateValidationBadges(invoice: any, purchaseOrder?: any, good
       category: 'risk',
       label: 'High Risk Vendor',
       description: 'Vendor has payment issues or compliance concerns',
-      icon: <AlertCircle className="w-3 h-3" />,
-      clickable: true
+      icon: <AlertCircle className="w-3 h-3" />
     })
   }
 
@@ -259,8 +250,7 @@ export function generateValidationBadges(invoice: any, purchaseOrder?: any, good
       category: 'risk',
       label: `Duplicate Risk (${Math.floor(duplicateRisk * 100)}% match)`,
       description: 'Similar invoice amount and vendor detected within the last 7 days',
-      icon: <AlertTriangle className="w-3 h-3" />,
-      clickable: true
+      icon: <AlertTriangle className="w-3 h-3" />
     })
   }
 

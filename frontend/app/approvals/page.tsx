@@ -1972,7 +1972,7 @@ export default function ApprovalsPage() {
             {/* Content */}
             <div className="flex-1 overflow-y-auto px-6 pt-6 pb-4 space-y-4 min-h-0">
               {/* Enhanced Hero Section with AI Integration */}
-              <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden mt-2">
                 {/* Main Hero Content */}
                 <div className="p-4">
                   <div className="flex items-start justify-between">
@@ -2063,41 +2063,8 @@ export default function ApprovalsPage() {
                       <span className="text-xs text-slate-500">(AI-powered)</span>
                       
                       {/* Count bubble */}
-                      <div className="inline-flex items-center justify-center w-4 h-4 text-xs font-medium text-white bg-violet-500 rounded-full">
-                        {(() => {
-                          const badges = generateValidationBadges(
-                            {
-                              ...sampleInvoiceData,
-                              totalAmount: 4086.10,
-                              supplierName: 'WOODPECKER SCHOOL & OFFICE SUPPLIES',
-                              department: 'Marketing',
-                              attachments: ['invoice.pdf', 'receipt.pdf']
-                            },
-                            { 
-                              amount: 4000, 
-                              poNumber: 'PO-2024-0456',
-                              items: sampleInvoiceData.lineItems 
-                            },
-                            { 
-                              status: 'received', 
-                              receivedDate: '2024-01-20',
-                              items: sampleInvoiceData.lineItems 
-                            }
-                          )
-                          const actions = generatePredictiveActions(
-                            {
-                              ...sampleInvoiceData,
-                              totalAmount: 4086.10,
-                              supplierName: 'WOODPECKER SCHOOL & OFFICE SUPPLIES',
-                              department: 'Marketing',
-                              dueDate: '2024-02-14',
-                              attachments: ['invoice.pdf', 'receipt.pdf']
-                            },
-                            badges,
-                            { id: 'current-user', name: 'John Doe', approvalLimit: 10000 }
-                          )
-                          return badges.length + actions.length
-                        })()}
+                      <div className="inline-flex items-center justify-center w-4 h-4 text-xs font-medium text-amber-700 bg-amber-100 border border-amber-300 rounded-full">
+                        2
                       </div>
                     </div>
                     <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${
@@ -2268,9 +2235,7 @@ export default function ApprovalsPage() {
                   </div>
                   <div className="col-span-2">
                     <div className="text-xs text-gray-500">Vendor</div>
-                    <div className="inline-block px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium truncate max-w-full">
-                      {sampleInvoiceData.vendor}
-                    </div>
+                    <div className="font-medium">Office Supplies Co.</div>
                   </div>
                 </div>
               </div>
