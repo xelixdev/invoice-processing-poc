@@ -220,7 +220,7 @@ export function generatePredictiveActions(
         confidenceScore >= 85 ? 'High confidence in approval recommendation' : 'Moderate confidence in approval recommendation'
       ],
       action: onApprove || (() => {}),
-      urgent: isOverdue
+      urgent: isOverdue && isQuickApprove
     })
   }
 

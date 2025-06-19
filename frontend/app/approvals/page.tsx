@@ -1983,10 +1983,10 @@ export default function ApprovalsPage() {
                       
                       {/* Status and Timeline */}
                       <div className="flex items-center gap-2 mb-3">
-                        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 text-xs font-medium">
+                        <Badge className="bg-amber-200/50 text-amber-800 hover:bg-amber-200/70 text-xs font-medium">
                           Pending Approval
                         </Badge>
-                        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 text-xs font-medium">
+                        <Badge className="bg-blue-100/50 text-blue-800 hover:bg-blue-100/70 text-xs font-medium">
                           <Clock className="h-3 w-3 mr-1" />
                           28 days left
                         </Badge>
@@ -2063,7 +2063,7 @@ export default function ApprovalsPage() {
                       <span className="text-xs text-slate-500">(AI-powered)</span>
                       
                       {/* Count bubble */}
-                      <div className="inline-flex items-center justify-center w-4 h-4 text-xs font-medium text-amber-700 bg-amber-100 border border-amber-300 rounded-full">
+                      <div className="inline-flex items-center justify-center w-4 h-4 text-xs font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-full">
                         2
                       </div>
                     </div>
