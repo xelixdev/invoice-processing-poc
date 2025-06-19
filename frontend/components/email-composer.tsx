@@ -245,7 +245,7 @@ export default function EmailComposer({
 // Generate AI-powered email body
 function generateEmailBody(invoiceData: any, vendorName: string): string {
   const discrepancyText = invoiceData.discrepancies.length > 0 
-    ? `\n\nWe've identified the following items that need clarification:\n${invoiceData.discrepancies.map(d => `• ${d}`).join('\n')}`
+    ? `\n\nWe've identified the following items that need clarification:\n${invoiceData.discrepancies.map((d: string) => `• ${d}`).join('\n')}`
     : ''
 
   const poText = invoiceData.poNumber 
