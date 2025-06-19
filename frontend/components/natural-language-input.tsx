@@ -64,11 +64,7 @@ export default function NaturalLanguageInput({ onRuleGenerated, onPreviewUpdate 
     "If amount > $75,000 AND department = Finance, send notification to CFO", 
     "Auto-approve invoices under $1,000 from trusted vendors",
     "Route all Legal invoices to Legal Counsel and notify Finance Manager",
-    "If vendor contains 'Acme Corp' and amount > $5,000, route to Legal Counsel",
-    "Invoices between $10,000 and $50,000 require department head approval",
-    "Route Marketing invoices over $25,000 to Marketing Director",
-    "If department = Human Resources AND amount > $5,000, notify Finance Manager",
-    "Auto-approve all Software category invoices under $2,500 for Engineering department"
+    "Invoices between $10,000 and $50,000 require department head approval"
   ]
 
   // Handle click outside to close suggestions

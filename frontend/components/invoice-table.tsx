@@ -10,6 +10,43 @@ const BACKEND_URL = process.env.NODE_ENV === 'development'
   ? (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
   : (process.env.NEXT_PUBLIC_API_URL || 'https://invoice-processing-poc-production.up.railway.app')
 
+// Helper function to get status badge colors
+const getStatusColor = (status: string) => {
+  switch (status?.toLowerCase()) {
+    case 'draft':
+      return 'bg-gray-100 text-gray-600 hover:bg-gray-100 hover:text-gray-600'
+    case 'processing':
+      return 'bg-blue-100 text-blue-600 hover:bg-blue-100 hover:text-blue-600'
+    case 'review':
+      return 'bg-yellow-100 text-yellow-600 hover:bg-yellow-100 hover:text-yellow-600'
+    case 'pending_approval':
+      return 'bg-orange-100 text-orange-600 hover:bg-orange-100 hover:text-orange-600'
+    case 'in_approval':
+      return 'bg-amber-100 text-amber-600 hover:bg-amber-100 hover:text-amber-600'
+    case 'approved':
+      return 'bg-green-100 text-green-600 hover:bg-green-100 hover:text-green-600'
+    case 'escalated':
+      return 'bg-red-100 text-red-600 hover:bg-red-100 hover:text-red-600'
+    case 'paid':
+      return 'bg-violet-100 text-violet-600 hover:bg-violet-100 hover:text-violet-600'
+    case 'cancelled':
+      return 'bg-gray-200 text-gray-700 hover:bg-gray-200 hover:text-gray-700'
+    default:
+      return 'bg-gray-100 text-gray-600 hover:bg-gray-100 hover:text-gray-600'
+  }
+}
+
+// Helper function to capitalize and format status text
+const formatStatus = (status: string) => {
+  if (!status) return 'Unknown'
+  
+  // Handle underscore-separated statuses
+  return status
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
+}
+
 export default function InvoiceTable() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loading, setLoading] = useState(true)
@@ -104,17 +141,15 @@ export default function InvoiceTable() {
               <TableCell>
                 <Badge
                   variant="outline"
-                  className={`${
-                    invoice.status === "Paid"
-                      ? "bg-violet-100 text-violet-600 hover:bg-violet-100 hover:text-violet-600"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-100 hover:text-gray-600"
-                  } rounded-full px-3 py-0.5 font-medium`}
+                  className={`${getStatusColor(invoice.status)} rounded-full px-3 py-0.5 font-medium`}
                 >
-                  {invoice.status}
+                  {formatStatus(invoice.status)}
                 </Badge>
               </TableCell>
               <TableCell className="font-medium text-violet-600">{invoice.invoiceNumber}</TableCell>
-              <TableCell>{invoice.vendor}</TableCell>
+              <TableCell>
+                {typeof invoice.vendor === 'string' ? invoice.vendor : invoice.vendor?.name || invoice.vendor_name}
+              </TableCell>
               <TableCell>
                 {typeof invoice.amount === 'string' 
                   ? invoice.amount 

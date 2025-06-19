@@ -14,7 +14,7 @@ export default function Dashboard() {
     <div className="flex min-h-screen bg-background">
       <Sidebar activePage="invoices" />
       <div className="flex-1 flex flex-col overflow-auto">
-        <MainHeader activePage="invoices" />
+        <MainHeader activePage="invoices" sidebarContext="invoices" />
         <main className="flex-1 overflow-auto p-6">
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-bold tracking-tight">Invoices</h1>

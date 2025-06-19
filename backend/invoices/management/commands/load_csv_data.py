@@ -329,7 +329,8 @@ class Command(BaseCommand):
                             'assigned_to': assigned_to,
                             'currency': row['Currency'],
                             'payment_terms': row['Payment_Terms'],
-                            'shipping': Decimal(row.get('Shipping', '0'))
+                            'shipping': Decimal(row.get('Shipping', '0')),
+                            'status': row.get('Status', 'draft')
                         }
                     )
                     
