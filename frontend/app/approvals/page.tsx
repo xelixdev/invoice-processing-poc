@@ -1972,7 +1972,7 @@ export default function ApprovalsPage() {
             {/* Content */}
             <div className="flex-1 overflow-y-auto px-6 pt-6 pb-4 space-y-4 min-h-0">
               {/* Enhanced Hero Section with AI Integration */}
-              <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden mt-2">
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
                 {/* Main Hero Content */}
                 <div className="p-4">
                   <div className="flex items-start justify-between">
