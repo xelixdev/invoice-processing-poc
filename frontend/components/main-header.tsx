@@ -2,7 +2,7 @@ import Link from "next/link"
 import { Bell, User, HelpCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-type ActivePage = "statements" | "invoices" | "approvals" | "vendors" | "helpdesk" | "settings" | "approval-rules" | "purchase-orders" | "goods-received" | "automation"
+type ActivePage = "statements" | "invoices" | "approvals" | "escalations" | "vendors" | "helpdesk" | "settings" | "approval-rules" | "purchase-orders" | "goods-received" | "automation"
 
 interface MainHeaderProps {
   activePage: ActivePage
@@ -63,7 +63,7 @@ export default function MainHeader({ activePage, invoicesHref = "/", sidebarCont
         </>
       )
     } else {
-      // Invoice Processing Context: Dashboard | Invoices | Purchase Orders | Goods Receipts | Approvals
+      // Invoice Processing Context: Dashboard | Invoices | Purchase Orders | Goods Receipts | Approvals | Escalations
       return (
         <>
           <Link 
@@ -115,6 +115,16 @@ export default function MainHeader({ activePage, invoicesHref = "/", sidebarCont
             } transition-colors`}
           >
             Approvals
+          </Link>
+          <Link 
+            href="/escalations" 
+            className={`text-sm font-medium px-3 py-1 rounded-full ${
+              activePage === "escalations" 
+                ? "text-primary bg-primary/10" 
+                : "text-muted-foreground hover:text-primary"
+            } transition-colors`}
+          >
+            Escalations
           </Link>
         </>
       )

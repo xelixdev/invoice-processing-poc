@@ -1005,7 +1005,7 @@ export default function ApprovalsPage() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar />
+      <Sidebar activePage="approvals" />
       <div className="flex-1 flex flex-col min-w-0">
         <MainHeader activePage="approvals" sidebarContext="invoices" />
         

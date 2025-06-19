@@ -95,17 +95,8 @@ class InvoiceSerializer(serializers.ModelSerializer):
         ]
     
     def get_status(self, obj):
-        """Return a status based on due date and other factors."""
-        today = date.today()
-        
-        if not obj.due_date:
-            return "In Approval"  # No due date set
-        elif obj.due_date < today:
-            return "Review"  # Overdue
-        elif obj.due_date <= today + timedelta(days=7):
-            return "In Approval"  # Due soon
-        else:
-            return "Approved"  # Not due yet
+        """Return the actual status from the database."""
+        return obj.status
     
     def get_match(self, obj):
         """Return a match color based on PO/GR linking."""

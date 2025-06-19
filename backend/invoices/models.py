@@ -69,12 +69,25 @@ class Invoice(models.Model):
         ('EUR', 'Euro'),
         ('GBP', 'British Pound'),
     ]
+    
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('processing', 'Processing'),
+        ('review', 'Review'),
+        ('pending_approval', 'Pending Approval'),
+        ('in_approval', 'In Approval'),
+        ('approved', 'Approved'),
+        ('escalated', 'Escalated'),
+        ('paid', 'Paid'),
+        ('cancelled', 'Cancelled'),
+    ]
 
     invoice_number = models.CharField(max_length=50)
     date = models.DateField()
     due_date = models.DateField()
     po_number = models.CharField(max_length=50, blank=True)
     gr_number = models.CharField(max_length=50, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     
     vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='invoices')
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='invoices')
