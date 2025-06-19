@@ -1982,11 +1982,11 @@ export default function ApprovalsPage() {
                       <div className="text-2xl font-semibold text-gray-900 mb-2">{sampleInvoiceData.totalAmount}</div>
                       
                       {/* Status and Timeline */}
-                      <div className="flex items-center gap-3 mb-3">
-                        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 text-xs font-medium">
                           Pending Approval
                         </Badge>
-                        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                        <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100 text-xs font-medium">
                           <Clock className="h-3 w-3 mr-1" />
                           28 days left
                         </Badge>
@@ -2063,7 +2063,7 @@ export default function ApprovalsPage() {
                       <span className="text-xs text-slate-500">(AI-powered)</span>
                       
                       {/* Count bubble */}
-                      <div className="inline-flex items-center justify-center w-4 h-4 text-xs font-medium text-white bg-violet-500 rounded-full ml-2">
+                      <div className="inline-flex items-center justify-center w-4 h-4 text-xs font-medium text-white bg-violet-500 rounded-full">
                         {(() => {
                           const badges = generateValidationBadges(
                             {
@@ -2230,7 +2230,7 @@ export default function ApprovalsPage() {
                   <TabsTrigger value="goods-receipt">Goods Receipt</TabsTrigger>
                   <TabsTrigger value="comments" className="relative">
                     Comments
-                    <span className="ml-2 inline-flex items-center justify-center w-4 h-4 text-xs font-medium text-white bg-violet-500 rounded-full">
+                    <span className="ml-2 inline-flex items-center justify-center w-4 h-4 text-xs font-medium text-violet-600 bg-white border border-violet-300 rounded-full">
                       {comments.length}
                     </span>
                   </TabsTrigger>
