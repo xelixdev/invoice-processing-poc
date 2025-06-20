@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Check, X, Users, Clock, CheckCircle, Calendar, Pause, AlertTriangle, ChevronDown, Plus, Settings, User, UserX, RotateCcw, FileText, Inbox, PartyPopper, Sparkles, Search, Filter, ArrowRight, Forward, Receipt, Eye, CreditCard, DollarSign, MessageSquare, Send } from 'lucide-react'
+import { Check, X, Users, Clock, CheckCircle, Calendar, Pause, AlertTriangle, ChevronDown, ChevronRight, Plus, Settings, User, UserX, RotateCcw, FileText, Inbox, PartyPopper, Sparkles, Search, Filter, ArrowRight, Forward, Receipt, Eye, CreditCard, DollarSign, MessageSquare, Send } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Switch } from '@/components/ui/switch'
@@ -80,6 +80,19 @@ export default function ApprovalsPage() {
   const [selectedInvoices, setSelectedInvoices] = useState<Set<string>>(new Set())
   const [showEmailComposer, setShowEmailComposer] = useState(false)
   const [smartSuggestionsExpanded, setSmartSuggestionsExpanded] = useState(false)
+  const [showTeamWorkloadDrawer, setShowTeamWorkloadDrawer] = useState(false)
+  const [teamSearchQuery, setTeamSearchQuery] = useState('')
+  const [teamFilterOptions, setTeamFilterOptions] = useState({
+    status: 'all', // all, available, busy, out-of-office
+    workloadLevel: 'all', // all, underloaded, balanced, overloaded
+    slaPerformance: 'all', // all, high, medium, low
+    department: 'all' // all, or specific departments
+  })
+  const [showBulkAssignmentDrawer, setShowBulkAssignmentDrawer] = useState(false)
+  const [assignmentStrategy, setAssignmentStrategy] = useState<'direct' | 'round-robin' | 'load-balance' | 'ai-smart'>('direct')
+  const [selectedAssignee, setSelectedAssignee] = useState<typeof assigneeOptions[0] | null>(null)
+  const [assignmentPreview, setAssignmentPreview] = useState<Array<{invoiceId: string, assignedTo: typeof assigneeOptions[0], reason: string}>>([])
+  const [bulkAssignmentSearchQuery, setBulkAssignmentSearchQuery] = useState('')
   
   const { toast } = useToast()
   
@@ -93,13 +106,119 @@ export default function ApprovalsPage() {
   
   // User options for reassignment
   const assigneeOptions = [
-    { initials: 'SC', name: 'Sarah Chen', role: 'AP Manager', color: 'bg-violet-500' },
-    { initials: 'MJ', name: 'Michael Johnson', role: 'AP Specialist', color: 'bg-blue-500' },
-    { initials: 'AR', name: 'Anna Rodriguez', role: 'Finance Director', color: 'bg-green-500' },
-    { initials: 'DK', name: 'David Kim', role: 'CFO', color: 'bg-amber-500' },
-    { initials: 'LP', name: 'Lisa Park', role: 'Senior Accountant', color: 'bg-purple-500' },
-    { initials: 'JW', name: 'John Wilson', role: 'Department Head', color: 'bg-red-500' },
-    { initials: 'KB', name: 'Karen Brown', role: 'Legal Counsel', color: 'bg-indigo-500' }
+    { id: 'SC', initials: 'SC', name: 'Sarah Chen', role: 'AP Manager', color: 'bg-violet-500', currentWorkload: 8 },
+    { id: 'MJ', initials: 'MJ', name: 'Michael Johnson', role: 'AP Specialist', color: 'bg-blue-500', currentWorkload: 5 },
+    { id: 'AR', initials: 'AR', name: 'Anna Rodriguez', role: 'Finance Director', color: 'bg-green-500', currentWorkload: 3 },
+    { id: 'DK', initials: 'DK', name: 'David Kim', role: 'CFO', color: 'bg-amber-500', currentWorkload: 2 },
+    { id: 'LP', initials: 'LP', name: 'Lisa Park', role: 'Senior Accountant', color: 'bg-purple-500', currentWorkload: 6 },
+    { id: 'JW', initials: 'JW', name: 'John Wilson', role: 'Department Head', color: 'bg-red-500', currentWorkload: 4 },
+    { id: 'KB', initials: 'KB', name: 'Karen Brown', role: 'Legal Counsel', color: 'bg-indigo-500', currentWorkload: 1 }
+  ]
+
+  // Team workload data for admin view
+  const teamWorkloadData = [
+    {
+      id: 'SC',
+      name: 'Sarah Chen',
+      initials: 'SC',
+      role: 'AP Manager',
+      color: 'bg-violet-500',
+      status: 'available',
+      currentWorkload: {
+        pending: 8,
+        inProgress: 3,
+        completedToday: 5
+      },
+      capacity: 12,
+      avgApprovalTime: 1.2, // hours
+      slaCompliance: 96,
+      lastActive: '2 mins ago'
+    },
+    {
+      id: 'MJ',
+      name: 'Michael Johnson',
+      initials: 'MJ',
+      role: 'AP Specialist',
+      color: 'bg-blue-500',
+      status: 'busy',
+      currentWorkload: {
+        pending: 11,
+        inProgress: 2,
+        completedToday: 4
+      },
+      capacity: 12,
+      avgApprovalTime: 2.1,
+      slaCompliance: 89,
+      lastActive: '5 mins ago'
+    },
+    {
+      id: 'AR',
+      name: 'Anna Rodriguez',
+      initials: 'AR',
+      role: 'Finance Director',
+      color: 'bg-green-500',
+      status: 'available',
+      currentWorkload: {
+        pending: 4,
+        inProgress: 1,
+        completedToday: 7
+      },
+      capacity: 8,
+      avgApprovalTime: 0.8,
+      slaCompliance: 98,
+      lastActive: '1 min ago'
+    },
+    {
+      id: 'DK',
+      name: 'David Kim',
+      initials: 'DK',
+      role: 'CFO',
+      color: 'bg-amber-500',
+      status: 'available',
+      currentWorkload: {
+        pending: 2,
+        inProgress: 1,
+        completedToday: 3
+      },
+      capacity: 6,
+      avgApprovalTime: 1.5,
+      slaCompliance: 94,
+      lastActive: '10 mins ago'
+    },
+    {
+      id: 'LP',
+      name: 'Lisa Park',
+      initials: 'LP',
+      role: 'Senior Accountant',
+      color: 'bg-purple-500',
+      status: 'out-of-office',
+      currentWorkload: {
+        pending: 0,
+        inProgress: 0,
+        completedToday: 0
+      },
+      capacity: 10,
+      avgApprovalTime: 1.8,
+      slaCompliance: 91,
+      lastActive: 'Yesterday'
+    },
+    {
+      id: 'JW',
+      name: 'John Wilson',
+      initials: 'JW',
+      role: 'Department Head',
+      color: 'bg-red-500',
+      status: 'available',
+      currentWorkload: {
+        pending: 6,
+        inProgress: 2,
+        completedToday: 2
+      },
+      capacity: 8,
+      avgApprovalTime: 2.3,
+      slaCompliance: 87,
+      lastActive: '15 mins ago'
+    }
   ]
 
   // Delegation reasons
@@ -254,16 +373,41 @@ export default function ApprovalsPage() {
     setActionTypes({})
   }
 
-  // Handle role change
-  const handleRoleChange = (isAdmin: boolean) => {
-    setUserRole(isAdmin ? 'admin' : 'user')
-    setTimeout(initializeAssignments, 0) // Initialize after state update
-  }
 
   // Initialize assignments on component mount
   useEffect(() => {
     initializeAssignments()
   }, [userRole])
+
+  // Filter team members based on search and filter options
+  const getFilteredTeamMembers = () => {
+    return teamWorkloadData
+      .filter(member => {
+        // Search filter
+        const matchesSearch = teamSearchQuery === '' || 
+          member.name.toLowerCase().includes(teamSearchQuery.toLowerCase()) ||
+          member.role.toLowerCase().includes(teamSearchQuery.toLowerCase())
+        
+        // Status filter
+        const matchesStatus = teamFilterOptions.status === 'all' || 
+          member.status === teamFilterOptions.status
+        
+        // Workload level filter
+        const workloadPercentage = Math.round((member.currentWorkload.pending / member.capacity) * 100)
+        const matchesWorkload = teamFilterOptions.workloadLevel === 'all' || 
+          (teamFilterOptions.workloadLevel === 'underloaded' && workloadPercentage < 70) ||
+          (teamFilterOptions.workloadLevel === 'balanced' && workloadPercentage >= 70 && workloadPercentage < 90) ||
+          (teamFilterOptions.workloadLevel === 'overloaded' && workloadPercentage >= 90)
+        
+        // SLA performance filter
+        const matchesSLA = teamFilterOptions.slaPerformance === 'all' ||
+          (teamFilterOptions.slaPerformance === 'high' && member.slaCompliance >= 95) ||
+          (teamFilterOptions.slaPerformance === 'medium' && member.slaCompliance >= 85 && member.slaCompliance < 95) ||
+          (teamFilterOptions.slaPerformance === 'low' && member.slaCompliance < 85)
+        
+        return matchesSearch && matchesStatus && matchesWorkload && matchesSLA
+      })
+  }
 
   const handleReassignInvoice = (invoiceId: string, assignee: typeof assigneeOptions[0]) => {
     // In user mode, show delegation modal for reasoning
@@ -509,7 +653,10 @@ export default function ApprovalsPage() {
       projectCode: 'PROJ-2024-001',
       businessUnit: 'Operations',
       department: 'Admin',
-      approverName: 'John Doe'
+      approverName: 'John Doe',
+      poNumber: 'PO-2024-001',
+      grNumber: 'GR-2024-001',
+      hasGoodsReceipt: true
     },
     {
       id: '2',
@@ -524,7 +671,10 @@ export default function ApprovalsPage() {
       projectCode: 'PROJ-2024-002',
       businessUnit: 'IT',
       department: 'Infrastructure',
-      approverName: 'John Doe'
+      approverName: 'John Doe',
+      poNumber: null,
+      grNumber: null,
+      hasGoodsReceipt: false
     },
     {
       id: '5',
@@ -539,7 +689,10 @@ export default function ApprovalsPage() {
       projectCode: 'CONS-2024-003',
       businessUnit: 'Strategy',
       department: 'Business Development',
-      approverName: 'John Doe'
+      approverName: 'John Doe',
+      poNumber: 'PO-2024-003',
+      grNumber: null,
+      hasGoodsReceipt: false
     },
     {
       id: '6',
@@ -845,7 +998,7 @@ export default function ApprovalsPage() {
 
   // Calculate if we need horizontal scroll based on column count
   const getColumnCount = () => {
-    let baseColumns = 9 // Invoice#, Date, Supplier, Amount, Due, Status, Category, GL, Dept
+    let baseColumns = 10 // Invoice#, Date, Supplier, Amount, Due, PO/GR, Status, Category, GL, Dept
     
     if (activeView === 'delegated') {
       baseColumns += 4 // Delegated To, Date Delegated, Reason, Actions
@@ -936,62 +1089,6 @@ export default function ApprovalsPage() {
           actionLabel: "View All Invoices",
           actionView: 'all' as ViewType
         }
-      case 'overdue':
-        return {
-          icon: <CheckCircle className="h-12 w-12 text-green-400" />,
-          title: "No overdue invoices!",
-          description: "Great job keeping up with approvals. All invoices are being processed on time.",
-          actionLabel: "Check Pending",
-          actionView: 'pending' as ViewType
-        }
-      case 'on-hold':
-        return {
-          icon: <Inbox className="h-12 w-12 text-orange-400" />,
-          title: "No invoices on hold",
-          description: "All invoices have the information needed to proceed with approval.",
-          actionLabel: "View Pending",
-          actionView: 'pending' as ViewType
-        }
-      case 'approved-today':
-        return {
-          icon: <Calendar className="h-12 w-12 text-blue-400" />,
-          title: "No approvals yet today",
-          description: "You haven't approved any invoices today. Check your pending items to get started.",
-          actionLabel: "View Pending",
-          actionView: 'pending' as ViewType
-        }
-      case 'rejected':
-        return {
-          icon: <CheckCircle className="h-12 w-12 text-gray-400" />,
-          title: "No rejected invoices",
-          description: "All submitted invoices are in good standing with no issues found.",
-          actionLabel: "View All",
-          actionView: 'all' as ViewType
-        }
-      case 'approved-month':
-        return {
-          icon: <Calendar className="h-12 w-12 text-blue-400" />,
-          title: "No approvals this month",
-          description: "You haven't approved any invoices this month yet.",
-          actionLabel: "Check Pending",
-          actionView: 'pending' as ViewType
-        }
-      case 'delegated':
-        return {
-          icon: <Users className="h-12 w-12 text-orange-400" />,
-          title: "No delegated invoices",
-          description: "You haven't delegated any invoices to other team members.",
-          actionLabel: "View Pending",
-          actionView: 'pending' as ViewType
-        }
-      case 'all':
-        return {
-          icon: <Inbox className="h-12 w-12 text-blue-400" />,
-          title: "No invoices found",
-          description: "There are no invoices in the system at this time.",
-          actionLabel: null,
-          actionView: null
-        }
       default:
         return {
           icon: <Inbox className="h-12 w-12 text-gray-400" />,
@@ -1003,18 +1100,60 @@ export default function ApprovalsPage() {
     }
   }
 
+  // Main component render  
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar activePage="approvals" />
+      <Sidebar activePage="invoices" />
       <div className="flex-1 flex flex-col min-w-0">
-        <MainHeader activePage="approvals" sidebarContext="invoices" />
+        <MainHeader activePage="approvals" />
         
         <main className="flex-1 overflow-auto bg-gray-50/50 min-w-0">
           <div className="p-6 min-w-0">
-            <div className="mb-6">
+            <div className="mb-6 flex items-center justify-between">
               <h1 className="text-2xl font-bold tracking-tight">
                 {userRole === 'user' ? 'My Approvals' : 'Team Approvals'}
               </h1>
+              
+              {/* Compact Team Workload Widget - Admin Only */}
+              {userRole === 'admin' && (
+                <button
+                  onClick={() => setShowTeamWorkloadDrawer(true)}
+                  className="flex items-center gap-3 px-3 py-2 bg-white border border-gray-200 rounded-lg hover:border-gray-300 hover:shadow-sm transition-all group"
+                >
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-gray-600" />
+                    <div className="text-left">
+                      <div className="text-sm font-medium text-gray-900">
+                        {teamWorkloadData.filter(m => m.status === 'available').length}/{teamWorkloadData.length} available
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {Math.round((teamWorkloadData.reduce((sum, m) => sum + m.currentWorkload.pending, 0) / teamWorkloadData.reduce((sum, m) => sum + m.capacity, 0)) * 100)}% capacity
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {/* Mini status indicators */}
+                    <div className="flex -space-x-1">
+                      {teamWorkloadData.slice(0, 4).map((member, idx) => (
+                        <div
+                          key={member.id}
+                          className={`w-2 h-2 rounded-full border border-white ${
+                            member.status === 'available' ? 'bg-green-500' :
+                            member.status === 'busy' ? 'bg-amber-500' : 'bg-gray-400'
+                          }`}
+                          style={{ zIndex: 10 - idx }}
+                        />
+                      ))}
+                      {teamWorkloadData.length > 4 && (
+                        <div className="w-2 h-2 rounded-full bg-gray-300 border border-white" style={{ zIndex: 5 }}>
+                          <span className="sr-only">+{teamWorkloadData.length - 4} more</span>
+                        </div>
+                      )}
+                    </div>
+                    <ChevronRight className="w-3 h-3 text-gray-400 group-hover:text-gray-600 transition-colors" />
+                  </div>
+                </button>
+              )}
             </div>
 
             {/* Priority Action Cards - Compact */}
@@ -1036,6 +1175,21 @@ export default function ApprovalsPage() {
                           ? [...pendingApprovals, ...overdueApprovals].filter(invoice => !delegatedInvoices.has(invoice.id)).length 
                           : pendingApprovals.length + overdueApprovals.length}
                       </p>
+                      {userRole === 'admin' && (
+                        <div className="mt-1">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs text-gray-500">
+                              {pendingApprovals.length + overdueApprovals.length} inv. across {teamWorkloadData.filter(m => m.currentWorkload.pending > 0).length} members
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-1.5">
+                            <div 
+                              className="bg-purple-500 h-1.5 rounded-full transition-all"
+                              style={{ width: `${Math.min(((pendingApprovals.length + overdueApprovals.length) / 20) * 100, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div className={`p-1.5 rounded-full ${
                       activeView === 'pending' ? 'bg-gradient-to-br from-purple-400 to-purple-500' : 'bg-purple-100'
@@ -1065,6 +1219,13 @@ export default function ApprovalsPage() {
                           ? overdueApprovals.filter(invoice => !delegatedInvoices.has(invoice.id)).length 
                           : overdueApprovals.length}
                       </p>
+                      {userRole === 'admin' && overdueApprovals.length > 0 && (
+                        <div className="mt-1">
+                          <span className="text-xs text-red-600 font-medium">
+                            Needs immediate attention
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div className={`p-1.5 rounded-full ${
                       activeView === 'overdue' ? 'bg-gradient-to-br from-red-400 to-red-500' : 'bg-red-100'
@@ -1094,6 +1255,16 @@ export default function ApprovalsPage() {
                           ? onHoldApprovals.filter(invoice => !delegatedInvoices.has(invoice.id)).length 
                           : onHoldApprovals.length}
                       </p>
+                      {userRole === 'admin' && onHoldApprovals.length > 0 && (
+                        <div className="mt-1">
+                          <span className="text-xs text-orange-600">
+                            {teamWorkloadData.filter(m => m.status === 'out-of-office').length > 0 
+                              ? `${teamWorkloadData.filter(m => m.status === 'out-of-office').length} team member(s) unavailable`
+                              : 'Awaiting documentation'
+                            }
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div className={`p-1.5 rounded-full ${
                       activeView === 'on-hold' ? 'bg-gradient-to-br from-orange-400 to-orange-500' : 'bg-orange-100'
@@ -1121,6 +1292,13 @@ export default function ApprovalsPage() {
                       <p className="text-2xl font-bold text-gray-900 mt-0.5">
                         {pendingApprovals.length + onHoldApprovals.length + overdueApprovals.length + approvedToday.length + rejectedApprovals.length + approvedThisMonth.length}
                       </p>
+                      {userRole === 'admin' && (
+                        <div className="mt-1">
+                          <span className="text-xs text-blue-600">
+                            Avg {Math.round((teamWorkloadData.reduce((sum, m) => sum + m.avgApprovalTime, 0) / teamWorkloadData.length) * 10) / 10}h processing time
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div className={`p-1.5 rounded-full ${
                       activeView === 'all' ? 'bg-gradient-to-br from-blue-400 to-blue-500' : 'bg-blue-100'
@@ -1226,6 +1404,7 @@ export default function ApprovalsPage() {
               </div>
             </div>
 
+
             {/* Approvals Table */}
             <Card className="overflow-hidden min-w-0">
               <CardHeader className="pb-2">
@@ -1257,7 +1436,7 @@ export default function ApprovalsPage() {
               </CardHeader>
               <CardContent className="px-6 pb-6 pt-2 min-w-0">
                 <div className={needsHorizontalScroll ? 'overflow-x-auto' : ''}>
-                  <Table style={needsHorizontalScroll ? { minWidth: '1200px', width: '1200px' } : {}} className={needsHorizontalScroll ? '' : 'w-full'}>
+                  <Table style={needsHorizontalScroll ? { minWidth: '1200px' } : {}} className="w-full">
                   <TableHeader>
                     <TableRow>
                       {supportsBulkOperations() && (
@@ -1283,6 +1462,7 @@ export default function ApprovalsPage() {
                       <TableHead className="text-right whitespace-nowrap">Total Amount</TableHead>
                       <TableHead className="whitespace-nowrap">Due Date</TableHead>
                       {activeView === 'overdue' && <TableHead className="whitespace-nowrap">Days Overdue</TableHead>}
+                      <TableHead className="whitespace-nowrap">PO/GR</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Spend Category</TableHead>
                       <TableHead className="whitespace-nowrap">GL Code</TableHead>
@@ -1359,6 +1539,25 @@ export default function ApprovalsPage() {
                         <TableCell className="text-right font-medium py-2">${approval.totalAmount.toFixed(2)}</TableCell>
                         <TableCell className="py-2">{approval.dueDate}</TableCell>
                         {activeView === 'overdue' && <TableCell className="py-2"><Badge variant="destructive" className="bg-red-500">{(approval as any).daysPastDue} days</Badge></TableCell>}
+                        <TableCell className="py-2">
+                          <div className="flex gap-1">
+                            {(approval as any).poNumber ? (
+                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                                PO
+                              </Badge>
+                            ) : null}
+                            {(approval as any).hasGoodsReceipt ? (
+                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+                                GR
+                              </Badge>
+                            ) : null}
+                            {!(approval as any).poNumber && !(approval as any).hasGoodsReceipt ? (
+                              <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-300 text-xs">
+                                Non-PO
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </TableCell>
                         <TableCell className="py-2">
                           <Badge 
                             variant="secondary" 
@@ -1911,6 +2110,17 @@ export default function ApprovalsPage() {
               </Button>
             )}
             
+            {(activeView === 'pending' || activeView === 'overdue') && userRole === 'admin' && (
+              <Button
+                size="sm"
+                className="h-8 px-3 bg-violet-600 hover:bg-violet-700 text-white rounded-full text-xs"
+                onClick={() => setShowBulkAssignmentDrawer(true)}
+              >
+                <Users className="h-3 w-3 mr-1" />
+                Assign
+              </Button>
+            )}
+            
             {activeView === 'on-hold' && (
               <Button
                 size="sm"
@@ -2405,6 +2615,704 @@ export default function ApprovalsPage() {
             </div>
           </div>
       </>
+
+      {/* Team Workload Drawer */}
+      {userRole === 'admin' && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className={`fixed inset-0 z-40 transition-opacity duration-300 ease-in-out ${
+              showTeamWorkloadDrawer ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+            }`}
+            onClick={() => setShowTeamWorkloadDrawer(false)}
+          />
+          
+          {/* Drawer */}
+          <div className={`fixed top-0 right-0 h-full w-[480px] bg-white shadow-2xl z-50 transform transition-all duration-300 ease-in-out flex flex-col ${
+            showTeamWorkloadDrawer ? 'translate-x-0' : 'translate-x-full'
+          }`}>
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <Users className="h-5 w-5 text-violet-600" />
+                <h2 className="text-lg font-semibold text-gray-900">Team Workload</h2>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowTeamWorkloadDrawer(false)}
+                className="h-8 w-8 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Search and Summary Stats */}
+            <div className="px-3 pt-3 pb-0 bg-gray-50 border-b border-gray-200 flex-shrink-0">
+              {/* Search and Filter Bar */}
+              <div className="flex gap-2 mb-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="search"
+                    placeholder="Search team members..."
+                    className="pl-10 bg-white border-gray-200 focus:border-violet-300 focus:ring-violet-200"
+                    value={teamSearchQuery}
+                    onChange={(e) => setTeamSearchQuery(e.target.value)}
+                  />
+                </div>
+                
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      className={`h-10 w-10 relative ${
+                        Object.values(teamFilterOptions).some(filter => filter !== 'all')
+                          ? 'bg-violet-50 border-violet-200 hover:border-violet-300' 
+                          : 'bg-white border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <Filter className={`h-4 w-4 ${
+                        Object.values(teamFilterOptions).some(filter => filter !== 'all')
+                          ? 'text-violet-600' 
+                          : 'text-gray-600'
+                      }`} />
+                      {Object.values(teamFilterOptions).some(filter => filter !== 'all') && (
+                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-violet-500 rounded-full"></div>
+                      )}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    {/* Status Filter */}
+                    <div className="px-2 py-1.5">
+                      <div className="text-xs font-medium text-gray-500 mb-2">Status</div>
+                      <div className="space-y-1">
+                        {[
+                          { value: 'all', label: 'All Members' },
+                          { value: 'available', label: 'Available' },
+                          { value: 'busy', label: 'Busy' },
+                          { value: 'out-of-office', label: 'Out of Office' }
+                        ].map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => setTeamFilterOptions(prev => ({ ...prev, status: option.value }))}
+                            className={`w-full text-left px-2 py-1 rounded text-sm hover:bg-gray-100 ${
+                              teamFilterOptions.status === option.value ? 'bg-violet-50 text-violet-700' : 'text-gray-700'
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div className="border-t border-gray-100 my-1" />
+                    
+                    {/* Workload Level Filter */}
+                    <div className="px-2 py-1.5">
+                      <div className="text-xs font-medium text-gray-500 mb-2">Workload Level</div>
+                      <div className="space-y-1">
+                        {[
+                          { value: 'all', label: 'All Levels' },
+                          { value: 'underloaded', label: 'Light Load (<70%)' },
+                          { value: 'balanced', label: 'Balanced (70-89%)' },
+                          { value: 'overloaded', label: 'Overloaded (90%+)' }
+                        ].map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => setTeamFilterOptions(prev => ({ ...prev, workloadLevel: option.value }))}
+                            className={`w-full text-left px-2 py-1 rounded text-sm hover:bg-gray-100 ${
+                              teamFilterOptions.workloadLevel === option.value ? 'bg-violet-50 text-violet-700' : 'text-gray-700'
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div className="border-t border-gray-100 my-1" />
+                    
+                    {/* SLA Performance Filter */}
+                    <div className="px-2 py-1.5">
+                      <div className="text-xs font-medium text-gray-500 mb-2">SLA Performance</div>
+                      <div className="space-y-1">
+                        {[
+                          { value: 'all', label: 'All Performance' },
+                          { value: 'high', label: 'High (95%+)' },
+                          { value: 'medium', label: 'Medium (85-94%)' },
+                          { value: 'low', label: 'Low (<85%)' }
+                        ].map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => setTeamFilterOptions(prev => ({ ...prev, slaPerformance: option.value }))}
+                            className={`w-full text-left px-2 py-1 rounded text-sm hover:bg-gray-100 ${
+                              teamFilterOptions.slaPerformance === option.value ? 'bg-violet-50 text-violet-700' : 'text-gray-700'
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div className="border-t border-gray-100 my-1" />
+                    
+                    {/* Clear Filters */}
+                    <div className="px-2 py-1.5">
+                      <button
+                        onClick={() => setTeamFilterOptions({
+                          status: 'all',
+                          workloadLevel: 'all',
+                          slaPerformance: 'all',
+                          department: 'all'
+                        })}
+                        className="w-full text-left px-2 py-1 rounded text-sm text-gray-500 hover:bg-gray-100"
+                      >
+                        Clear All Filters
+                      </button>
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              {/* Sleek Team Status Overview */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center justify-between mb-4 bg-white rounded-lg border border-gray-200 px-3 py-2.5 hover:bg-gray-50 transition-colors cursor-help">
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                          <span className="text-sm font-medium text-gray-900">
+                            {teamWorkloadData.filter(m => m.status === 'available').length}
+                          </span>
+                          <span className="text-xs text-gray-500">Available</span>
+                        </div>
+                        
+                        <div className="w-px h-4 bg-gray-200"></div>
+                        
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 bg-amber-500 rounded-full"></div>
+                          <span className="text-sm font-medium text-gray-900">
+                            {teamWorkloadData.filter(m => m.status === 'busy').length}
+                          </span>
+                          <span className="text-xs text-gray-500">Busy</span>
+                        </div>
+                        
+                        <div className="w-px h-4 bg-gray-200"></div>
+                        
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 bg-gray-400 rounded-full"></div>
+                          <span className="text-sm font-medium text-gray-900">
+                            {teamWorkloadData.filter(m => m.status === 'out-of-office').length}
+                          </span>
+                          <span className="text-xs text-gray-500">OOO</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <div className="text-right">
+                          <div className="text-sm font-bold text-gray-900">
+                            {Math.round((teamWorkloadData.reduce((sum, m) => sum + m.currentWorkload.pending, 0) / teamWorkloadData.reduce((sum, m) => sum + m.capacity, 0)) * 100)}%{' '}
+                            <span className="text-xs text-gray-500 font-normal">capacity</span>
+                          </div>
+                        </div>
+                        <div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-violet-500 transition-all"
+                            style={{ width: `${Math.min((teamWorkloadData.reduce((sum, m) => sum + m.currentWorkload.pending, 0) / teamWorkloadData.reduce((sum, m) => sum + m.capacity, 0)) * 100, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-sm">
+                    <div className="space-y-2">
+                      <div className="font-semibold text-sm">Team Workload Details</div>
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <div className="font-medium text-green-600">Available ({teamWorkloadData.filter(m => m.status === 'available').length})</div>
+                          <div className="text-gray-600">
+                            Avg load: {Math.round(teamWorkloadData.filter(m => m.status === 'available').reduce((sum, m) => sum + (m.currentWorkload.pending / m.capacity * 100), 0) / Math.max(teamWorkloadData.filter(m => m.status === 'available').length, 1))}%
+                          </div>
+                        </div>
+                        <div>
+                          <div className="font-medium text-amber-600">Busy ({teamWorkloadData.filter(m => m.status === 'busy').length})</div>
+                          <div className="text-gray-600">
+                            Avg load: {Math.round(teamWorkloadData.filter(m => m.status === 'busy').reduce((sum, m) => sum + (m.currentWorkload.pending / m.capacity * 100), 0) / Math.max(teamWorkloadData.filter(m => m.status === 'busy').length, 1))}%
+                          </div>
+                        </div>
+                      </div>
+                      <div className="border-t pt-2 text-xs">
+                        <div className="flex justify-between">
+                          <span>Total pending approvals:</span>
+                          <span className="font-medium">{teamWorkloadData.reduce((sum, m) => sum + m.currentWorkload.pending, 0)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Total team capacity:</span>
+                          <span className="font-medium">{teamWorkloadData.reduce((sum, m) => sum + m.capacity, 0)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Avg processing time:</span>
+                          <span className="font-medium">{Math.round((teamWorkloadData.reduce((sum, m) => sum + m.avgApprovalTime, 0) / teamWorkloadData.length) * 10) / 10}h</span>
+                        </div>
+                      </div>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+
+            {/* Team Members List */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {getFilteredTeamMembers().map((member) => {
+                  const workloadPercentage = Math.round((member.currentWorkload.pending / member.capacity) * 100)
+                  const totalActive = member.currentWorkload.pending + member.currentWorkload.inProgress
+                  
+                  return (
+                    <div key={member.id} className="bg-white border border-gray-200 rounded-lg p-3 hover:border-gray-300 hover:shadow-sm transition-all cursor-pointer">
+                      {/* Compact Header */}
+                      <div className="flex items-center gap-3">
+                        <div className="relative flex-shrink-0">
+                          <div className={`w-8 h-8 ${member.color} rounded-full flex items-center justify-center text-white text-xs font-semibold`}>
+                            {member.initials}
+                          </div>
+                          <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${
+                            member.status === 'available' ? 'bg-green-500' : 
+                            member.status === 'busy' ? 'bg-amber-500' : 'bg-gray-400'
+                          }`} />
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <div className="min-w-0">
+                              <div className="font-medium text-gray-900 text-sm truncate">{member.name}</div>
+                              <div className="text-xs text-gray-500 truncate">{member.role}</div>
+                            </div>
+                            <div className="text-right flex-shrink-0 ml-2">
+                              <div className="text-sm font-medium text-gray-900">{totalActive}/{member.capacity}</div>
+                              <div className="text-xs text-gray-500">{workloadPercentage}%</div>
+                            </div>
+                          </div>
+                          
+                          {/* Compact Progress Bar */}
+                          <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
+                            <div 
+                              className={`h-1.5 rounded-full transition-all ${
+                                workloadPercentage >= 90 ? 'bg-red-500' :
+                                workloadPercentage >= 70 ? 'bg-amber-500' : 'bg-green-500'
+                              }`}
+                              style={{ width: `${Math.min(workloadPercentage, 100)}%` }}
+                            />
+                          </div>
+                          
+                          {/* Improved Bottom Row with Tooltips */}
+                          <div className="flex items-center justify-between mt-3">
+                            <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                              member.status === 'available' ? 'bg-green-100 text-green-700' :
+                              member.status === 'busy' ? 'bg-amber-100 text-amber-700' :
+                              'bg-gray-100 text-gray-600'
+                            }`}>
+                              {member.status === 'available' ? 'Available' :
+                               member.status === 'busy' ? 'Busy' : 'OOO'}
+                            </span>
+                            
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex items-center gap-2 cursor-help">
+                                      <span>{member.currentWorkload.pending} Pend.</span>
+                                      <span>{member.currentWorkload.inProgress} Active</span>
+                                      <span>{member.currentWorkload.completedToday} Done</span>
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <div className="text-xs">
+                                      <div>{member.currentWorkload.pending} Pending approvals</div>
+                                      <div>{member.currentWorkload.inProgress} Currently processing</div>
+                                      <div>{member.currentWorkload.completedToday} Completed today</div>
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              
+                              <span className="text-gray-400">•</span>
+                              
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="cursor-help">{member.avgApprovalTime}h avg</span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <div className="text-xs">
+                                      Average processing time from assignment to completion: {member.avgApprovalTime} hours
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              
+              {/* No Results Message */}
+              {getFilteredTeamMembers().length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <Search className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                  <div className="text-sm">No team members found</div>
+                  <div className="text-xs">
+                    {teamSearchQuery || Object.values(teamFilterOptions).some(filter => filter !== 'all') 
+                      ? 'Try adjusting your search terms or filters' 
+                      : 'No team members available'
+                    }
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Bulk Assignment Drawer */}
+      {userRole === 'admin' && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className={`fixed inset-0 z-40 bg-black/20 backdrop-blur-sm transition-all duration-300 ease-in-out ${
+              showBulkAssignmentDrawer ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+            }`}
+            onClick={() => setShowBulkAssignmentDrawer(false)}
+          />
+          
+          {/* Drawer */}
+          <div className={`fixed top-0 right-0 h-full w-96 bg-white shadow-xl z-50 transform transition-all duration-300 ease-in-out flex flex-col ${
+            showBulkAssignmentDrawer ? 'translate-x-0' : 'translate-x-full'
+          }`}>
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <Forward className="h-5 w-5 text-violet-600" />
+                <h2 className="text-lg font-semibold text-gray-900">Bulk Assignment</h2>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowBulkAssignmentDrawer(false)}
+                className="h-8 w-8 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="p-6 space-y-6 flex-shrink-0">
+                {/* Selected Invoices Summary */}
+                <div className="bg-violet-50 border border-violet-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-5 h-5 bg-violet-600 rounded flex items-center justify-center">
+                      <span className="text-white text-xs font-bold">{selectedInvoices.size}</span>
+                    </div>
+                    <span className="text-sm font-medium text-violet-900">
+                      {selectedInvoices.size} invoice{selectedInvoices.size === 1 ? '' : 's'} selected
+                    </span>
+                  </div>
+                  <div className="text-xs text-violet-700">
+                    Total value: ${Array.from(selectedInvoices).reduce((sum, id) => {
+                      const allInvoices = [...pendingApprovals, ...onHoldApprovals, ...overdueApprovals, ...approvedToday, ...rejectedApprovals, ...approvedThisMonth]
+                      const invoice = allInvoices.find(inv => inv.id === id)
+                      return sum + (invoice?.totalAmount || 0)
+                    }, 0).toLocaleString()}
+                  </div>
+                </div>
+
+                {/* Assignment Strategy */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-gray-900">Assignment Strategy</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => {
+                        setAssignmentStrategy('direct')
+                        setAssignmentPreview([])
+                      }}
+                      className={`p-3 rounded-lg border-2 transition-all ${
+                        assignmentStrategy === 'direct' 
+                          ? 'border-violet-600 bg-violet-50 text-violet-900' 
+                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="text-sm font-medium">Direct</div>
+                      <div className="text-xs text-gray-500">Assign to specific user</div>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setAssignmentStrategy('round-robin')
+                        setAssignmentPreview([])
+                      }}
+                      className={`p-3 rounded-lg border-2 transition-all ${
+                        assignmentStrategy === 'round-robin' 
+                          ? 'border-violet-600 bg-violet-50 text-violet-900' 
+                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="text-sm font-medium">Round Robin</div>
+                      <div className="text-xs text-gray-500">Distribute evenly</div>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setAssignmentStrategy('load-balance')
+                        setAssignmentPreview([])
+                      }}
+                      className={`p-3 rounded-lg border-2 transition-all ${
+                        assignmentStrategy === 'load-balance' 
+                          ? 'border-violet-600 bg-violet-50 text-violet-900' 
+                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="text-sm font-medium">Load Balance</div>
+                      <div className="text-xs text-gray-500">Based on workload</div>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setAssignmentStrategy('ai-smart')
+                        setAssignmentPreview([])
+                      }}
+                      className={`p-3 rounded-lg border-2 transition-all ${
+                        assignmentStrategy === 'ai-smart' 
+                          ? 'border-violet-600 bg-violet-50 text-violet-900' 
+                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="text-sm font-medium">AI Smart</div>
+                      <div className="text-xs text-gray-500">Intelligent matching</div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Direct Assignment - User Selection */}
+                {assignmentStrategy === 'direct' && (
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium text-gray-900">Select Assignee</Label>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="w-full justify-between text-left font-normal">
+                          {selectedAssignee ? (
+                            <div className="flex items-center gap-2">
+                              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-medium ${selectedAssignee.color}`}>
+                                {selectedAssignee.initials}
+                              </div>
+                              <span>{selectedAssignee.name}</span>
+                              <span className="text-gray-500">• {selectedAssignee.role}</span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-500">Search and select team member...</span>
+                          )}
+                          <ChevronDown className="h-4 w-4 opacity-50" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-[368px] p-2">
+                        <div className="relative mb-2">
+                          <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <Input
+                            type="search"
+                            placeholder="Search team members..."
+                            className="pl-8 h-8"
+                            value={bulkAssignmentSearchQuery}
+                            onChange={(e) => setBulkAssignmentSearchQuery(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                        <div className="max-h-64 overflow-y-auto">
+                          {assigneeOptions
+                            .filter(assignee => 
+                              assignee.name.toLowerCase().includes(bulkAssignmentSearchQuery.toLowerCase()) ||
+                              assignee.role.toLowerCase().includes(bulkAssignmentSearchQuery.toLowerCase())
+                            )
+                            .map((assignee) => (
+                              <DropdownMenuItem
+                                key={assignee.id}
+                                onClick={() => {
+                                  setSelectedAssignee(assignee)
+                                  setBulkAssignmentSearchQuery('')
+                                }}
+                                className="cursor-pointer p-2"
+                              >
+                                <div className="flex items-center gap-3 w-full">
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${assignee.color}`}>
+                                    {assignee.initials}
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="font-medium text-sm">{assignee.name}</div>
+                                    <div className="text-xs text-gray-500">{assignee.role}</div>
+                                  </div>
+                                  <div className="text-xs text-gray-400">
+                                    {assignee.currentWorkload} active
+                                  </div>
+                                </div>
+                              </DropdownMenuItem>
+                            ))}
+                        </div>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                )}
+
+              </div>
+              
+              {/* Preview Section - Full Height */}
+              {assignmentPreview.length > 0 && (
+                <div className="flex-1 flex flex-col px-6 pb-6 overflow-hidden">
+                  <Label className="text-sm font-medium text-gray-900 mb-3 flex-shrink-0">Assignment Preview</Label>
+                  <div className="flex-1 overflow-y-auto space-y-2">
+                    {assignmentPreview.map((preview) => (
+                      <div key={preview.invoiceId} className="p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="font-medium text-sm">
+                            Invoice {(() => {
+                              const allInvoices = [...pendingApprovals, ...onHoldApprovals, ...overdueApprovals, ...approvedToday, ...rejectedApprovals, ...approvedThisMonth]
+                              return allInvoices.find(inv => inv.id === preview.invoiceId)?.invoiceNumber
+                            })()}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-medium ${preview.assignedTo.color}`}>
+                              {preview.assignedTo.initials}
+                            </div>
+                            <span className="text-xs text-gray-600">{preview.assignedTo.name}</span>
+                          </div>
+                        </div>
+                        <div className="text-xs text-gray-500">{preview.reason}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Fixed Footer */}
+            <div className="border-t border-gray-200 px-6 py-4 bg-white flex-shrink-0">
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    // Generate preview based on strategy
+                    const selectedInvoiceIds = Array.from(selectedInvoices)
+                    const newPreview: Array<{invoiceId: string, assignedTo: typeof assigneeOptions[0], reason: string}> = []
+                    
+                    if (assignmentStrategy === 'direct') {
+                      // Direct assignment - all to selected user
+                      selectedInvoiceIds.forEach(invoiceId => {
+                        newPreview.push({
+                          invoiceId,
+                          assignedTo: selectedAssignee || assigneeOptions[0],
+                          reason: 'Direct assignment to selected team member'
+                        })
+                      })
+                    } else if (assignmentStrategy === 'round-robin') {
+                      // Round Robin - distribute evenly
+                      const availableAssignees = assigneeOptions.filter(a => a.currentWorkload < 10)
+                      selectedInvoiceIds.forEach((invoiceId, index) => {
+                        const assignee = availableAssignees[index % availableAssignees.length]
+                        newPreview.push({
+                          invoiceId,
+                          assignedTo: assignee,
+                          reason: `Round-robin distribution (position ${(index % availableAssignees.length) + 1}/${availableAssignees.length})`
+                        })
+                      })
+                    } else if (assignmentStrategy === 'load-balance') {
+                      // Load Balance - assign to least busy
+                      const sortedByWorkload = [...assigneeOptions].sort((a, b) => a.currentWorkload - b.currentWorkload)
+                      const workloadMap = new Map(sortedByWorkload.map(a => [a.id, a.currentWorkload]))
+                      
+                      selectedInvoiceIds.forEach(invoiceId => {
+                        // Find person with lowest current workload
+                        const lowestWorkload = Math.min(...Array.from(workloadMap.values()))
+                        const assignee = sortedByWorkload.find(a => workloadMap.get(a.id) === lowestWorkload) || sortedByWorkload[0]
+                        
+                        newPreview.push({
+                          invoiceId,
+                          assignedTo: assignee,
+                          reason: `Load-balanced assignment (${workloadMap.get(assignee.id)} current tasks, ${Math.round((workloadMap.get(assignee.id)! / 10) * 100)}% capacity)`
+                        })
+                        
+                        // Update workload for next iteration
+                        workloadMap.set(assignee.id, (workloadMap.get(assignee.id) || 0) + 1)
+                      })
+                    } else if (assignmentStrategy === 'ai-smart') {
+                      // AI Smart - intelligent matching based on various factors
+                      const allInvoices = [...pendingApprovals, ...onHoldApprovals, ...overdueApprovals]
+                      
+                      selectedInvoiceIds.forEach(invoiceId => {
+                        const invoice = allInvoices.find(inv => inv.id === invoiceId)
+                        let assignee: typeof assigneeOptions[0]
+                        let reason: string
+                        
+                        if (invoice) {
+                          // Match based on category/amount
+                          if (invoice.totalAmount > 5000) {
+                            // High value - assign to senior staff
+                            assignee = assigneeOptions.find(a => a.role.includes('Director') || a.role.includes('CFO')) || assigneeOptions[3]
+                            reason = `High-value invoice ($${invoice.totalAmount.toLocaleString()}) - assigned to senior approver`
+                          } else if (invoice.spendCategory === 'Office Supplies') {
+                            // Office supplies - assign to AP specialist
+                            assignee = assigneeOptions.find(a => a.role === 'AP Specialist') || assigneeOptions[1]
+                            reason = `Category expertise match: ${invoice.spendCategory} specialist`
+                          } else if (invoice.supplierName.includes('Tech')) {
+                            // Tech vendor - assign to someone familiar
+                            assignee = assigneeOptions[2]
+                            reason = `Vendor relationship: Previously handled ${invoice.supplierName} invoices`
+                          } else {
+                            // Default intelligent assignment
+                            const workloadScore = assigneeOptions.map(a => ({
+                              assignee: a,
+                              score: (10 - a.currentWorkload) * 0.5 + (a.role.includes('Manager') ? 2 : 0)
+                            })).sort((a, b) => b.score - a.score)
+                            assignee = workloadScore[0].assignee
+                            reason = `AI optimization: Best match based on workload and expertise`
+                          }
+                        } else {
+                          assignee = assigneeOptions[0]
+                          reason = 'AI-powered assignment based on current capacity'
+                        }
+                        
+                        newPreview.push({ invoiceId, assignedTo: assignee, reason })
+                      })
+                    }
+                    
+                    setAssignmentPreview(newPreview)
+                  }}
+                  className="flex-1"
+                  disabled={selectedInvoices.size === 0 || (assignmentStrategy === 'direct' && !selectedAssignee)}
+                >
+                  Generate Preview
+                </Button>
+                <Button
+                  onClick={() => {
+                    // Execute assignment logic here
+                    toast({
+                      title: "Assignment Successful",
+                      description: `${selectedInvoices.size} invoice${selectedInvoices.size === 1 ? '' : 's'} assigned successfully.`,
+                      className: "bg-green-50 border-green-200 text-green-800",
+                    })
+                    setShowBulkAssignmentDrawer(false)
+                    setSelectedInvoices(new Set())
+                    setAssignmentPreview([])
+                  }}
+                  className="flex-1 bg-violet-600 hover:bg-violet-700"
+                  disabled={selectedInvoices.size === 0 || assignmentPreview.length === 0}
+                >
+                  Assign
+                </Button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Email Composer for Contact Vendor Action */}
       <EmailComposer

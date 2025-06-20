@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Sidebar from '@/components/sidebar'
 import MainHeader from '@/components/main-header'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -44,6 +44,9 @@ interface EscalatedInvoice {
   priority: 'High' | 'Medium' | 'Low'
   escalationDate: string
   slaRule: SLARule
+  poNumber: string | null
+  grNumber: string | null
+  hasGoodsReceipt: boolean
 }
 
 // Mock SLA rules that match the ones in settings
@@ -99,7 +102,10 @@ const mockEscalatedInvoices: EscalatedInvoice[] = [
     escalationStatus: 'In Progress',
     priority: 'High',
     escalationDate: '2024-01-18',
-    slaRule: mockSLARules[1]
+    slaRule: mockSLARules[1],
+    poNumber: 'PO-2024-001',
+    grNumber: 'GR-2024-001',
+    hasGoodsReceipt: true
   },
   {
     id: '2',
@@ -121,7 +127,10 @@ const mockEscalatedInvoices: EscalatedInvoice[] = [
     escalationStatus: 'Pending',
     priority: 'High',
     escalationDate: '2024-01-15',
-    slaRule: mockSLARules[0]
+    slaRule: mockSLARules[0],
+    poNumber: null,
+    grNumber: null,
+    hasGoodsReceipt: false
   },
   {
     id: '3',
@@ -143,7 +152,35 @@ const mockEscalatedInvoices: EscalatedInvoice[] = [
     escalationStatus: 'In Progress',
     priority: 'Medium',
     escalationDate: '2024-01-22',
-    slaRule: mockSLARules[0]
+    slaRule: mockSLARules[0],
+    poNumber: 'PO-2024-032',
+    grNumber: null,
+    hasGoodsReceipt: false
+  },
+  {
+    id: '4',
+    invoiceNumber: 'INV-2024-067',
+    vendorName: 'Global Logistics Solutions',
+    escalationReason: 'Standard Processing Timeout',
+    escalationAge: '6 days',
+    slaBreach: true,
+    totalAmount: '$12,850.00',
+    invoiceDate: '2024-01-14',
+    assignedTo: {
+      name: 'Lisa Park',
+      initials: 'LP',
+      color: 'bg-purple-500',
+      department: 'Finance'
+    },
+    lastActionTaken: 'Requested additional documentation',
+    nextActionRequired: 'Document Review Required',
+    escalationStatus: 'Pending',
+    priority: 'Medium',
+    escalationDate: '2024-01-20',
+    slaRule: mockSLARules[2],
+    poNumber: 'PO-2024-067',
+    grNumber: 'GR-2024-067',
+    hasGoodsReceipt: true
   }
 ]
 
@@ -159,31 +196,13 @@ export default function EscalationsPage() {
     setIsRuleModalOpen(true)
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Pending':
-        return 'bg-yellow-100 text-yellow-700 border-yellow-200'
-      case 'In Progress':
-        return 'bg-blue-100 text-blue-700 border-blue-200'
-      case 'Resolved':
-        return 'bg-green-100 text-green-700 border-green-200'
-      default:
-        return 'bg-gray-100 text-gray-700 border-gray-200'
-    }
+  // Calculate if we need horizontal scroll based on column count
+  const getColumnCount = () => {
+    return 13 // Invoice#, Vendor, SLA, Priority, Age, Amount, Date, PO/GR, Assigned, Last Action, Next Action, Status, Actions
   }
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'High':
-        return 'bg-red-100 text-red-700 border-red-200'
-      case 'Medium':
-        return 'bg-orange-100 text-orange-700 border-orange-200'
-      case 'Low':
-        return 'bg-gray-100 text-gray-700 border-gray-200'
-      default:
-        return 'bg-gray-100 text-gray-700 border-gray-200'
-    }
-  }
+  const needsHorizontalScroll = getColumnCount() > 11 // Threshold for enabling scroll
+
 
   const filteredInvoices = mockEscalatedInvoices.filter(invoice => {
     const matchesSearch = 
@@ -211,70 +230,72 @@ export default function EscalationsPage() {
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
                 <AlertTriangle className="h-3 w-3 mr-1" />
-                {filteredInvoices.filter(inv => inv.slaBreach).length} SLA Breaches
+                {mockEscalatedInvoices.filter(inv => inv.slaBreach).length} SLA Breaches
               </Badge>
               <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
                 <Clock className="h-3 w-3 mr-1" />
-                {filteredInvoices.filter(inv => inv.priority === 'High').length} High Priority
+                {mockEscalatedInvoices.filter(inv => inv.priority === 'High').length} High Priority
               </Badge>
             </div>
           </div>
 
-          {/* Filters */}
-          <Card className="mb-6">
-            <CardContent className="pt-6">
-              <div className="flex flex-col sm:flex-row gap-4 justify-between">
-                <div className="flex gap-4 items-center">
-                  <div className="relative w-full max-w-xl">
-                    <Search className="absolute left-2.5 top-2.5 h-5 w-4 text-muted-foreground" />
+          {/* Escalations Table */}
+          <Card className="overflow-hidden min-w-0">
+            <CardHeader className="pb-2">
+              <div className="flex items-end justify-between">
+                <div className="space-y-0">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                    Escalated Invoices ({filteredInvoices.length})
+                  </CardTitle>
+                </div>
+                <div className="flex gap-2">
+                  <div className="relative w-56">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input 
                       type="search" 
-                      placeholder="Search by invoice number, vendor, or escalation reason..." 
-                      className="w-full pl-8 bg-white"
+                      placeholder="Search escalations..." 
+                      className="w-full pl-8 h-9 text-sm"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                     />
                   </div>
-                </div>
-                <div className="flex gap-2">
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="All Statuses" />
+                    <SelectTrigger className="w-32 h-9 text-sm">
+                      <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="all">All Status</SelectItem>
                       <SelectItem value="Pending">Pending</SelectItem>
                       <SelectItem value="In Progress">In Progress</SelectItem>
                       <SelectItem value="Resolved">Resolved</SelectItem>
                     </SelectContent>
                   </Select>
                   <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="All Priorities" />
+                    <SelectTrigger className="w-32 h-9 text-sm">
+                      <SelectValue placeholder="Priority" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Priorities</SelectItem>
-                      <SelectItem value="High">High Priority</SelectItem>
-                      <SelectItem value="Medium">Medium Priority</SelectItem>
-                      <SelectItem value="Low">Low Priority</SelectItem>
+                      <SelectItem value="all">All Priority</SelectItem>
+                      <SelectItem value="High">High</SelectItem>
+                      <SelectItem value="Medium">Medium</SelectItem>
+                      <SelectItem value="Low">Low</SelectItem>
                     </SelectContent>
                   </Select>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="h-9 px-3 text-sm border-purple-600 text-purple-600 hover:bg-purple-50"
+                  >
+                    <Filter className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Escalations Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-red-600" />
-                Escalated Invoices ({filteredInvoices.length})
-              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="border rounded-lg overflow-hidden bg-white">
-                <Table>
+            <CardContent className="px-6 pb-6 pt-2 min-w-0">
+              <div className={needsHorizontalScroll ? 'overflow-x-auto' : ''}>
+                <div className="border rounded-lg overflow-hidden bg-white">
+                  <Table style={needsHorizontalScroll ? { minWidth: '1400px' } : {}} className="w-full">
                   <TableHeader>
                     <TableRow className="bg-gray-50">
                       <TableHead>Invoice #</TableHead>
@@ -284,6 +305,7 @@ export default function EscalationsPage() {
                       <TableHead>Escalation Age</TableHead>
                       <TableHead>Total Amount</TableHead>
                       <TableHead>Invoice Date</TableHead>
+                      <TableHead className="whitespace-nowrap">PO/GR</TableHead>
                       <TableHead>Assigned To</TableHead>
                       <TableHead>Last Action</TableHead>
                       <TableHead>Next Action</TableHead>
@@ -293,47 +315,82 @@ export default function EscalationsPage() {
                   </TableHeader>
                   <TableBody>
                     {filteredInvoices.map((invoice) => (
-                      <TableRow key={invoice.id} className="hover:bg-gray-50">
-                        <TableCell className="font-medium text-violet-600">
-                          {invoice.invoiceNumber}
+                      <TableRow 
+                        key={invoice.id} 
+                        className="transition-all ease-in-out duration-200 hover:bg-gray-50"
+                      >
+                        <TableCell className="font-medium py-2">
+                          <button 
+                            className="text-blue-600 hover:underline focus:outline-none"
+                            onClick={() => {
+                              // Handle invoice details view
+                              console.log('View invoice:', invoice.invoiceNumber)
+                            }}
+                          >
+                            {invoice.invoiceNumber}
+                          </button>
                         </TableCell>
-                        <TableCell className="font-medium">
-                          {invoice.vendorName}
-                        </TableCell>
-                        <TableCell>
+                        <TableCell className="max-w-[200px] truncate py-2">{invoice.vendorName}</TableCell>
+                        <TableCell className="py-2">
                           <button 
                             onClick={() => handleRuleClick(invoice.slaRule)}
-                            className="text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium"
+                            className="text-blue-600 hover:underline focus:outline-none text-left"
                           >
                             {invoice.escalationReason}
                           </button>
                         </TableCell>
-                        <TableCell>
-                          <Badge className={getPriorityColor(invoice.priority)}>
+                        <TableCell className="py-2">
+                          <Badge 
+                            variant="secondary" 
+                            className={
+                              invoice.priority === 'High' 
+                                ? "bg-red-100 text-red-800" 
+                                : invoice.priority === 'Medium'
+                                ? "bg-orange-100 text-orange-800"
+                                : "bg-gray-100 text-gray-800"
+                            }
+                          >
                             {invoice.priority}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          <span className="text-sm font-medium">{invoice.escalationAge}</span>
+                        <TableCell className="py-2">
+                          <span className={`text-sm font-medium ${
+                            invoice.slaBreach ? 'text-red-600' : 'text-gray-900'
+                          }`}>
+                            {invoice.escalationAge}
+                          </span>
                         </TableCell>
-                        <TableCell className="font-semibold">
-                          {invoice.totalAmount}
-                        </TableCell>
-                        <TableCell>
-                          {new Date(invoice.invoiceDate).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          {invoice.assignedTo ? (
-                            <div className="flex flex-col space-y-1">
-                              <span className="text-sm font-medium text-gray-900">
-                                {invoice.assignedTo.name}
-                              </span>
-                              <Badge 
-                                variant="secondary" 
-                                className="text-xs w-fit bg-blue-100 text-blue-700 hover:bg-blue-100"
-                              >
-                                {invoice.assignedTo.department}
+                        <TableCell className="text-right font-medium py-2">{invoice.totalAmount}</TableCell>
+                        <TableCell className="py-2">{new Date(invoice.invoiceDate).toLocaleDateString('en-US')}</TableCell>
+                        <TableCell className="py-2">
+                          <div className="flex gap-1">
+                            {invoice.poNumber ? (
+                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                                PO
                               </Badge>
+                            ) : null}
+                            {invoice.hasGoodsReceipt ? (
+                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+                                GR
+                              </Badge>
+                            ) : null}
+                            {!invoice.poNumber && !invoice.hasGoodsReceipt ? (
+                              <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-300 text-xs">
+                                Non-PO
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-2">
+                          {invoice.assignedTo ? (
+                            <div className="flex items-center gap-2">
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-medium ${invoice.assignedTo.color}`}>
+                                {invoice.assignedTo.initials}
+                              </div>
+                              <div>
+                                <div className="text-sm font-medium">{invoice.assignedTo.name}</div>
+                                <div className="text-xs text-gray-500">{invoice.assignedTo.department}</div>
+                              </div>
                             </div>
                           ) : (
                             <Badge 
@@ -344,25 +401,43 @@ export default function EscalationsPage() {
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="py-2">
                           <span className="text-sm text-gray-600">{invoice.lastActionTaken}</span>
                         </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                        <TableCell className="py-2">
+                          <Badge 
+                            variant="outline" 
+                            className="bg-blue-50 text-blue-700 border-blue-200 text-xs"
+                          >
                             {invoice.nextActionRequired}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(invoice.escalationStatus)}>
+                        <TableCell className="py-2">
+                          <Badge 
+                            variant="secondary" 
+                            className={
+                              invoice.escalationStatus === 'Pending' 
+                                ? "bg-yellow-100 text-yellow-800" 
+                                : invoice.escalationStatus === 'In Progress'
+                                ? "bg-blue-100 text-blue-800"
+                                : invoice.escalationStatus === 'Resolved'
+                                ? "bg-green-100 text-green-800"
+                                : "bg-gray-100 text-gray-800"
+                            }
+                          >
                             {invoice.escalationStatus}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
+                        <TableCell className="text-center py-2">
+                          <div className="flex items-center gap-1 justify-center">
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button variant="ghost" size="sm">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    className="h-8 w-8 p-0 hover:bg-blue-50"
+                                  >
                                     <Eye className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
@@ -374,7 +449,11 @@ export default function EscalationsPage() {
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button variant="ghost" size="sm">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    className="h-8 w-8 p-0 hover:bg-blue-50"
+                                  >
                                     <MessageSquare className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
@@ -386,7 +465,11 @@ export default function EscalationsPage() {
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button variant="ghost" size="sm">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    className="h-8 w-8 p-0 hover:bg-blue-50"
+                                  >
                                     <User className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
@@ -400,7 +483,8 @@ export default function EscalationsPage() {
                       </TableRow>
                     ))}
                   </TableBody>
-                </Table>
+                  </Table>
+                </div>
               </div>
 
               {filteredInvoices.length === 0 && (
@@ -480,7 +564,7 @@ export default function EscalationsPage() {
                 <div>
                   <h4 className="font-medium text-gray-900 mb-2">Created Date</h4>
                   <p className="text-gray-600">
-                    {new Date(selectedRule.created).toLocaleDateString()}
+                    {new Date(selectedRule.created).toLocaleDateString('en-US')}
                   </p>
                 </div>
                 <div>
