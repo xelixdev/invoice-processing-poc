@@ -88,6 +88,11 @@ export default function ApprovalsPage() {
     slaPerformance: 'all', // all, high, medium, low
     department: 'all' // all, or specific departments
   })
+  const [showBulkAssignmentDrawer, setShowBulkAssignmentDrawer] = useState(false)
+  const [assignmentStrategy, setAssignmentStrategy] = useState<'direct' | 'round-robin' | 'load-balance' | 'ai-smart'>('direct')
+  const [selectedAssignee, setSelectedAssignee] = useState<typeof assigneeOptions[0] | null>(null)
+  const [assignmentPreview, setAssignmentPreview] = useState<Array<{invoiceId: string, assignedTo: typeof assigneeOptions[0], reason: string}>>([])
+  const [bulkAssignmentSearchQuery, setBulkAssignmentSearchQuery] = useState('')
   
   const { toast } = useToast()
   
@@ -101,13 +106,13 @@ export default function ApprovalsPage() {
   
   // User options for reassignment
   const assigneeOptions = [
-    { initials: 'SC', name: 'Sarah Chen', role: 'AP Manager', color: 'bg-violet-500' },
-    { initials: 'MJ', name: 'Michael Johnson', role: 'AP Specialist', color: 'bg-blue-500' },
-    { initials: 'AR', name: 'Anna Rodriguez', role: 'Finance Director', color: 'bg-green-500' },
-    { initials: 'DK', name: 'David Kim', role: 'CFO', color: 'bg-amber-500' },
-    { initials: 'LP', name: 'Lisa Park', role: 'Senior Accountant', color: 'bg-purple-500' },
-    { initials: 'JW', name: 'John Wilson', role: 'Department Head', color: 'bg-red-500' },
-    { initials: 'KB', name: 'Karen Brown', role: 'Legal Counsel', color: 'bg-indigo-500' }
+    { id: 'SC', initials: 'SC', name: 'Sarah Chen', role: 'AP Manager', color: 'bg-violet-500', currentWorkload: 8 },
+    { id: 'MJ', initials: 'MJ', name: 'Michael Johnson', role: 'AP Specialist', color: 'bg-blue-500', currentWorkload: 5 },
+    { id: 'AR', initials: 'AR', name: 'Anna Rodriguez', role: 'Finance Director', color: 'bg-green-500', currentWorkload: 3 },
+    { id: 'DK', initials: 'DK', name: 'David Kim', role: 'CFO', color: 'bg-amber-500', currentWorkload: 2 },
+    { id: 'LP', initials: 'LP', name: 'Lisa Park', role: 'Senior Accountant', color: 'bg-purple-500', currentWorkload: 6 },
+    { id: 'JW', initials: 'JW', name: 'John Wilson', role: 'Department Head', color: 'bg-red-500', currentWorkload: 4 },
+    { id: 'KB', initials: 'KB', name: 'Karen Brown', role: 'Legal Counsel', color: 'bg-indigo-500', currentWorkload: 1 }
   ]
 
   // Team workload data for admin view
@@ -1075,62 +1080,6 @@ export default function ApprovalsPage() {
           actionLabel: "View All Invoices",
           actionView: 'all' as ViewType
         }
-      case 'overdue':
-        return {
-          icon: <CheckCircle className="h-12 w-12 text-green-400" />,
-          title: "No overdue invoices!",
-          description: "Great job keeping up with approvals. All invoices are being processed on time.",
-          actionLabel: "Check Pending",
-          actionView: 'pending' as ViewType
-        }
-      case 'on-hold':
-        return {
-          icon: <Inbox className="h-12 w-12 text-orange-400" />,
-          title: "No invoices on hold",
-          description: "All invoices have the information needed to proceed with approval.",
-          actionLabel: "View Pending",
-          actionView: 'pending' as ViewType
-        }
-      case 'approved-today':
-        return {
-          icon: <Calendar className="h-12 w-12 text-blue-400" />,
-          title: "No approvals yet today",
-          description: "You haven't approved any invoices today. Check your pending items to get started.",
-          actionLabel: "View Pending",
-          actionView: 'pending' as ViewType
-        }
-      case 'rejected':
-        return {
-          icon: <CheckCircle className="h-12 w-12 text-gray-400" />,
-          title: "No rejected invoices",
-          description: "All submitted invoices are in good standing with no issues found.",
-          actionLabel: "View All",
-          actionView: 'all' as ViewType
-        }
-      case 'approved-month':
-        return {
-          icon: <Calendar className="h-12 w-12 text-blue-400" />,
-          title: "No approvals this month",
-          description: "You haven't approved any invoices this month yet.",
-          actionLabel: "Check Pending",
-          actionView: 'pending' as ViewType
-        }
-      case 'delegated':
-        return {
-          icon: <Users className="h-12 w-12 text-orange-400" />,
-          title: "No delegated invoices",
-          description: "You haven't delegated any invoices to other team members.",
-          actionLabel: "View Pending",
-          actionView: 'pending' as ViewType
-        }
-      case 'all':
-        return {
-          icon: <Inbox className="h-12 w-12 text-blue-400" />,
-          title: "No invoices found",
-          description: "There are no invoices in the system at this time.",
-          actionLabel: null,
-          actionView: null
-        }
       default:
         return {
           icon: <Inbox className="h-12 w-12 text-gray-400" />,
@@ -1142,11 +1091,12 @@ export default function ApprovalsPage() {
     }
   }
 
+  // Main component render  
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar activePage="approvals" />
       <div className="flex-1 flex flex-col min-w-0">
-        <MainHeader activePage="approvals" sidebarContext="invoices" />
+        <MainHeader activePage="invoices" />
         
         <main className="flex-1 overflow-auto bg-gray-50/50 min-w-0">
           <div className="p-6 min-w-0">
@@ -2131,6 +2081,17 @@ export default function ApprovalsPage() {
               </Button>
             )}
             
+            {(activeView === 'pending' || activeView === 'overdue') && userRole === 'admin' && (
+              <Button
+                size="sm"
+                className="h-8 px-3 bg-violet-600 hover:bg-violet-700 text-white rounded-full text-xs"
+                onClick={() => setShowBulkAssignmentDrawer(true)}
+              >
+                <Users className="h-3 w-3 mr-1" />
+                Assign
+              </Button>
+            )}
+            
             {activeView === 'on-hold' && (
               <Button
                 size="sm"
@@ -2984,6 +2945,228 @@ export default function ApprovalsPage() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Bulk Assignment Drawer */}
+      {userRole === 'admin' && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className={`fixed inset-0 z-40 bg-black/20 backdrop-blur-sm transition-all duration-300 ease-in-out ${
+              showBulkAssignmentDrawer ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+            }`}
+            onClick={() => setShowBulkAssignmentDrawer(false)}
+          />
+          
+          {/* Drawer */}
+          <div className={`fixed top-0 right-0 h-full w-96 bg-white shadow-xl z-50 transform transition-all duration-300 ease-in-out flex flex-col ${
+            showBulkAssignmentDrawer ? 'translate-x-0' : 'translate-x-full'
+          }`}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-violet-600 to-violet-700 text-white flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                  <Forward className="h-4 w-4" />
+                </div>
+                <h2 className="text-lg font-semibold">Bulk Assignment</h2>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowBulkAssignmentDrawer(false)}
+                className="h-8 w-8 p-0 text-white hover:bg-white/10"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-6 space-y-6">
+                {/* Selected Invoices Summary */}
+                <div className="bg-violet-50 border border-violet-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-5 h-5 bg-violet-600 rounded flex items-center justify-center">
+                      <span className="text-white text-xs font-bold">{selectedInvoices.size}</span>
+                    </div>
+                    <span className="text-sm font-medium text-violet-900">
+                      {selectedInvoices.size} invoice{selectedInvoices.size === 1 ? '' : 's'} selected
+                    </span>
+                  </div>
+                  <div className="text-xs text-violet-700">
+                    Total value: ${Array.from(selectedInvoices).reduce((sum, id) => {
+                      const allInvoices = [...pendingApprovals, ...onHoldApprovals, ...overdueApprovals, ...approvedToday, ...rejectedApprovals, ...approvedThisMonth]
+                      const invoice = allInvoices.find(inv => inv.id === id)
+                      return sum + (invoice?.totalAmount || 0)
+                    }, 0).toLocaleString()}
+                  </div>
+                </div>
+
+                {/* Assignment Strategy */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-gray-900">Assignment Strategy</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setAssignmentStrategy('direct')}
+                      className={`p-3 rounded-lg border-2 transition-all ${
+                        assignmentStrategy === 'direct' 
+                          ? 'border-violet-600 bg-violet-50 text-violet-900' 
+                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="text-sm font-medium">Direct</div>
+                      <div className="text-xs text-gray-500">Assign to specific user</div>
+                    </button>
+                    <button
+                      onClick={() => setAssignmentStrategy('round-robin')}
+                      className={`p-3 rounded-lg border-2 transition-all ${
+                        assignmentStrategy === 'round-robin' 
+                          ? 'border-violet-600 bg-violet-50 text-violet-900' 
+                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="text-sm font-medium">Round Robin</div>
+                      <div className="text-xs text-gray-500">Distribute evenly</div>
+                    </button>
+                    <button
+                      onClick={() => setAssignmentStrategy('load-balance')}
+                      className={`p-3 rounded-lg border-2 transition-all ${
+                        assignmentStrategy === 'load-balance' 
+                          ? 'border-violet-600 bg-violet-50 text-violet-900' 
+                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="text-sm font-medium">Load Balance</div>
+                      <div className="text-xs text-gray-500">Based on workload</div>
+                    </button>
+                    <button
+                      onClick={() => setAssignmentStrategy('ai-smart')}
+                      className={`p-3 rounded-lg border-2 transition-all ${
+                        assignmentStrategy === 'ai-smart' 
+                          ? 'border-violet-600 bg-violet-50 text-violet-900' 
+                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="text-sm font-medium">AI Smart</div>
+                      <div className="text-xs text-gray-500">Intelligent matching</div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Direct Assignment - User Selection */}
+                {assignmentStrategy === 'direct' && (
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium text-gray-900">Select Assignee</Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Input
+                        type="search"
+                        placeholder="Search team members..."
+                        className="pl-10"
+                        value={bulkAssignmentSearchQuery}
+                        onChange={(e) => setBulkAssignmentSearchQuery(e.target.value)}
+                      />
+                    </div>
+                    <div className="max-h-48 overflow-y-auto space-y-2">
+                      {assigneeOptions.map((assignee) => (
+                        <button
+                          key={assignee.id}
+                          onClick={() => setSelectedAssignee(assignee)}
+                          className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                            selectedAssignee?.id === assignee.id
+                              ? 'border-violet-600 bg-violet-50' 
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${assignee.color}`}>
+                              {assignee.initials}
+                            </div>
+                            <div className="flex-1">
+                              <div className="font-medium text-sm">{assignee.name}</div>
+                              <div className="text-xs text-gray-500">{assignee.role}</div>
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              {assignee.currentWorkload} active
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Preview Section */}
+                {assignmentPreview.length > 0 && (
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium text-gray-900">Assignment Preview</Label>
+                    <div className="max-h-64 overflow-y-auto space-y-2">
+                      {assignmentPreview.map((preview) => (
+                        <div key={preview.invoiceId} className="p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="font-medium text-sm">
+                              Invoice {(() => {
+                                const allInvoices = [...pendingApprovals, ...onHoldApprovals, ...overdueApprovals, ...approvedToday, ...rejectedApprovals, ...approvedThisMonth]
+                                return allInvoices.find(inv => inv.id === preview.invoiceId)?.invoiceNumber
+                              })()}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-medium ${preview.assignedTo.color}`}>
+                                {preview.assignedTo.initials}
+                              </div>
+                              <span className="text-xs text-gray-600">{preview.assignedTo.name}</span>
+                            </div>
+                          </div>
+                          <div className="text-xs text-gray-500">{preview.reason}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Fixed Footer */}
+            <div className="border-t border-gray-200 px-6 py-4 bg-white flex-shrink-0">
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    // Generate preview logic here
+                    setAssignmentPreview([
+                      {
+                        invoiceId: Array.from(selectedInvoices)[0] || 'inv-001',
+                        assignedTo: selectedAssignee || assigneeOptions[0],
+                        reason: 'Selected for direct assignment'
+                      }
+                    ])
+                  }}
+                  className="flex-1"
+                  disabled={selectedInvoices.size === 0}
+                >
+                  Generate Preview
+                </Button>
+                <Button
+                  onClick={() => {
+                    // Execute assignment logic here
+                    toast({
+                      title: "Assignment Successful",
+                      description: `${selectedInvoices.size} invoice${selectedInvoices.size === 1 ? '' : 's'} assigned successfully.`,
+                      className: "bg-green-50 border-green-200 text-green-800",
+                    })
+                    setShowBulkAssignmentDrawer(false)
+                    setSelectedInvoices(new Set())
+                    setAssignmentPreview([])
+                  }}
+                  className="flex-1 bg-violet-600 hover:bg-violet-700"
+                  disabled={selectedInvoices.size === 0 || assignmentPreview.length === 0}
+                >
+                  Assign
+                </Button>
+              </div>
             </div>
           </div>
         </>
