@@ -1103,9 +1103,9 @@ export default function ApprovalsPage() {
   // Main component render  
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar activePage="approvals" />
+      <Sidebar activePage="invoices" />
       <div className="flex-1 flex flex-col min-w-0">
-        <MainHeader activePage="invoices" />
+        <MainHeader activePage="approvals" />
         
         <main className="flex-1 overflow-auto bg-gray-50/50 min-w-0">
           <div className="p-6 min-w-0">
@@ -1436,7 +1436,7 @@ export default function ApprovalsPage() {
               </CardHeader>
               <CardContent className="px-6 pb-6 pt-2 min-w-0">
                 <div className={needsHorizontalScroll ? 'overflow-x-auto' : ''}>
-                  <Table style={needsHorizontalScroll ? { minWidth: '1200px', width: '1200px' } : {}} className={needsHorizontalScroll ? '' : 'w-full'}>
+                  <Table style={needsHorizontalScroll ? { minWidth: '1200px' } : {}} className="w-full">
                   <TableHeader>
                     <TableRow>
                       {supportsBulkOperations() && (

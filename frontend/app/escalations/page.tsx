@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Sidebar from '@/components/sidebar'
 import MainHeader from '@/components/main-header'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -156,6 +156,31 @@ const mockEscalatedInvoices: EscalatedInvoice[] = [
     poNumber: 'PO-2024-032',
     grNumber: null,
     hasGoodsReceipt: false
+  },
+  {
+    id: '4',
+    invoiceNumber: 'INV-2024-067',
+    vendorName: 'Global Logistics Solutions',
+    escalationReason: 'Standard Processing Timeout',
+    escalationAge: '6 days',
+    slaBreach: true,
+    totalAmount: '$12,850.00',
+    invoiceDate: '2024-01-14',
+    assignedTo: {
+      name: 'Lisa Park',
+      initials: 'LP',
+      color: 'bg-purple-500',
+      department: 'Finance'
+    },
+    lastActionTaken: 'Requested additional documentation',
+    nextActionRequired: 'Document Review Required',
+    escalationStatus: 'Pending',
+    priority: 'Medium',
+    escalationDate: '2024-01-20',
+    slaRule: mockSLARules[2],
+    poNumber: 'PO-2024-067',
+    grNumber: 'GR-2024-067',
+    hasGoodsReceipt: true
   }
 ]
 
@@ -214,62 +239,63 @@ export default function EscalationsPage() {
             </div>
           </div>
 
-          {/* Filters */}
-          <Card className="mb-6">
-            <CardContent className="pt-6">
-              <div className="flex flex-col sm:flex-row gap-4 justify-between">
-                <div className="flex gap-4 items-center">
-                  <div className="relative w-full max-w-xl">
-                    <Search className="absolute left-2.5 top-2.5 h-5 w-4 text-muted-foreground" />
+          {/* Escalations Table */}
+          <Card className="overflow-hidden min-w-0">
+            <CardHeader className="pb-2">
+              <div className="flex items-end justify-between">
+                <div className="space-y-0">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                    Escalated Invoices ({filteredInvoices.length})
+                  </CardTitle>
+                </div>
+                <div className="flex gap-2">
+                  <div className="relative w-56">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input 
                       type="search" 
-                      placeholder="Search by invoice number, vendor, or escalation reason..." 
-                      className="w-full pl-8 bg-white"
+                      placeholder="Search escalations..." 
+                      className="w-full pl-8 h-9 text-sm"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                     />
                   </div>
-                </div>
-                <div className="flex gap-2">
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="All Statuses" />
+                    <SelectTrigger className="w-32 h-9 text-sm">
+                      <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="all">All Status</SelectItem>
                       <SelectItem value="Pending">Pending</SelectItem>
                       <SelectItem value="In Progress">In Progress</SelectItem>
                       <SelectItem value="Resolved">Resolved</SelectItem>
                     </SelectContent>
                   </Select>
                   <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="All Priorities" />
+                    <SelectTrigger className="w-32 h-9 text-sm">
+                      <SelectValue placeholder="Priority" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Priorities</SelectItem>
-                      <SelectItem value="High">High Priority</SelectItem>
-                      <SelectItem value="Medium">Medium Priority</SelectItem>
-                      <SelectItem value="Low">Low Priority</SelectItem>
+                      <SelectItem value="all">All Priority</SelectItem>
+                      <SelectItem value="High">High</SelectItem>
+                      <SelectItem value="Medium">Medium</SelectItem>
+                      <SelectItem value="Low">Low</SelectItem>
                     </SelectContent>
                   </Select>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="h-9 px-3 text-sm border-purple-600 text-purple-600 hover:bg-purple-50"
+                  >
+                    <Filter className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Escalations Table */}
-          <Card className="overflow-hidden min-w-0">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-red-600" />
-                Escalated Invoices ({filteredInvoices.length})
-              </CardTitle>
             </CardHeader>
-            <CardContent className="min-w-0">
+            <CardContent className="px-6 pb-6 pt-2 min-w-0">
               <div className={needsHorizontalScroll ? 'overflow-x-auto' : ''}>
                 <div className="border rounded-lg overflow-hidden bg-white">
-                  <Table style={needsHorizontalScroll ? { minWidth: '1400px', width: '1400px' } : {}} className={needsHorizontalScroll ? '' : 'w-full'}>
+                  <Table style={needsHorizontalScroll ? { minWidth: '1400px' } : {}} className="w-full">
                   <TableHeader>
                     <TableRow className="bg-gray-50">
                       <TableHead>Invoice #</TableHead>
@@ -335,7 +361,7 @@ export default function EscalationsPage() {
                           </span>
                         </TableCell>
                         <TableCell className="text-right font-medium py-2">{invoice.totalAmount}</TableCell>
-                        <TableCell className="py-2">{new Date(invoice.invoiceDate).toLocaleDateString()}</TableCell>
+                        <TableCell className="py-2">{new Date(invoice.invoiceDate).toLocaleDateString('en-US')}</TableCell>
                         <TableCell className="py-2">
                           <div className="flex gap-1">
                             {invoice.poNumber ? (
@@ -538,7 +564,7 @@ export default function EscalationsPage() {
                 <div>
                   <h4 className="font-medium text-gray-900 mb-2">Created Date</h4>
                   <p className="text-gray-600">
-                    {new Date(selectedRule.created).toLocaleDateString()}
+                    {new Date(selectedRule.created).toLocaleDateString('en-US')}
                   </p>
                 </div>
                 <div>
