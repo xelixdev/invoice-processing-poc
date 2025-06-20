@@ -3008,7 +3008,10 @@ export default function ApprovalsPage() {
                   <Label className="text-sm font-medium text-gray-900">Assignment Strategy</Label>
                   <div className="grid grid-cols-2 gap-2">
                     <button
-                      onClick={() => setAssignmentStrategy('direct')}
+                      onClick={() => {
+                        setAssignmentStrategy('direct')
+                        setAssignmentPreview([])
+                      }}
                       className={`p-3 rounded-lg border-2 transition-all ${
                         assignmentStrategy === 'direct' 
                           ? 'border-violet-600 bg-violet-50 text-violet-900' 
@@ -3019,7 +3022,10 @@ export default function ApprovalsPage() {
                       <div className="text-xs text-gray-500">Assign to specific user</div>
                     </button>
                     <button
-                      onClick={() => setAssignmentStrategy('round-robin')}
+                      onClick={() => {
+                        setAssignmentStrategy('round-robin')
+                        setAssignmentPreview([])
+                      }}
                       className={`p-3 rounded-lg border-2 transition-all ${
                         assignmentStrategy === 'round-robin' 
                           ? 'border-violet-600 bg-violet-50 text-violet-900' 
@@ -3030,7 +3036,10 @@ export default function ApprovalsPage() {
                       <div className="text-xs text-gray-500">Distribute evenly</div>
                     </button>
                     <button
-                      onClick={() => setAssignmentStrategy('load-balance')}
+                      onClick={() => {
+                        setAssignmentStrategy('load-balance')
+                        setAssignmentPreview([])
+                      }}
                       className={`p-3 rounded-lg border-2 transition-all ${
                         assignmentStrategy === 'load-balance' 
                           ? 'border-violet-600 bg-violet-50 text-violet-900' 
@@ -3041,7 +3050,10 @@ export default function ApprovalsPage() {
                       <div className="text-xs text-gray-500">Based on workload</div>
                     </button>
                     <button
-                      onClick={() => setAssignmentStrategy('ai-smart')}
+                      onClick={() => {
+                        setAssignmentStrategy('ai-smart')
+                        setAssignmentPreview([])
+                      }}
                       className={`p-3 rounded-lg border-2 transition-all ${
                         assignmentStrategy === 'ai-smart' 
                           ? 'border-violet-600 bg-violet-50 text-violet-900' 
