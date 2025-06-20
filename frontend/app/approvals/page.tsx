@@ -2966,18 +2966,16 @@ export default function ApprovalsPage() {
             showBulkAssignmentDrawer ? 'translate-x-0' : 'translate-x-full'
           }`}>
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-violet-600 to-violet-700 text-white flex-shrink-0">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-                  <Forward className="h-4 w-4" />
-                </div>
-                <h2 className="text-lg font-semibold">Bulk Assignment</h2>
+                <Forward className="h-5 w-5 text-violet-600" />
+                <h2 className="text-lg font-semibold text-gray-900">Bulk Assignment</h2>
               </div>
               <Button 
                 variant="ghost" 
                 size="sm"
                 onClick={() => setShowBulkAssignmentDrawer(false)}
-                className="h-8 w-8 p-0 text-white hover:bg-white/10"
+                className="h-8 w-8 p-0"
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -3135,17 +3133,94 @@ export default function ApprovalsPage() {
                 <Button
                   variant="outline"
                   onClick={() => {
-                    // Generate preview logic here
-                    setAssignmentPreview([
-                      {
-                        invoiceId: Array.from(selectedInvoices)[0] || 'inv-001',
-                        assignedTo: selectedAssignee || assigneeOptions[0],
-                        reason: 'Selected for direct assignment'
-                      }
-                    ])
+                    // Generate preview based on strategy
+                    const selectedInvoiceIds = Array.from(selectedInvoices)
+                    const newPreview: Array<{invoiceId: string, assignedTo: typeof assigneeOptions[0], reason: string}> = []
+                    
+                    if (assignmentStrategy === 'direct') {
+                      // Direct assignment - all to selected user
+                      selectedInvoiceIds.forEach(invoiceId => {
+                        newPreview.push({
+                          invoiceId,
+                          assignedTo: selectedAssignee || assigneeOptions[0],
+                          reason: 'Direct assignment to selected team member'
+                        })
+                      })
+                    } else if (assignmentStrategy === 'round-robin') {
+                      // Round Robin - distribute evenly
+                      const availableAssignees = assigneeOptions.filter(a => a.currentWorkload < 10)
+                      selectedInvoiceIds.forEach((invoiceId, index) => {
+                        const assignee = availableAssignees[index % availableAssignees.length]
+                        newPreview.push({
+                          invoiceId,
+                          assignedTo: assignee,
+                          reason: `Round-robin distribution (position ${(index % availableAssignees.length) + 1}/${availableAssignees.length})`
+                        })
+                      })
+                    } else if (assignmentStrategy === 'load-balance') {
+                      // Load Balance - assign to least busy
+                      const sortedByWorkload = [...assigneeOptions].sort((a, b) => a.currentWorkload - b.currentWorkload)
+                      const workloadMap = new Map(sortedByWorkload.map(a => [a.id, a.currentWorkload]))
+                      
+                      selectedInvoiceIds.forEach(invoiceId => {
+                        // Find person with lowest current workload
+                        const lowestWorkload = Math.min(...Array.from(workloadMap.values()))
+                        const assignee = sortedByWorkload.find(a => workloadMap.get(a.id) === lowestWorkload) || sortedByWorkload[0]
+                        
+                        newPreview.push({
+                          invoiceId,
+                          assignedTo: assignee,
+                          reason: `Load-balanced assignment (${workloadMap.get(assignee.id)} current tasks, ${Math.round((workloadMap.get(assignee.id)! / 10) * 100)}% capacity)`
+                        })
+                        
+                        // Update workload for next iteration
+                        workloadMap.set(assignee.id, (workloadMap.get(assignee.id) || 0) + 1)
+                      })
+                    } else if (assignmentStrategy === 'ai-smart') {
+                      // AI Smart - intelligent matching based on various factors
+                      const allInvoices = [...pendingApprovals, ...onHoldApprovals, ...overdueApprovals]
+                      
+                      selectedInvoiceIds.forEach(invoiceId => {
+                        const invoice = allInvoices.find(inv => inv.id === invoiceId)
+                        let assignee: typeof assigneeOptions[0]
+                        let reason: string
+                        
+                        if (invoice) {
+                          // Match based on category/amount
+                          if (invoice.totalAmount > 5000) {
+                            // High value - assign to senior staff
+                            assignee = assigneeOptions.find(a => a.role.includes('Director') || a.role.includes('CFO')) || assigneeOptions[3]
+                            reason = `High-value invoice ($${invoice.totalAmount.toLocaleString()}) - assigned to senior approver`
+                          } else if (invoice.spendCategory === 'Office Supplies') {
+                            // Office supplies - assign to AP specialist
+                            assignee = assigneeOptions.find(a => a.role === 'AP Specialist') || assigneeOptions[1]
+                            reason = `Category expertise match: ${invoice.spendCategory} specialist`
+                          } else if (invoice.supplierName.includes('Tech')) {
+                            // Tech vendor - assign to someone familiar
+                            assignee = assigneeOptions[2]
+                            reason = `Vendor relationship: Previously handled ${invoice.supplierName} invoices`
+                          } else {
+                            // Default intelligent assignment
+                            const workloadScore = assigneeOptions.map(a => ({
+                              assignee: a,
+                              score: (10 - a.currentWorkload) * 0.5 + (a.role.includes('Manager') ? 2 : 0)
+                            })).sort((a, b) => b.score - a.score)
+                            assignee = workloadScore[0].assignee
+                            reason = `AI optimization: Best match based on workload and expertise`
+                          }
+                        } else {
+                          assignee = assigneeOptions[0]
+                          reason = 'AI-powered assignment based on current capacity'
+                        }
+                        
+                        newPreview.push({ invoiceId, assignedTo: assignee, reason })
+                      })
+                    }
+                    
+                    setAssignmentPreview(newPreview)
                   }}
                   className="flex-1"
-                  disabled={selectedInvoices.size === 0}
+                  disabled={selectedInvoices.size === 0 || (assignmentStrategy === 'direct' && !selectedAssignee)}
                 >
                   Generate Preview
                 </Button>
