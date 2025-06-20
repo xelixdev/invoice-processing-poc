@@ -653,7 +653,10 @@ export default function ApprovalsPage() {
       projectCode: 'PROJ-2024-001',
       businessUnit: 'Operations',
       department: 'Admin',
-      approverName: 'John Doe'
+      approverName: 'John Doe',
+      poNumber: 'PO-2024-001',
+      grNumber: 'GR-2024-001',
+      hasGoodsReceipt: true
     },
     {
       id: '2',
@@ -668,7 +671,10 @@ export default function ApprovalsPage() {
       projectCode: 'PROJ-2024-002',
       businessUnit: 'IT',
       department: 'Infrastructure',
-      approverName: 'John Doe'
+      approverName: 'John Doe',
+      poNumber: null,
+      grNumber: null,
+      hasGoodsReceipt: false
     },
     {
       id: '5',
@@ -683,7 +689,10 @@ export default function ApprovalsPage() {
       projectCode: 'CONS-2024-003',
       businessUnit: 'Strategy',
       department: 'Business Development',
-      approverName: 'John Doe'
+      approverName: 'John Doe',
+      poNumber: 'PO-2024-003',
+      grNumber: null,
+      hasGoodsReceipt: false
     },
     {
       id: '6',
@@ -989,7 +998,7 @@ export default function ApprovalsPage() {
 
   // Calculate if we need horizontal scroll based on column count
   const getColumnCount = () => {
-    let baseColumns = 9 // Invoice#, Date, Supplier, Amount, Due, Status, Category, GL, Dept
+    let baseColumns = 10 // Invoice#, Date, Supplier, Amount, Due, PO/GR, Status, Category, GL, Dept
     
     if (activeView === 'delegated') {
       baseColumns += 4 // Delegated To, Date Delegated, Reason, Actions
@@ -1453,6 +1462,7 @@ export default function ApprovalsPage() {
                       <TableHead className="text-right whitespace-nowrap">Total Amount</TableHead>
                       <TableHead className="whitespace-nowrap">Due Date</TableHead>
                       {activeView === 'overdue' && <TableHead className="whitespace-nowrap">Days Overdue</TableHead>}
+                      <TableHead className="whitespace-nowrap">PO/GR</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Spend Category</TableHead>
                       <TableHead className="whitespace-nowrap">GL Code</TableHead>
@@ -1529,6 +1539,25 @@ export default function ApprovalsPage() {
                         <TableCell className="text-right font-medium py-2">${approval.totalAmount.toFixed(2)}</TableCell>
                         <TableCell className="py-2">{approval.dueDate}</TableCell>
                         {activeView === 'overdue' && <TableCell className="py-2"><Badge variant="destructive" className="bg-red-500">{(approval as any).daysPastDue} days</Badge></TableCell>}
+                        <TableCell className="py-2">
+                          <div className="flex gap-1">
+                            {(approval as any).poNumber ? (
+                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                                PO
+                              </Badge>
+                            ) : null}
+                            {(approval as any).hasGoodsReceipt ? (
+                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+                                GR
+                              </Badge>
+                            ) : null}
+                            {!(approval as any).poNumber && !(approval as any).hasGoodsReceipt ? (
+                              <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-300 text-xs">
+                                Non-PO
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </TableCell>
                         <TableCell className="py-2">
                           <Badge 
                             variant="secondary" 
