@@ -2982,8 +2982,8 @@ export default function ApprovalsPage() {
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto">
-              <div className="p-6 space-y-6">
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="p-6 space-y-6 flex-shrink-0">
                 {/* Selected Invoices Summary */}
                 <div className="bg-violet-50 border border-violet-200 rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-2">
@@ -3058,73 +3058,99 @@ export default function ApprovalsPage() {
                 {assignmentStrategy === 'direct' && (
                   <div className="space-y-3">
                     <Label className="text-sm font-medium text-gray-900">Select Assignee</Label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        type="search"
-                        placeholder="Search team members..."
-                        className="pl-10"
-                        value={bulkAssignmentSearchQuery}
-                        onChange={(e) => setBulkAssignmentSearchQuery(e.target.value)}
-                      />
-                    </div>
-                    <div className="max-h-48 overflow-y-auto space-y-2">
-                      {assigneeOptions.map((assignee) => (
-                        <button
-                          key={assignee.id}
-                          onClick={() => setSelectedAssignee(assignee)}
-                          className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
-                            selectedAssignee?.id === assignee.id
-                              ? 'border-violet-600 bg-violet-50' 
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${assignee.color}`}>
-                              {assignee.initials}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="w-full justify-between text-left font-normal">
+                          {selectedAssignee ? (
+                            <div className="flex items-center gap-2">
+                              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-medium ${selectedAssignee.color}`}>
+                                {selectedAssignee.initials}
+                              </div>
+                              <span>{selectedAssignee.name}</span>
+                              <span className="text-gray-500">• {selectedAssignee.role}</span>
                             </div>
-                            <div className="flex-1">
-                              <div className="font-medium text-sm">{assignee.name}</div>
-                              <div className="text-xs text-gray-500">{assignee.role}</div>
-                            </div>
-                            <div className="text-xs text-gray-400">
-                              {assignee.currentWorkload} active
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
+                          ) : (
+                            <span className="text-gray-500">Search and select team member...</span>
+                          )}
+                          <ChevronDown className="h-4 w-4 opacity-50" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-[368px] p-2">
+                        <div className="relative mb-2">
+                          <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <Input
+                            type="search"
+                            placeholder="Search team members..."
+                            className="pl-8 h-8"
+                            value={bulkAssignmentSearchQuery}
+                            onChange={(e) => setBulkAssignmentSearchQuery(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                        <div className="max-h-64 overflow-y-auto">
+                          {assigneeOptions
+                            .filter(assignee => 
+                              assignee.name.toLowerCase().includes(bulkAssignmentSearchQuery.toLowerCase()) ||
+                              assignee.role.toLowerCase().includes(bulkAssignmentSearchQuery.toLowerCase())
+                            )
+                            .map((assignee) => (
+                              <DropdownMenuItem
+                                key={assignee.id}
+                                onClick={() => {
+                                  setSelectedAssignee(assignee)
+                                  setBulkAssignmentSearchQuery('')
+                                }}
+                                className="cursor-pointer p-2"
+                              >
+                                <div className="flex items-center gap-3 w-full">
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${assignee.color}`}>
+                                    {assignee.initials}
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="font-medium text-sm">{assignee.name}</div>
+                                    <div className="text-xs text-gray-500">{assignee.role}</div>
+                                  </div>
+                                  <div className="text-xs text-gray-400">
+                                    {assignee.currentWorkload} active
+                                  </div>
+                                </div>
+                              </DropdownMenuItem>
+                            ))}
+                        </div>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 )}
 
-                {/* Preview Section */}
-                {assignmentPreview.length > 0 && (
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium text-gray-900">Assignment Preview</Label>
-                    <div className="max-h-64 overflow-y-auto space-y-2">
-                      {assignmentPreview.map((preview) => (
-                        <div key={preview.invoiceId} className="p-3 bg-gray-50 rounded-lg">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="font-medium text-sm">
-                              Invoice {(() => {
-                                const allInvoices = [...pendingApprovals, ...onHoldApprovals, ...overdueApprovals, ...approvedToday, ...rejectedApprovals, ...approvedThisMonth]
-                                return allInvoices.find(inv => inv.id === preview.invoiceId)?.invoiceNumber
-                              })()}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-medium ${preview.assignedTo.color}`}>
-                                {preview.assignedTo.initials}
-                              </div>
-                              <span className="text-xs text-gray-600">{preview.assignedTo.name}</span>
-                            </div>
-                          </div>
-                          <div className="text-xs text-gray-500">{preview.reason}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
+              
+              {/* Preview Section - Full Height */}
+              {assignmentPreview.length > 0 && (
+                <div className="flex-1 flex flex-col px-6 pb-6 overflow-hidden">
+                  <Label className="text-sm font-medium text-gray-900 mb-3 flex-shrink-0">Assignment Preview</Label>
+                  <div className="flex-1 overflow-y-auto space-y-2">
+                    {assignmentPreview.map((preview) => (
+                      <div key={preview.invoiceId} className="p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="font-medium text-sm">
+                            Invoice {(() => {
+                              const allInvoices = [...pendingApprovals, ...onHoldApprovals, ...overdueApprovals, ...approvedToday, ...rejectedApprovals, ...approvedThisMonth]
+                              return allInvoices.find(inv => inv.id === preview.invoiceId)?.invoiceNumber
+                            })()}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-medium ${preview.assignedTo.color}`}>
+                              {preview.assignedTo.initials}
+                            </div>
+                            <span className="text-xs text-gray-600">{preview.assignedTo.name}</span>
+                          </div>
+                        </div>
+                        <div className="text-xs text-gray-500">{preview.reason}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Fixed Footer */}
